@@ -1,0 +1,29 @@
+﻿@using System.Globalization
+@using Microsoft.AspNetCore.Localization
+@using Microsoft.AspNetCore.Http.Features
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    var requestCulture = Context.Features.Get<IRequestCultureFeature>();
+    var currentCulture = requestCulture?.RequestCulture.UICulture.Name ?? CultureInfo.CurrentUICulture.Name;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var isArabic = string.Equals(currentCulture, "ar-IQ", StringComparison.OrdinalIgnoreCase);
+}
+
+<div class="d-flex align-items-center gap-2 language-switcher">
+    <span class="small text-muted">@L["Language"]:</span>
+
+    <form asp-controller="Culture" asp-action="SetLanguage" method="post" class="m-0">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="culture" value="ar-IQ" />
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <button type="submit" class="btn btn-sm @(isArabic ? "btn-primary" : "btn-outline-primary")">@L["Arabic"]</button>
+    </form>
+
+    <form asp-controller="Culture" asp-action="SetLanguage" method="post" class="m-0">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="culture" value="en-GB" />
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <button type="submit" class="btn btn-sm @(!isArabic ? "btn-primary" : "btn-outline-primary")">@L["English"]</button>
+    </form>
+</div>
+

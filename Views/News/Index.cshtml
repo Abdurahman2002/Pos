@@ -1,0 +1,142 @@
+﻿@model IEnumerable<News>
+
+@{
+    
+    ViewData["Title"] = ViewContext.RouteData.Values["controller"]?.ToString();
+}
+
+@*رابط الموقع  https://datatables.net/*@
+
+<partial name="Partial/_datatables-css"></partial>
+
+
+ @await Component.InvokeAsync("NewsCount") 
+
+
+<div class="">
+    <div class="row " style="min-height:63vh;">
+        @if (Model.Any())
+        {
+            <P>
+                <a href="@Url.Action("Create", "News")" class="btn btn-primary mt-3">Create News</a>
+                @* <a asp-action="Create" class="btn btn-primary mt-3">Create News</a> *@
+            </P>
+            <table id="table1" class="display table dataTable table-hover table-striped table-bordered w-100">
+                <thead class=" table-primary">
+                    <tr>
+                        <th class="text-center">
+                            N
+                        </th>
+                        <th>
+                            Active
+                        </th>
+                        <th>
+                            Title
+                        </th>
+                        <th>
+                            Posted
+                        </th>
+                        <th>
+                            Modified
+                        </th>
+                        <th>
+                            Section
+                        </th>
+                        <th class="hiddinCol">
+                            Photo
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        int i = 0;
+                        foreach (var item in Model)
+                        {
+                            i++;
+                            <tr class="text-center">
+                                <td class="text-center">
+                                    <span class="ms-3">@i</span>
+                                </td>
+
+                                <td class="text-center">
+                                    <span class="d-inline-block rounded-circle"
+                                          style="width:28px; height:28px; background-color:@(item.State ? "#28a745" : "#ff7b7b"); box-shadow:0 0 5px rgba(0,0,0,0.3);">
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <a asp-action="Edit" asp-route-id="@item.Id">
+                                        @item.Title?.Substring(0, Math.Min(item.Title.Length, 30))...
+                                    </a>
+
+                                    @*
+                                    <a href="@Url.Action("Edit", "News", new { id = item.Id })" >
+                                        @item.Title?.Substring(0, Math.Min(item.Title.Length, 30))...
+                                    </a>
+                                    *@
+
+                                </td>
+                                <td>
+                                    @*  @Html.DisplayFor(modelItem => @item.Created.ToShortDateString()) *@  @* سيعطي Error *@
+                                    @*  @item.Created.ToShortDateString()*@
+                                    @* @Html.DisplayFor(modelItem => @item.Created)*@
+
+                                    <small>@Html.DisplayFor(modelItem => item.Created)</small>
+                                </td>
+                                <td>
+                                    <small>@Html.DisplayFor(modelItem => item.Modified)</small>
+                                </td>
+                                <td>
+                                    @item.Sections.Name
+                                </td>
+
+                                <td class="text-center ">
+                                    @*   @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                    {
+                                        <img src="~/upload/@item.ImageUrl" style="width:100px;height:80px" class="img-thumbnail" />
+                                    }
+                                    else
+                                    {
+                                        <img src="~/img/news.jpg" style="width: 100px; height: 80px " class="img-thumbnail" />
+                                    }*@
+
+
+                                    <img src="~/@(string.IsNullOrEmpty(item.ImageUrl) ? "img/news.jpg" : $"upload/{item.ImageUrl}")"
+                                         class="shadow-sm border rounded-2 "
+                                         style="width:100px; height:80px; transition:0.3s ease;" />
+                                </td>
+
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="card mt-5" style="max-height:200px;">
+                <div class="card-header">
+                    No news in this section
+                </div>
+                <div class="card-body">
+                    <a asp-action="Create" asp-controller="News" asp-route-sectionId="@ViewBag.SectionId" class="btn btn-primary">Create news</a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<partial name="Partial/_datatables-js"></partial>
+
+
+
+
+
+<script>
+    var table = new DataTable('#table1', {
+        language: {
+            // url: '//cdn.datatables.net/plug-ins/2.0.3/i18n/ar.json',
+        },
+        scrollX: true
+    });
+</script>

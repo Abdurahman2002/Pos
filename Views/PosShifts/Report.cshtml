@@ -1,0 +1,108 @@
+@model NewsApp2.ViewModels.Pos.PosShiftReportVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تقرير إغلاق الوردية";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <h2 class="m-0">تقرير إغلاق الوردية</h2>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة</button>
+        <a asp-action="Current" class="btn btn-outline-secondary">رجوع</a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body row g-3">
+        <div class="col-md-4"><strong>رقم الوردية:</strong> @Model.ShiftId</div>
+        <div class="col-md-4"><strong>فتح بواسطة:</strong> @Model.OpenedByUserName</div>
+        <div class="col-md-4"><strong>وقت الفتح:</strong> @Model.OpenedAtLocal.ToString("dd/MM/yyyy HH:mm")</div>
+        <div class="col-md-4"><strong>وقت الإغلاق:</strong> @(Model.ClosedAtLocal.HasValue ? Model.ClosedAtLocal.Value.ToString("dd/MM/yyyy HH:mm") : "-")</div>
+        <div class="col-md-4"><strong>عدد الفواتير:</strong> @Model.InvoiceCount</div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body row g-3">
+        <div class="col-md-4"><strong>رصيد البداية:</strong> @Model.OpeningCashLyd.ToString("0.00") دينار</div>
+        <div class="col-md-4"><strong>إجمالي البيع:</strong> @Model.GrossSalesLyd.ToString("0.00") دينار</div>
+        <div class="col-md-4"><strong>إجمالي المرتجعات:</strong> @Model.ReturnsLyd.ToString("0.00") دينار</div>
+        <div class="col-md-4"><strong>صافي البيع:</strong> @Model.NetSalesLyd.ToString("0.00") دينار</div>
+        <div class="col-md-3"><strong>نقدي:</strong> @Model.CashSalesLyd.ToString("0.00")</div>
+        <div class="col-md-3"><strong>بطاقة:</strong> @Model.CardSalesLyd.ToString("0.00")</div>
+        <div class="col-md-3"><strong>تحويل:</strong> @Model.TransferSalesLyd.ToString("0.00")</div>
+        <div class="col-md-3"><strong>آجل:</strong> @Model.CreditSalesLyd.ToString("0.00")</div>
+        <div class="col-md-4"><strong>النقد المتوقع:</strong> @Model.ExpectedCashLyd.ToString("0.00") دينار</div>
+        <div class="col-md-4"><strong>النقد الفعلي:</strong> @(Model.ActualCashLyd.HasValue ? Model.ActualCashLyd.Value.ToString("0.00") : "-")</div>
+        <div class="col-md-4"><strong>الفرق:</strong> <span class="@(Model.CashDifferenceLyd == 0 ? "text-success" : "text-danger")">@Model.CashDifferenceLyd.ToString("0.00")</span></div>
+        <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي فقط.</small></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header fw-semibold">فواتير الوردية</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>@L["#"]</th>
+                    <th>الفاتورة</th>
+                    <th>التاريخ</th>
+                    <th>العميل</th>
+                    <th>الدفع</th>
+                    <th>النوع</th>
+                    <th class="text-end">الإجمالي</th>
+                    <th>الإنشاء</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Invoices.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">لا توجد فواتير في هذه الوردية.</td>
+                    </tr>
+                }
+                else
+                {
+                    var idx = 1;
+                    foreach (var row in Model.Invoices)
+                    {
+                        <tr>
+                            <td>@idx</td>
+                            <td>@row.Number</td>
+                            <td><span dir="ltr">@row.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                            <td>@row.CustomerName</td>
+                            <td>@row.PaymentMethod</td>
+                            <td>
+                                <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">
+                                    @(row.IsReturn ? "مرتجع" : "بيع")
+                                </span>
+                            </td>
+                            <td class="text-end">@row.TotalLyd.ToString("0.00")</td>
+                            <td><span dir="ltr">@row.CreatedLocal.ToString("dd/MM/yyyy HH:mm")</span></td>
+                        </tr>
+                        idx++;
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+@@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    .card {
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+}
+</style>

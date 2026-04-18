@@ -1,0 +1,141 @@
+﻿@model NewsApp2.Models.Entities.Item
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    var returnUrl = ViewData["ReturnUrl"]?.ToString();
+}
+
+<h2>@L["Create Item"]</h2>
+<hr />
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+            @if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                <div class="alert alert-info">
+                    @L["You are adding a new item from an invoice barcode scan. After save, you will return to the invoice."]
+                </div>
+            }
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Barcode" class="form-label">@L["Barcode"]</label>
+                <div class="input-group">
+                    <input asp-for="Barcode" class="form-control" />
+                    <button type="button" class="btn btn-outline-secondary" id="scan-barcode-btn">@L["Scan Camera"]</button>
+                </div>
+                <span asp-validation-for="Barcode" class="text-danger"></span>
+                <small class="text-muted">@L["Leave empty to auto-generate an internal Code128 barcode. You can assign one primary barcode here, and add more later for the same item."]</small>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="CategoryId" class="form-label">@L["Category"]</label>
+                <select asp-for="CategoryId" asp-items="@(ViewData["Categories"] as SelectList)" class="form-select"></select>
+                <span asp-validation-for="CategoryId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ReorderLevel" class="form-label">@L["Reorder level"]</label>
+                <input asp-for="ReorderLevel" asp-format="{0:0}" class="form-control" type="number" step="1" min="0" inputmode="numeric" />
+                <span asp-validation-for="ReorderLevel" class="text-danger"></span>
+            </div>
+
+            @if (ViewBag.Message != null)
+            {
+                <div class="alert alert-warning">@ViewBag.Message</div>
+            }
+
+            <button type="submit" class="btn btn-primary">@L["Save"]</button>
+            @if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                <a href="@returnUrl" class="btn btn-secondary">@L["Cancel"]</a>
+            }
+            else
+            {
+                <a asp-action="Index" class="btn btn-secondary">@L["Cancel"]</a>
+            }
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="barcode-camera-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@L["Scan barcode"]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-4x3 bg-dark">
+                    <video id="barcode-video" playsinline></video>
+                </div>
+                <div class="small text-muted mt-2">@L["Point the camera at the barcode. Scanning starts automatically."]</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://unpkg.com/@@zxing/library@latest"></script>
+    <script>
+        (function () {
+            const barcodeInput = document.getElementById('Barcode');
+            const scanBtn = document.getElementById('scan-barcode-btn');
+            const cameraModalEl = document.getElementById('barcode-camera-modal');
+            const videoEl = document.getElementById('barcode-video');
+
+            if (!barcodeInput || !scanBtn || !cameraModalEl || !videoEl) return;
+
+            const cameraModal = new bootstrap.Modal(cameraModalEl);
+            let reader = null;
+            let scanning = false;
+            let lastText = '';
+            let lastAt = 0;
+
+            function stopCamera() {
+                if (reader) reader.reset();
+                scanning = false;
+            }
+
+            function startCamera() {
+                if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+                    alert('@L["Camera scanner is not available."]');
+                    return;
+                }
+
+                if (!reader) reader = new ZXing.BrowserMultiFormatReader();
+
+                stopCamera();
+                lastText = '';
+                lastAt = 0;
+                scanning = true;
+                cameraModal.show();
+
+                reader.decodeFromVideoDevice(null, videoEl, function (result) {
+                    if (!scanning || !result || !result.text) return;
+
+                    const now = Date.now();
+                    if (result.text === lastText && now - lastAt < 1200) return;
+
+                    lastText = result.text;
+                    lastAt = now;
+                    barcodeInput.value = result.text.trim();
+                    stopCamera();
+                    cameraModal.hide();
+                });
+            }
+
+            scanBtn.addEventListener('click', startCamera);
+            cameraModalEl.addEventListener('hidden.bs.modal', stopCamera);
+        })();
+    </script>
+}
+

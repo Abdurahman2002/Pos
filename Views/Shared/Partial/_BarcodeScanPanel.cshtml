@@ -1,0 +1,74 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    var mode = ViewData["ScanMode"]?.ToString() ?? "receipt";
+    var warehouseField = ViewData["ScanWarehouseField"]?.ToString() ?? "WarehouseId";
+}
+
+<div class="card mb-3 barcode-scan" data-resolve-url="@Url.Action("Resolve", "BarcodeScan")" data-map-url="@Url.Action("Map", "BarcodeScan")" data-mode="@mode" data-warehouse-field="@warehouseField">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label">@L["Barcode"]</label>
+                <input type="text" class="form-control" id="barcode-input" autocomplete="off" inputmode="latin" />
+            </div>
+            <div class="col-6 col-md-3">
+                <button type="button" class="btn btn-primary w-100" id="barcode-resolve">@L["Add by scan"]</button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button type="button" class="btn btn-outline-secondary w-100" id="barcode-camera">@L["Camera"]</button>
+            </div>
+        </div>
+        <div class="alert alert-warning mt-3 d-none" id="barcode-warning"></div>
+        <div class="small text-muted mt-2">@L["Supports regular barcodes. You can also use a USB barcode reader."]</div>
+    </div>
+</div>
+
+<div class="modal fade" id="barcode-camera-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@L["Scan barcode"]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@L["Close"]"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-4x3 bg-dark">
+                    <video id="barcode-video" playsinline></video>
+                </div>
+                <div class="small text-muted mt-2">@L["Point the camera at the barcode. Scanning starts automatically."]</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="barcode-map-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@L["Map barcode"]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@L["Close"]"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">@L["Barcode"]: <span class="fw-semibold" id="barcode-map-code"></span></div>
+                <div class="mb-3">
+                    <label class="form-label">@L["Item"]</label>
+                    <select id="barcode-map-item" class="form-select" data-placeholder="@L["Select item..."]">
+                        <option value=""></option>
+                        @if (ViewData["Items"] is SelectList items)
+                        {
+                            foreach (var item in items)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="alert alert-danger d-none" id="barcode-map-error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@L["Cancel"]</button>
+                <button type="button" class="btn btn-primary" id="barcode-map-save">@L["Save mapping"]</button>
+            </div>
+        </div>
+    </div>
+</div>
+

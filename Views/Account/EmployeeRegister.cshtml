@@ -1,0 +1,139 @@
+﻿@model EmployeeRegisterVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["Employee Register"];
+}
+
+<style>
+    .section-title {
+        font-weight: 600;
+        color: #495057;
+        margin-top: 30px;
+        margin-bottom: 15px;
+        border-left: 4px solid #0d6efd;
+        padding-left: 10px;
+    }
+
+    .input-icon {
+        position: relative;
+    }
+
+        .input-icon i {
+            position: absolute;
+            top: 50%;
+            left: 12px;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .input-icon input,
+        .input-icon textarea {
+            padding-left: 38px;
+        }
+</style>
+
+<div class="container pt-4" style="min-height:75vh">
+
+    <h3 class="fw-bold mb-4 text-center">
+        <i class="bi bi-person-plus-fill text-primary me-1"></i>
+        @L["Employee Register"]
+    </h3>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4 p-lg-5">
+
+                    <form asp-action="EmployeeRegister">
+                        <div asp-validation-summary="All" class="text-danger mb-4"></div>
+
+                        <!-- User Information -->
+                        <div class="section-title">
+                            <i class="bi bi-shield-lock-fill me-1"></i>
+                            @L["User Information"]
+                            <span class="badge bg-primary ms-2">@L["Account"]</span>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Email" class="form-label fw-semibold"></label>
+                                <div class="input-icon">
+                                    <i class="bi bi-envelope"></i>
+                                    <input asp-for="Email" class="form-control" />
+                                </div>
+                                <span asp-validation-for="Email" class="text-danger"></span>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Password" class="form-label fw-semibold"></label>
+                                <div class="input-icon">
+                                    <i class="bi bi-lock"></i>
+                                    <input asp-for="Password" class="form-control" />
+                                </div>
+                                <span asp-validation-for="Password" class="text-danger"></span>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="ConfirmPassword" class="form-label fw-semibold"></label>
+                                <div class="input-icon">
+                                    <i class="bi bi-lock-fill"></i>
+                                    <input asp-for="ConfirmPassword" class="form-control" />
+                                </div>
+                                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <!-- Employee Information -->
+                        <div class="section-title">
+                            <i class="bi bi-briefcase-fill me-1"></i>
+                            @L["Employee Information"]
+                            <span class="badge bg-secondary ms-2">@L["Profile"]</span>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Employee.Name" class="form-label fw-semibold"></label>
+                                <div class="input-icon">
+                                    <i class="bi bi-person"></i>
+                                    <input asp-for="Employee.Name" class="form-control" />
+                                </div>
+                                <span asp-validation-for="Employee.Name" class="text-danger"></span>
+                            </div>
+
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="mt-4 pt-3 border-top">
+                            <div class="row justify-content-center">
+                                <div class="col-md-6">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        @L["Register"]
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <a asp-action="Login" class="text-decoration-none">
+                            <i class="bi bi-box-arrow-in-right me-1"></i>
+                            @L["Already have an account?"] <b>@L["Login"]</b>
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+

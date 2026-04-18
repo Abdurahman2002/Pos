@@ -1,0 +1,150 @@
+@model NewsApp2.ViewModels.Expenses.ExpenseEntryIndexVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "المصروفات والمرتبات";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2 class="mb-0">@ViewData["Title"]</h2>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-info" asp-action="EmployeeSummary"><i class="bi bi-people me-1"></i> تقرير حركة الموظفين</a>
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-circle me-1"></i> إضافة حركة</a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">من</label>
+                <input type="date" class="form-control" name="from" value="@(Model.From?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">إلى</label>
+                <input type="date" class="form-control" name="to" value="@(Model.To?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">النوع</label>
+                <select name="expenseKind" class="form-select" asp-items="ViewBag.ExpenseKinds">
+                    <option value="">الكل</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">الموظف</label>
+                <select name="employeeId" class="form-select" asp-items="ViewBag.Employees">
+                    <option value="">الكل</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">بحث</label>
+                <input type="text" class="form-control" name="search" value="@Model.Search" placeholder="تصنيف/مرجع/ملاحظة" />
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-outline-primary" type="submit">تصفية</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-bottom border-4 border-secondary">
+            <div class="card-body text-center">
+                <div class="text-muted small">مصروفات عامة</div>
+                <div class="fw-bold fs-5">@Model.GeneralExpensesTotal.ToString("N2") د.ل</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-bottom border-4 border-primary">
+            <div class="card-body text-center">
+                <div class="text-muted small">مرتبات</div>
+                <div class="fw-bold fs-5">@Model.SalariesTotal.ToString("N2") د.ل</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-bottom border-4 border-warning">
+            <div class="card-body text-center">
+                <div class="text-muted small">سلف موظفين</div>
+                <div class="fw-bold fs-5">@Model.AdvancesTotal.ToString("N2") د.ل</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-bottom border-4 border-danger">
+            <div class="card-body text-center">
+                <div class="text-muted small">الإجمالي</div>
+                <div class="fw-bold fs-5">@Model.OverallTotal.ToString("N2") د.ل</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-light border d-flex justify-content-between align-items-center mb-3">
+    <span class="text-muted">إجمالي التسويات الداخلية للسلف (غير محسوبة كمصروف تشغيلي)</span>
+    <span class="fw-bold">@Model.SettlementsTotal.ToString("N2") د.ل</span>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>التصنيف</th>
+                <th>الموظف</th>
+                <th>طريقة الدفع</th>
+                <th class="text-end">المبلغ</th>
+                <th>المرجع</th>
+                <th>ملاحظة</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Rows.Any())
+        {
+            <tr>
+                <td colspan="9" class="text-center text-muted py-4">لا توجد بيانات في الفترة المحددة.</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td>@row.ExpenseDate.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        @if (row.ExpenseKind == "Salary")
+                        {
+                            <span class="badge bg-primary">مرتب</span>
+                        }
+                        else if (row.ExpenseKind == "Advance")
+                        {
+                            <span class="badge bg-warning text-dark">سلفة</span>
+                        }
+                        else if (row.ExpenseKind == "AdvanceSettlement")
+                        {
+                            <span class="badge bg-info text-dark">تسوية سلفة</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">مصروف</span>
+                        }
+                    </td>
+                    <td>@row.Category</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.EmployeeName) ? "-" : row.EmployeeName)</td>
+                    <td>@row.PaymentMethod</td>
+                    <td class="text-end fw-bold">@row.Amount.ToString("N2")</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.ReferenceNo) ? "-" : row.ReferenceNo)</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.Note) ? "-" : row.Note)</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-warning" asp-action="Edit" asp-route-id="@row.Id">تعديل</a>
+                        <a class="btn btn-sm btn-danger" asp-action="Delete" asp-route-id="@row.Id">حذف</a>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>

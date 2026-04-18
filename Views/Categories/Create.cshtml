@@ -1,0 +1,30 @@
+@model NewsApp2.Models.Entities.Category
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+<h2>@L["Create Category"]</h2>
+<hr />
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            @if (ViewBag.Message != null)
+            {
+                <div class="alert alert-warning">@ViewBag.Message</div>
+            }
+
+            <button type="submit" class="btn btn-primary">@L["Save"]</button>
+            <a asp-action="Index" class="btn btn-secondary">@L["Cancel"]</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts{
+    <partial name="_ValidationScriptsPartial" />
+}

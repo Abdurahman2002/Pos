@@ -1,0 +1,47 @@
+﻿
+
+@inject SignInManager<ApplicationUser> _signInManager
+@inject UserManager<ApplicationUser> _userManager
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+
+@if (_signInManager.IsSignedIn(User))
+{
+    <ul class="navbar-nav ml-5">
+        <li class="nav-item dropdown ">
+            <a class="nav-link dropdown-toggle me-5 fs-6" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <!--------------------------------------------------------------------------------->
+                <img src="~/img/User.png" alt="no img" style="width:43px;height:43px" class="rounded-circle img-responsive" />
+                @User.Identity.Name
+                <!--------------------------------------------------------------------------------->
+            </a>
+            <ul class="dropdown-menu bg-white px-3">
+                <li><h5 class="dropdown-header text-uppercase  pl-2 mt-2">@L["Account"]</h5></li>
+                @if (User.IsInRole("Prog") 
+                      || User.IsInRole("Admin") 
+                          || User.IsInRole("Employee"))
+                {
+                    <li>
+                        <a class="dropdown-item fs-6" asp-action="Index" asp-controller="Admin">
+                            @L["Dashboard"]<i class="bi bi-gear" style="float:right"></i>
+                        </a>
+                    </li>
+                }
+                <li><hr class="dropdown-divider text-opacity-50"></li>
+                <li><a class="dropdown-item fs-6" asp-action="ChangePassword" asp-controller="Account">@L["ChangePassword"]</a></li>
+                <li><h5 class="dropdown-header text-uppercase  pl-2 mt-2">@L["SignedIn"]</h5></li>
+                <li><a class="dropdown-item fs-6" asp-action="Logout" asp-controller="Account">@L["LogOut"]<i class="bi bi-box-arrow-right" style="float:right"></i></a></li>
+            </ul>
+        </li>
+    </ul>
+}
+else
+{
+    <ul class="navbar-nav me-5">
+        <li><a class="nav-link" asp-action="EmployeeRegister" asp-controller="Account">@L["Employee Register"]</a></li>
+        <li><a class="nav-link" asp-action="Login" asp-controller="Account">@L["Login"]</a></li>
+    </ul>
+}
+
+
+

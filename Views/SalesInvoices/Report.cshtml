@@ -1,0 +1,77 @@
+﻿@model NewsApp2.ViewModels.Sales.SalesReportVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تقرير المبيعات";
+}
+
+<h1>تقرير المبيعات</h1>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-3">
+        <label class="form-label">@L["From"]</label>
+        <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">@L["To"]</label>
+        <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">العميل</label>
+        <select name="customerId" asp-items="@(ViewData["Customers"] as SelectList)" class="form-select">
+            <option value="">@L["All customers"]</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">طريقة الدفع</label>
+        <select name="paymentMethod" asp-items="@(ViewData["PaymentMethods"] as SelectList)" class="form-select"></select>
+    </div>
+    <div class="col-md-12">
+        <button type="submit" class="btn btn-primary">تصفية</button>
+        <a asp-action="Report" class="btn btn-secondary">إعادة تعيين</a>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي البيع</div><div class="fw-bold">@Model.SumDinar.ToString("0.00")</div></div></div></div>
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">مرتجعات</div><div class="fw-bold text-danger">@Model.ReturnsLyd.ToString("0.00")</div></div></div></div>
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">الصافي</div><div class="fw-bold text-success">@Model.NetSalesLyd.ToString("0.00")</div></div></div></div>
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">نقدي</div><div class="fw-bold">@Model.CashSalesLyd.ToString("0.00")</div></div></div></div>
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">بطاقة/تحويل</div><div class="fw-bold">@((Model.CardSalesLyd + Model.TransferSalesLyd).ToString("0.00"))</div></div></div></div>
+    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">آجل</div><div class="fw-bold">@Model.CreditSalesLyd.ToString("0.00")</div></div></div></div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>@L["Number"]</th>
+                <th>@L["Date"]</th>
+                <th>العميل</th>
+                <th>الحالة</th>
+                <th>طريقة الدفع</th>
+                <th>النوع</th>
+                <th>الإجمالي</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;
+            <tr>
+                <td>@row.Number</td>
+                <td><span dir="ltr">@row.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                <td>@row.CustomerName</td>
+                <td>@localizedStatus</td>
+                <td>@row.PaymentMethod</td>
+                <td>
+                    <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">
+                        @(row.IsReturn ? "مرتجع" : "بيع")
+                    </span>
+                </td>
+                <td class="@(row.IsReturn ? "text-danger" : "")">@row.TotalDinar.ToString("0.00")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+

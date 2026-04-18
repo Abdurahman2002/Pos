@@ -1,0 +1,146 @@
+﻿
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <title>{SiteName}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: #f7f8f9;
+            color: #2f3b42;
+            margin: 0;
+            padding: 40px 0;
+        }
+
+        .email-container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            border: 1px solid #e1e8ed;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4bb5e6, #2f3b42);
+            text-align: center;
+            padding: 35px 15px;
+            color: #fff;
+            border-bottom: 3px solid #4bb5e6;
+        }
+
+            .header h1 {
+                font-size: 26px;
+                margin: 0;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+
+        .content {
+            padding: 40px 30px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+            .content h2 {
+                color: #2f3b42;
+                font-size: 22px;
+                margin-bottom: 8px;
+            }
+
+            .content h3 {
+                color: #6b767c;
+                font-size: 15px;
+                margin-bottom: 25px;
+            }
+
+            .content p {
+                color: #333;
+                background: #f9fafb;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 20px;
+                text-align: justify;
+                line-height: 1.9;
+            }
+
+            .content a {
+                display: inline-block;
+                margin-top: 20px;
+                padding: 12px 25px;
+                background: #4bb5e6;
+                color: #fff;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+                transition: background 0.3s;
+            }
+
+                .content a:hover {
+                    background: #2f3b42;
+                }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #cfd4d7, transparent);
+            margin: 0 40px 10px 40px;
+        }
+
+        .footer {
+            background: linear-gradient(1deg, rgba(237, 235, 237, 1), rgba(45, 151, 200, 0.2));
+            padding: 25px 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #3e4a50;
+            border-top: 1px solid rgba(75, 181, 230, 0.3);
+        }
+
+            .footer a {
+                color: #2f3b42;
+                text-decoration: none;
+                font-weight: 600;
+            }
+
+            .footer span {
+                display: inline-block;
+                margin: 0 6px;
+                color: #4bb5e6;
+                font-weight: 500;
+            }
+
+        @media (max-width: 600px) {
+            .content {
+                padding: 25px 15px;
+            }
+
+            .divider {
+                margin: 0 20px 10px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>{SiteName}</h1>
+        </div>
+
+        <div class="content">
+            <h2>{Subject}</h2>
+            <h3>welcome: {UserName}</h3>
+            <p>Please Click the link below to verify your email address</p>
+            <a href="{confirmationLink}">Verify Email Address</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="footer">
+            <a href="{domain}">{domain}</a><br />
+            <span>{Mail}</span> | <span>{Phone}</span>
+        </div>
+    </div>
+</body>
+</html>

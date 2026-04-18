@@ -1,0 +1,32 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = L["NotFound"];
+    Layout = "_Layout";
+}
+
+<div class="container text-center pt-5 mt-5">
+    <div class="alert alert-danger shadow">
+
+        @if (ViewBag.Message != null)
+        {
+            <h4>@ViewBag.Message</h4>
+            <hr />
+        }
+        else
+        {
+            <h4>@L["The Resource you requested could not be found"]</h4>
+            <hr />
+        }
+
+        @if (ViewBag.Path != null)
+        {
+            <h6>@ViewBag.Path</h6>
+            <hr />
+        }
+
+        <a asp-action="Index" asp-controller="Home" class="btn btn-light ">
+            @L["Return To Home"]
+        </a>
+    </div>
+</div>
+

@@ -1,0 +1,45 @@
+﻿
+@model List<Section>
+
+<style>
+
+    .btn-white:hover {
+        background-color: #EEF3F3;
+        color: #64A19D;
+    }
+
+</style>
+
+    <h4>
+        <b>@ViewContext.RouteData.Values["controller"]?.ToString()</b>
+        - @ViewBag.Section
+    </h4>
+    <div style="overflow-x: auto;">
+        <div class="btn-group  p-0 w-100" role="group">
+
+            <a  asp-action="Index" class="btn btn-white">
+                All news
+                <span class="badge text-bg-light text-secondary fs-6 border-0" style="margin-left:10px;padding:10px;">
+                    @ViewBag.AllNewsCount
+                </span>
+            </a>
+
+            @{
+                if (Model.Count != 0)
+                {
+                    foreach (var _section in Model)
+                    {
+                        <a asp-action="DisplaySectionNews" asp-route-SectionId="@_section.Id" class="btn btn-white">
+                            @_section.Name
+
+                            <span class="badge text-bg-light text-secondary fs-6" style="margin-left:10px;padding:10px;">
+                                @_section.SectionNewsCount
+                            </span>
+                        </a>
+                    }
+                }
+            }
+        </div>
+    </div>
+
+

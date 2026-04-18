@@ -1,0 +1,94 @@
+@model NewsApp2.ViewModels.Pos.CashierPerformanceVM
+@{
+    ViewData["Title"] = "تقرير أداء الكاشير";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">تقرير أداء الكاشير</h2>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة</button>
+        <a asp-action="Current" class="btn btn-outline-secondary">الورديات</a>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3 no-print">
+    <div class="col-md-3">
+        <label class="form-label">من</label>
+        <input name="from" type="text" value="@Model.From.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">إلى</label>
+        <input name="to" type="text" value="@Model.To.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">الموظف / الكاشير</label>
+        <select name="userId" asp-items="@(ViewData["CashierUsers"] as List<SelectListItem>)" class="form-select">
+            <option value="">الكل</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">نسبة العمولة %</label>
+        <input name="commissionPercent" type="number" class="form-control" min="0" max="100" step="0.01" value="@Model.CommissionPercent.ToString("0.##")" />
+    </div>
+    <div class="col-md-1 d-grid align-self-end">
+        <button type="submit" class="btn btn-success">عرض</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي الورديات</div><div class="fw-bold">@Model.TotalShiftCount</div></div></div></div>
+    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">الفواتير المباعة</div><div class="fw-bold">@Model.TotalSoldInvoiceCount</div></div></div></div>
+    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">صافي البيع</div><div class="fw-bold">@Model.TotalNetSalesLyd.ToString("0.00") دينار</div></div></div></div>
+    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي العمولة</div><div class="fw-bold text-success">@Model.TotalCommissionLyd.ToString("0.00") دينار</div></div></div></div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>الموظف</th>
+                <th class="text-center">ورديات</th>
+                <th class="text-center">بيع</th>
+                <th class="text-center">مرتجع</th>
+                <th class="text-end">نقدي</th>
+                <th class="text-end">بطاقة</th>
+                <th class="text-end">تحويل</th>
+                <th class="text-end">آجل</th>
+                <th class="text-end">صافي البيع</th>
+                <th class="text-end">العمولة</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Rows.Any())
+        {
+            <tr>
+                <td colspan="10" class="text-center text-muted">لا توجد بيانات للفترة المحددة.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td>@row.UserName</td>
+                    <td class="text-center">@row.ShiftCount</td>
+                    <td class="text-center">@row.SoldInvoiceCount</td>
+                    <td class="text-center">@row.ReturnInvoiceCount</td>
+                    <td class="text-end">@row.CashSalesLyd.ToString("0.00")</td>
+                    <td class="text-end">@row.CardSalesLyd.ToString("0.00")</td>
+                    <td class="text-end">@row.TransferSalesLyd.ToString("0.00")</td>
+                    <td class="text-end">@row.CreditSalesLyd.ToString("0.00")</td>
+                    <td class="text-end fw-semibold">@row.NetSalesLyd.ToString("0.00")</td>
+                    <td class="text-end text-success fw-semibold">@row.CommissionAmountLyd.ToString("0.00")</td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>
+
+<style>
+@@media print {
+    .no-print { display: none !important; }
+}
+</style>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, ...</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, ...</value>
+  </resheader>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Arabic" xml:space="preserve"><value>Arabic</value></data>
+  <data name="English" xml:space="preserve"><value>English</value></data>
+  <data name="Account" xml:space="preserve"><value>Account</value></data>
+  <data name="ChangePassword" xml:space="preserve"><value>Change Password</value></data>
+  <data name="SignedIn" xml:space="preserve"><value>Signed in</value></data>
+  <data name="LogOut" xml:space="preserve"><value>Log Out</value></data>
+  <data name="Inventory" xml:space="preserve"><value>Inventory</value></data>
+  <data name="InventoryDashboard" xml:space="preserve"><value>Inventory Dashboard</value></data>
+  <data name="EmailSend" xml:space="preserve"><value>Email Send</value></data>
+  <data name="Categories" xml:space="preserve"><value>Categories</value></data>
+  <data name="Items" xml:space="preserve"><value>Items</value></data>
+  <data name="StockOverview" xml:space="preserve"><value>Stock Overview</value></data>
+  <data name="StockMovement" xml:space="preserve"><value>Stock Movement</value></data>
+  <data name="FinancialReport" xml:space="preserve"><value>Financial Report</value></data>
+  <data name="Purchases" xml:space="preserve"><value>Purchases</value></data>
+  <data name="Sales" xml:space="preserve"><value>Sales</value></data>
+  <data name="Customers" xml:space="preserve"><value>Customers</value></data>
+  <data name="Users" xml:space="preserve"><value>Users</value></data>
+  <data name="Employees" xml:space="preserve"><value>Employees</value></data>
+  <data name="Roles" xml:space="preserve"><value>Roles</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="SiteState" xml:space="preserve"><value>Site State</value></data>
+  <data name="SiteInfoContact" xml:space="preserve"><value>Site Info and Contact</value></data>
+  <data name="EmailSettings" xml:space="preserve"><value>Email Settings</value></data>
+  <data name="AuditLogs" xml:space="preserve"><value>Audit Logs</value></data>
+  <data name="Menu" xml:space="preserve"><value>Menu</value></data>
+  <data name="Contact" xml:space="preserve"><value>Contact</value></data>
+  <data name="About" xml:space="preserve"><value>About</value></data>
+  <data name="GetStarted" xml:space="preserve"><value>Get Started</value></data>
+  <data name="ContactUs" xml:space="preserve"><value>Contact Us</value></data>
+  <data name="FullName" xml:space="preserve"><value>Full Name</value></data>
+  <data name="Email" xml:space="preserve"><value>Email</value></data>
+  <data name="Message" xml:space="preserve"><value>Message</value></data>
+  <data name="Send" xml:space="preserve"><value>Send</value></data>
+  <data name="Copyright" xml:space="preserve"><value>Copyright</value></data>
+</root>

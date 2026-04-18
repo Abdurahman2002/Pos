@@ -1,0 +1,6 @@
+@model DateOnly?
+@using System.Globalization
+@if (Model.HasValue)
+{
+    @Model.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+}

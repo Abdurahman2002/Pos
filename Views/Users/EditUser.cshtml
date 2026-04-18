@@ -1,0 +1,247 @@
+﻿@model EditUserVM
+
+@{
+    ViewBag.Title = "Edit User";
+}
+
+<style>
+    .page-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #0d6efd;
+        margin-bottom: 10px;
+    }
+
+    .section-card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 25px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+        transition: .2s;
+    }
+
+        .section-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+        }
+
+    .info-box {
+        border-radius: 14px !important;
+        padding: 15px 18px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    }
+
+    .profile-btn {
+        font-size: 16px;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+
+    .form-control {
+        border-radius: 10px !important;
+    }
+
+    .btn {
+        border-radius: 12px !important;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container py-3">
+
+    <h4 class="page-title">
+        <i class="bi bi-person-gear me-2"></i> Edit User
+    </h4>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+        <div class="row">
+            <!-- LEFT SIDE -->
+            <div class="col-lg-6">
+
+                <div class="section-card">
+
+                    <div class="form-group mb-3">
+                        <label asp-for="Email" class="form-label fw-semibold"></label>
+                        <input asp-for="Email" class="form-control" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        @if (DateTime.Now < Model.LockoutEnd)
+                        {
+                            <div class="alert alert-danger info-box" role="alert">
+                                <b>@Html.DisplayNameFor(model => model.LockoutEnd):</b>
+                                @Html.DisplayFor(model => model.LockoutEndTimeLocalTime)
+
+                                <input type="submit" asp-action="LockoutUser" asp-route-id="@Model.Id"
+                                       value="Unlock the user"
+                                       class="btn btn-success w-100 mt-3" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-success info-box" role="alert">
+                                <b>@Html.DisplayNameFor(model => model.LockoutEnd):</b>
+                                @Html.DisplayFor(model => model.LockoutEndTimeLocalTime)
+
+                                <input type="submit" asp-action="LockoutUser" asp-route-id="@Model.Id"
+                                       value="User Lock"
+                                       class="btn btn-warning w-100 mt-3" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="form-group mb-3">
+                        @if (!Model.EmailConfirmed)
+                        {
+                            <div class="alert alert-danger info-box" role="alert">
+                                <b>@Html.DisplayNameFor(model => model.EmailConfirmed):</b>
+                                Not confirmed
+
+                                <div class="row mt-3">
+                                    <div class="col-lg-6">
+                                        <input type="submit" asp-action="UserEmailConfirmed"
+                                               asp-route-id="@Model.Id"
+                                               name="EmailConfirmed"
+                                               value="Email Confirmed"
+                                               class="btn btn-success w-100" />
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <input type="submit" asp-action="UserEmailConfirmed"
+                                               asp-route-id="@Model.Id"
+                                               name="EmailConfirmed"
+                                               value="Send confirmation link"
+                                               class="btn btn-success w-100 mt-3 mt-lg-0" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-success info-box" role="alert">
+                                <b>@Html.DisplayNameFor(model => model.EmailConfirmed):</b>
+                                Confirmed
+
+                                <div class="row mt-3">
+                                    <div class="col-lg-6">
+                                        <input disabled type="submit" class="btn btn-success w-100"
+                                               value="Email Confirmed" />
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <input disabled type="submit" class="btn btn-success w-100 mt-3 mt-lg-0"
+                                               value="Send confirmation link" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="alert alert-info info-box mb-4" role="alert">
+                        <p><b>@Html.DisplayNameFor(m => m.CreatedDate):</b> @Html.DisplayFor(m => m.CreatedDateLocalTime)</p>
+                        <p><b>@Html.DisplayNameFor(m => m.ModifiedDate):</b> @Html.DisplayFor(m => m.ModifiedDateLocalTime)</p>
+                        <p><b>@Html.DisplayNameFor(m => m.LastAccessTime):</b> @Html.DisplayFor(m => m.LastAccessTimeLocalTime)</p>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="row">
+                        <div class="col-lg-4">
+                            <input type="submit" asp-action="EditUser"
+                                   value="Update" class="btn btn-primary w-100" />
+                        </div>
+                        <div class="col-lg-4">
+                            <button type="button" class="btn btn-danger w-100 mt-3 mt-lg-0"
+                                    data-bs-toggle="modal" data-bs-target="#DeleteModal">
+                                Delete <i class="fa fa-trash-alt text-white"></i>
+                            </button>
+                        </div>
+                        <div class="col-lg-4">
+                            <a asp-action="Index"
+                               class="btn btn-outline-primary w-100 mt-3 mt-lg-0">
+                                Users list
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- RIGHT SIDE -->
+            <div class="col-lg-5 offset-lg-1">
+                <div class="accordion accordion-flush" id="accordionPanelsStayOpenExample">
+
+                    <!-- Roles -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="panelsStayOpen-headingOne">
+                            <button class="accordion-button fw-bold" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#panelsStayOpen-collapseOne"
+                                    aria-expanded="true"
+                                    aria-controls="panelsStayOpen-collapseOne">
+                                User Roles
+                            </button>
+                        </h2>
+                        <div id="panelsStayOpen-collapseOne"
+                             class="accordion-collapse collapse show">
+                            <div class="accordion-body">
+                                @await Component.InvokeAsync("UserRoles", new { userId = Model.Id })
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Claims -->
+                    <div class="accordion-item mt-3">
+                        <h2 class="accordion-header" id="panelsStayOpen-headingTwo">
+                            <button class="accordion-button fw-bold" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#panelsStayOpen-collapseTwo"
+                                    aria-expanded="true"
+                                    aria-controls="panelsStayOpen-collapseTwo">
+                                User Claims
+                            </button>
+                        </h2>
+
+                        <div id="panelsStayOpen-collapseTwo"
+                             class="accordion-collapse collapse show">
+                            <div class="accordion-body">
+                                @await Component.InvokeAsync("UserClaims", new { userId = Model.Id })
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+
+<!-- Delete Modal -->
+<form method="post">
+    <div class="modal fade" id="DeleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete this?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">Close</button>
+                    <input type="submit" asp-action="DeleteUser" asp-route-id="@Model.Id"
+                           value="Delete User" class="btn btn-danger" />
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

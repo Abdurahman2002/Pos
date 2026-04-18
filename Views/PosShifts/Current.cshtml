@@ -1,0 +1,86 @@
+@model NewsApp2.ViewModels.Pos.PosShiftCurrentVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "نظام الورديات";
+    var returnUrl = ViewBag.ReturnUrl as string;
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="m-0">@L["نظام الورديات"]</h2>
+    <div class="d-flex gap-2">
+        @if (ViewBag.LatestClosedShiftId is Guid latestClosedShiftId)
+        {
+            <a asp-action="Report" asp-route-id="@latestClosedShiftId" class="btn btn-outline-secondary">تقرير آخر وردية</a>
+        }
+        <a asp-controller="SalesInvoices" asp-action="Create" class="btn btn-outline-primary">العودة لنقطة البيع</a>
+    </div>
+</div>
+
+@if (Model.ActiveShift == null)
+{
+    <div class="card border-success-subtle">
+        <div class="card-body">
+            <h5 class="mb-3">فتح وردية جديدة</h5>
+            <form asp-action="Open" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <div class="col-md-4">
+                    <label asp-for="OpeningCashLyd" class="form-label">رصيد بداية الوردية (دينار)</label>
+                    <input asp-for="OpeningCashLyd" class="form-control" type="number" step="0.01" min="0" />
+                    <span asp-validation-for="OpeningCashLyd" class="text-danger"></span>
+                    <small class="text-muted d-block mt-1">يمكن تركها 0 إذا لا يوجد رصيد افتتاحي.</small>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">فتح الوردية</button>
+                    <button type="submit" formaction="@Url.Action("OpenQuick", "PosShifts")" class="btn btn-outline-success ms-2">فتح سريع (0 دينار)</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card mb-3 border-primary-subtle">
+        <div class="card-body row g-3">
+            <div class="col-md-3"><strong>فتح بواسطة:</strong> @Model.ActiveShift.OpenedByUserName</div>
+            <div class="col-md-3"><strong>وقت الفتح:</strong> @Model.ActiveShift.OpenedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="col-md-3"><strong>رصيد البداية:</strong> @Model.ActiveShift.OpeningCashLyd.ToString("0.00") دينار</div>
+            <div class="col-md-3"><strong>الحالة:</strong> <span class="badge bg-success">مفتوحة</span></div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body row g-3">
+            <div class="col-md-6"><strong>عدد الفواتير:</strong> @Model.SalesCount</div>
+            <div class="col-md-6"><strong>إجمالي المبيعات:</strong> @Model.SalesTotalLyd.ToString("0.00") دينار</div>
+            <div class="col-md-3"><strong>مبيعات نقدي:</strong> @Model.CashSalesLyd.ToString("0.00")</div>
+            <div class="col-md-3"><strong>مبيعات بطاقة:</strong> @Model.CardSalesLyd.ToString("0.00")</div>
+            <div class="col-md-3"><strong>مبيعات تحويل:</strong> @Model.TransferSalesLyd.ToString("0.00")</div>
+            <div class="col-md-3"><strong>مبيعات آجلة:</strong> @Model.CreditSalesLyd.ToString("0.00")</div>
+            <div class="col-md-6"><strong>النقد المتوقع:</strong> @Model.ExpectedCashLyd.ToString("0.00") دينار</div>
+            <div class="col-md-6"><strong>فرق النقد:</strong> <span class="@(Model.CashDifferenceLyd == 0 ? "text-success" : "text-danger")">@Model.CashDifferenceLyd.ToString("0.00")</span></div>
+            <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي فقط.</small></div>
+        </div>
+    </div>
+
+    <div class="card border-danger-subtle">
+        <div class="card-body">
+            <h5 class="mb-3">إغلاق الوردية</h5>
+            <form asp-action="Close" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div class="col-md-4">
+                    <label asp-for="ClosingCashLyd" class="form-label">النقد عند الإغلاق (دينار)</label>
+                    <input asp-for="ClosingCashLyd" class="form-control" type="number" step="0.01" min="0" />
+                    <span asp-validation-for="ClosingCashLyd" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('هل تريد إغلاق الوردية الحالية الآن؟');">إغلاق الوردية</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

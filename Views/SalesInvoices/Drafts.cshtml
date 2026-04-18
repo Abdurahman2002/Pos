@@ -1,0 +1,96 @@
+﻿@model IEnumerable<NewsApp2.ViewModels.Sales.SalesInvoiceDraftSummaryVM>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "الفواتير المعلقة";
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+        <h1 class="mb-0">الفواتير المعلقة</h1>
+        <div class="text-muted">مسودات محفوظة ويمكن استرجاعها لاحقا.</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Create" class="btn btn-primary">بيع جديد</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">فواتير البيع</a>
+    </div>
+</div>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-4">
+        <label class="form-label">@L["Search"]</label>
+        <input type="text" name="search" value="@(ViewBag.Search ?? string.Empty)" class="form-control" placeholder="العنوان، العميل، الملاحظة..." />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">@L["From"]</label>
+        <input type="text" name="from" value="@(ViewBag.From?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" placeholder="yyyy-MM-dd" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">@L["To"]</label>
+        <input type="text" name="to" value="@(ViewBag.To?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" placeholder="yyyy-MM-dd" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="includeReturns" value="true" id="includeReturns" @(ViewBag.IncludeReturns is bool includeReturns && includeReturns ? "checked" : string.Empty) />
+            <label class="form-check-label" for="includeReturns">تضمين المرتجعات</label>
+        </div>
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button type="submit" class="btn btn-primary w-100">@L["Filter"]</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>@L["Title"]</th>
+                <th>@L["Date"]</th>
+                <th>العميل</th>
+                <th>النوع</th>
+                <th>عدد السطور</th>
+                <th>الصافي</th>
+                <th>الإنشاء</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">لا توجد فواتير معلقة.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var draft in Model)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@draft.Title</div>
+                        @if (draft.Modified.HasValue)
+                        {
+                            <div class="small text-muted">تحديث @draft.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                        }
+                    </td>
+                    <td><span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                    <td>@(string.IsNullOrWhiteSpace(draft.CustomerName) ? "-" : draft.CustomerName)</td>
+                    <td>
+                        <span class="badge @(draft.IsReturn ? "bg-warning text-dark" : "bg-success")">@(draft.IsReturn ? "مرتجع" : "بيع")</span>
+                    </td>
+                    <td>@draft.LineCount</td>
+                    <td>@draft.NetDinar.ToString("0.00") دينار</td>
+                    <td>@draft.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                    <td class="text-end">
+                        <a asp-action="Create" asp-route-draftId="@draft.Id" class="btn btn-sm btn-outline-primary">استرجاع</a>
+                        <form asp-action="DeleteDraft" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@draft.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف الفاتورة المعلقة؟');">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>

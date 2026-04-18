@@ -1,0 +1,45 @@
+@model IEnumerable<NewsApp2.Models.Entities.AuditLog>
+@{
+    ViewData["Title"] = "Audit Logs";
+}
+
+<h1>Audit Logs</h1>
+
+<form method="get" class="mb-3">
+    <div class="row g-2 align-items-center">
+        <div class="col-auto">
+            <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="Search by user, action, entity..." />
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Number</th>
+                <th>User</th>
+                <th class="d-none d-md-table-cell">Details</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@Html.DisplayFor(modelItem => item.CreatedDateLocalTime)</td>
+                <td>@item.Action</td>
+                <td>@item.EntityType</td>
+                <td>@(item.EntityNumber ?? "-")</td>
+                <td>@(item.CreatedByUserName ?? "-")</td>
+                <td class="d-none d-md-table-cell">@(item.Description ?? "")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,258 @@
+@model NewsApp2.ViewModels.Expenses.ExpenseEntryFormVM
+@{
+    var outstandingAdvance = ViewBag.OutstandingAdvance is decimal o ? o : 0m;
+    var suggestedDeduction = ViewBag.SuggestedDeduction is decimal s ? s : 0m;
+    var balanceUrl = Url.Action("EmployeeAdvanceBalance", "Expenses") ?? "/Expenses/EmployeeAdvanceBalance";
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+<div class="row g-3">
+    <div class="col-md-3">
+        <label asp-for="ExpenseDate" class="form-label"></label>
+        <input asp-for="ExpenseDate" type="date" class="form-control" />
+        <span asp-validation-for="ExpenseDate" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Amount" class="form-label"></label>
+        <input asp-for="Amount" class="form-control" type="number" step="0.01" min="0.01" />
+        <span asp-validation-for="Amount" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="ExpenseKind" class="form-label"></label>
+        <select asp-for="ExpenseKind" class="form-select" asp-items="ViewBag.ExpenseKinds"></select>
+        <span asp-validation-for="ExpenseKind" class="text-danger"></span>
+    </div>
+    <div class="col-md-3 employee-field">
+        <label asp-for="EmployeeId" class="form-label"></label>
+        <select asp-for="EmployeeId" class="form-select" asp-items="ViewBag.Employees">
+            <option value="">اختر موظف</option>
+        </select>
+        <span asp-validation-for="EmployeeId" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-4">
+        <label asp-for="Category" class="form-label"></label>
+        <input asp-for="Category" class="form-control" placeholder="مثال: مواد تنظيف" />
+        <span asp-validation-for="Category" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="PaymentMethod" class="form-label"></label>
+        <select asp-for="PaymentMethod" class="form-select" asp-items="ViewBag.PaymentMethods"></select>
+        <span asp-validation-for="PaymentMethod" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="ReferenceNo" class="form-label"></label>
+        <input asp-for="ReferenceNo" class="form-control" placeholder="اختياري" />
+        <span asp-validation-for="ReferenceNo" class="text-danger"></span>
+    </div>
+
+    <div class="col-12">
+        <label asp-for="Note" class="form-label"></label>
+        <textarea asp-for="Note" class="form-control" rows="2"></textarea>
+        <span asp-validation-for="Note" class="text-danger"></span>
+    </div>
+
+    <div class="col-12">
+        <div id="advance-settlement-box" class="border rounded p-3 bg-light d-none"
+             data-balance-url="@balanceUrl"
+             data-outstanding="@outstandingAdvance.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+             data-suggested="@suggestedDeduction.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+             data-ignore-id="@(Model.Id?.ToString() ?? string.Empty)">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="fw-semibold">تسوية سلفة من المرتب (اعتماد يدوي)</div>
+                <span class="badge bg-warning text-dark">رصيد السلف الحالي: <span id="advance-outstanding-value">0.00</span> د.ل</span>
+            </div>
+
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" asp-for="ApplyAdvanceSettlement" />
+                <label class="form-check-label" asp-for="ApplyAdvanceSettlement">تفعيل خصم سلفة من هذا المرتب</label>
+            </div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label asp-for="AdvanceDeduction" class="form-label"></label>
+                    <input asp-for="AdvanceDeduction" class="form-control" type="number" step="0.01" min="0" />
+                    <span asp-validation-for="AdvanceDeduction" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">صافي المبلغ المصروف للموظف</label>
+                    <input id="salary-net-paid" class="form-control" type="text" value="0.00" readonly />
+                </div>
+                <div class="col-md-4">
+                    <button type="button" id="apply-suggested-deduction" class="btn btn-outline-primary w-100">تطبيق الخصم المقترح</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var kindSelect = document.getElementById('ExpenseKind');
+    var employeeField = document.querySelector('.employee-field');
+    var employeeInput = document.getElementById('EmployeeId');
+    var amountInput = document.getElementById('Amount');
+
+    var settlementBox = document.getElementById('advance-settlement-box');
+    var applySettlementInput = document.getElementById('ApplyAdvanceSettlement');
+    var deductionInput = document.getElementById('AdvanceDeduction');
+    var outstandingValue = document.getElementById('advance-outstanding-value');
+    var netPaidInput = document.getElementById('salary-net-paid');
+    var applySuggestedBtn = document.getElementById('apply-suggested-deduction');
+
+    function toNumber(value) {
+        var n = parseFloat(value);
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    function format2(value) {
+        return toNumber(value).toFixed(2);
+    }
+
+    function isSalaryKind() {
+        return kindSelect && (kindSelect.value || '').toLowerCase() === 'salary';
+    }
+
+    function toggleSettlementVisibility() {
+        if (!settlementBox) return;
+        settlementBox.classList.toggle('d-none', !isSalaryKind());
+    }
+
+    function syncNetSalaryPreview() {
+        if (!netPaidInput || !amountInput || !deductionInput || !applySettlementInput) return;
+
+        var amount = toNumber(amountInput.value);
+        var deduction = applySettlementInput.checked ? toNumber(deductionInput.value) : 0;
+        if (deduction < 0) deduction = 0;
+        if (deduction > amount) deduction = amount;
+
+        netPaidInput.value = format2(amount - deduction);
+    }
+
+    function getCurrentOutstanding() {
+        if (!outstandingValue) return 0;
+        return toNumber(outstandingValue.textContent);
+    }
+
+    function setOutstanding(balance) {
+        if (!outstandingValue) return;
+        outstandingValue.textContent = format2(balance);
+    }
+
+    async function refreshOutstanding() {
+        if (!settlementBox || !employeeInput || !isSalaryKind()) {
+            return;
+        }
+
+        var employeeId = (employeeInput.value || '').trim();
+        if (!employeeId) {
+            setOutstanding(0);
+            syncNetSalaryPreview();
+            return;
+        }
+
+        var urlBase = settlementBox.getAttribute('data-balance-url') || '';
+        if (!urlBase) return;
+
+        var ignoreId = settlementBox.getAttribute('data-ignore-id') || '';
+        var url = new URL(urlBase, window.location.origin);
+        url.searchParams.set('employeeId', employeeId);
+        if (ignoreId) {
+            url.searchParams.set('ignoreExpenseId', ignoreId);
+        }
+
+        try {
+            var response = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!response.ok) return;
+            var data = await response.json();
+            if (!data || !data.success) return;
+
+            var balance = toNumber(data.balance);
+            setOutstanding(balance);
+
+            if (applySettlementInput && applySettlementInput.checked && deductionInput) {
+                var salaryAmount = amountInput ? toNumber(amountInput.value) : 0;
+                var suggested = Math.min(balance, salaryAmount);
+                deductionInput.value = format2(suggested);
+            }
+
+            syncNetSalaryPreview();
+        } catch (_) {
+            // Ignore fetch failures and keep local values.
+        }
+    }
+
+    function applySuggestedDeduction() {
+        if (!deductionInput || !amountInput) return;
+        var salaryAmount = toNumber(amountInput.value);
+        var suggested = Math.min(getCurrentOutstanding(), salaryAmount);
+        deductionInput.value = format2(suggested);
+        if (applySettlementInput) {
+            applySettlementInput.checked = suggested > 0;
+        }
+        syncNetSalaryPreview();
+    }
+
+    function syncEmployeeVisibility() {
+        if (!kindSelect || !employeeField) return;
+        var kind = (kindSelect.value || '').toLowerCase();
+        var required = kind === 'salary' || kind === 'advance';
+        employeeField.classList.toggle('d-none', !required);
+        if (employeeInput) {
+            employeeInput.required = required;
+            if (!required) employeeInput.value = '';
+        }
+
+        toggleSettlementVisibility();
+        if (!required && applySettlementInput) {
+            applySettlementInput.checked = false;
+        }
+        syncNetSalaryPreview();
+
+        refreshOutstanding();
+    }
+
+    if (kindSelect) {
+        kindSelect.addEventListener('change', syncEmployeeVisibility);
+        syncEmployeeVisibility();
+    }
+
+    if (employeeInput) {
+        employeeInput.addEventListener('change', refreshOutstanding);
+    }
+
+    if (applySettlementInput) {
+        applySettlementInput.addEventListener('change', syncNetSalaryPreview);
+    }
+
+    if (deductionInput) {
+        deductionInput.addEventListener('input', syncNetSalaryPreview);
+    }
+
+    if (amountInput) {
+        amountInput.addEventListener('input', function () {
+            syncNetSalaryPreview();
+            refreshOutstanding();
+        });
+    }
+
+    if (applySuggestedBtn) {
+        applySuggestedBtn.addEventListener('click', applySuggestedDeduction);
+    }
+
+    if (settlementBox) {
+        var initialOutstanding = toNumber(settlementBox.getAttribute('data-outstanding') || '0');
+        setOutstanding(initialOutstanding);
+
+        if (deductionInput) {
+            var initialSuggested = toNumber(settlementBox.getAttribute('data-suggested') || '0');
+            if (toNumber(deductionInput.value) <= 0 && initialSuggested > 0) {
+                deductionInput.value = format2(initialSuggested);
+            }
+        }
+    }
+
+    syncNetSalaryPreview();
+})();
+</script>

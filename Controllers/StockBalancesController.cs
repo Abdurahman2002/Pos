@@ -1,0 +1,231 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using NewsApp2.Classes;
+using NewsApp2.Models;
+using NewsApp2.Models.Entities;
+using NewsApp2.Models.Interfaces;
+using NewsApp2.ViewModels.Inventory;
+
+namespace NewsApp2.Controllers
+{
+    [ViewLayout("_LayoutDashboard")]
+    [Authorize(Policy = "InventoryEditPolicy")]
+    [Authorize(Policy = "ApprovedUserPolicy")]
+    public class StockBalancesController : Controller
+    {
+        private readonly IUnitOfWork<InvStockBalance> _balances;
+        private readonly IUnitOfWork<Category> _categories;
+        private readonly IUnitOfWork<Item> _items;
+        private readonly AppDbContext _context;
+
+        public StockBalancesController(
+            IUnitOfWork<InvStockBalance> balances,
+            IUnitOfWork<Category> categories,
+            IUnitOfWork<Item> items,
+            AppDbContext context)
+        {
+            _balances = balances;
+            _categories = categories;
+            _items = items;
+            _context = context;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Index(string? search, Guid? categoryId, bool lowOnly = false, decimal? lowThreshold = null)
+        {
+            var threshold = lowThreshold ?? 5m;
+
+            IQueryable<InvStockBalance> query = _balances.Repository.GetAll()
+                .AsNoTracking()
+                .Include(b => b.Item)
+                .ThenInclude(i => i.Category);
+
+            if (categoryId.HasValue && categoryId != Guid.Empty)
+            {
+                query = query.Where(b => b.Item != null && b.Item.CategoryId == categoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(b => b.Item != null && b.Item.Name.Contains(term));
+            }
+
+            var list = await query.OrderBy(b => b.Item!.Name).ToListAsync();
+
+            bool IsLow(InvStockBalance b)
+            {
+                var itemLevel = b.Item?.ReorderLevel;
+                var limit = itemLevel.HasValue && itemLevel.Value > 0 ? itemLevel.Value : threshold;
+                return b.QuantityOnHand <= limit;
+            }
+
+            if (lowOnly)
+            {
+                list = list.Where(IsLow).ToList();
+            }
+
+            var lowCount = list.Count(IsLow);
+            var outOfStockCount = list.Count(b => b.QuantityOnHand <= 0);
+            ViewBag.TotalCount = list.Count;
+            ViewBag.LowCount = lowCount;
+            ViewBag.OutOfStockCount = outOfStockCount;
+            ViewBag.LowThreshold = threshold;
+            ViewBag.Search = search;
+            ViewBag.LowOnly = lowOnly;
+            ViewBag.CategoryId = categoryId;
+
+            await LoadLookups(categoryId);
+
+            return View(list);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Movement(DateOnly? from, DateOnly? to, Guid? itemId, string? referenceType)
+        {
+            if (User.IsInRole("Cashier"))
+                return Forbid();
+
+            var query = _context.Set<InvStockLedger>()
+                .AsNoTracking()
+                .Include(l => l.Item)
+                .AsQueryable();
+
+            if (itemId.HasValue && itemId.Value != Guid.Empty)
+                query = query.Where(l => l.ItemId == itemId.Value);
+
+            if (!string.IsNullOrWhiteSpace(referenceType))
+                query = query.Where(l => l.ReferenceType == referenceType);
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.ToDateTime(TimeOnly.MinValue);
+                query = query.Where(l => l.Created >= fromDate);
+            }
+
+            if (to.HasValue)
+            {
+                var toDateExclusive = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                query = query.Where(l => l.Created < toDateExclusive);
+            }
+
+            var rows = await query
+                .OrderByDescending(l => l.Created)
+                .Select(l => new StockMovementRowVM
+                {
+                    Created = l.Created,
+                    ItemId = l.ItemId,
+                    ItemName = l.Item != null ? l.Item.Name : string.Empty,
+                    MovementType = l.MovementType,
+                    ReferenceType = l.ReferenceType,
+                    ReferenceId = l.ReferenceId,
+                    QuantityChange = l.QuantityChange,
+                    BalanceAfter = l.BalanceAfter,
+                    Note = l.Note
+                })
+                .ToListAsync();
+
+            var vm = new StockMovementReportVM
+            {
+                From = from,
+                To = to,
+                ItemId = itemId,
+                ReferenceType = referenceType,
+                Rows = rows,
+                TotalIn = rows.Where(r => r.QuantityChange > 0).Sum(r => r.QuantityChange),
+                TotalOut = rows.Where(r => r.QuantityChange < 0).Sum(r => Math.Abs(r.QuantityChange))
+            };
+
+            var items = await _items.Repository.GetAll().OrderBy(i => i.Name).ToListAsync();
+            var refTypes = await _context.Set<InvStockLedger>()
+                .AsNoTracking()
+                .Select(l => l.ReferenceType)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+
+            ViewData["Items"] = new SelectList(items, "Id", "Name", itemId);
+            ViewData["ReferenceTypes"] = new SelectList(refTypes, referenceType);
+
+            return View(vm);
+        }
+
+        public async Task<IActionResult> DailyInventory(DateOnly? date)
+        {
+            if (User.IsInRole("Cashier")) 
+                return Forbid();
+
+            var targetDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            // using local time logic conceptually, but DB is storing Utc.
+            // for simple day grouping on UTC:
+            var fromDateTime = targetDate.ToDateTime(TimeOnly.MinValue);
+            var toDateTime = targetDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+            var itemsQuery = _context.Items.AsNoTracking().Include(i => i.Category).AsQueryable();
+
+            var openingBalances = await _context.Set<InvStockLedger>()
+                .Where(l => l.Created < fromDateTime)
+                .GroupBy(l => l.ItemId)
+                .Select(g => new { ItemId = g.Key, Opening = g.Sum(l => l.QuantityChange) })
+                .ToDictionaryAsync(x => x.ItemId, x => x.Opening);
+
+            var dailyMovements = await _context.Set<InvStockLedger>()
+                .Where(l => l.Created >= fromDateTime && l.Created < toDateTime)
+                .GroupBy(l => new { l.ItemId, l.ReferenceType })
+                .Select(g => new { g.Key.ItemId, g.Key.ReferenceType, TotalChange = g.Sum(l => l.QuantityChange) })
+                .ToListAsync();
+
+            var resultList = new List<NewsApp2.ViewModels.Inventory.DailyInventoryRowVM>();
+            var items = await itemsQuery.ToListAsync();
+
+            foreach(var item in items)
+            {
+                var opening = openingBalances.GetValueOrDefault(item.Id, 0m);
+                var moves = dailyMovements.Where(m => m.ItemId == item.Id).ToList();
+                
+                var purchases = moves.Where(m => m.ReferenceType.Contains("Purchase", StringComparison.OrdinalIgnoreCase)).Sum(m => m.TotalChange);
+                var sales = moves.Where(m => m.ReferenceType.StartsWith("SalesInvoice", StringComparison.OrdinalIgnoreCase)).Sum(m => m.TotalChange);
+                var returns = moves.Where(m => m.ReferenceType.StartsWith("SalesReturn", StringComparison.OrdinalIgnoreCase)).Sum(m => m.TotalChange);
+                var other = moves.Where(m => !m.ReferenceType.Contains("Purchase", StringComparison.OrdinalIgnoreCase) && !m.ReferenceType.StartsWith("Sales", StringComparison.OrdinalIgnoreCase)).Sum(m => m.TotalChange);
+
+                var received = purchases + (other > 0 ? other : 0);
+                var sold = Math.Abs(sales) + (other < 0 ? Math.Abs(other) : 0);
+                
+                var closing = opening + purchases + sales + returns + other;
+
+                if (opening == 0 && closing == 0 && received == 0 && sold == 0 && returns == 0)
+                    continue;
+
+                resultList.Add(new NewsApp2.ViewModels.Inventory.DailyInventoryRowVM
+                {
+                    ItemId = item.Id,
+                    ItemName = item.Name,
+                    CategoryName = item.Category?.Name ?? "",
+                    Barcode = item.Barcode ?? "",
+                    OpeningBalance = opening,
+                    Received = received,
+                    Sold = sold,
+                    Returns = returns,
+                    ClosingBalance = closing
+                });
+            }
+
+            var vm = new NewsApp2.ViewModels.Inventory.DailyInventoryReportVM
+            {
+                ReportDate = targetDate,
+                Rows = resultList.OrderBy(x => x.CategoryName).ThenBy(x => x.ItemName).ToList()
+            };
+
+            return View(vm);
+        }
+
+        private async Task LoadLookups(Guid? categoryId)
+        {
+            var categories = await _categories.Repository.GetAll().OrderBy(c => c.Name).ToListAsync();
+
+            ViewData["Categories"] = new SelectList(categories, "Id", "Name", categoryId);
+        }
+    }
+}

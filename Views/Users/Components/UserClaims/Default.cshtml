@@ -1,0 +1,133 @@
+﻿@model UserClaimListVM
+
+<form method="post">
+
+    <input type="hidden" name="UserId" value="@Model.UserId" />
+
+    @if (Model.Claims.Any())
+    {
+        <div class="claims-wrapper">
+
+            @for (int i = 0; i < Model.Claims.Count; i++)
+            {
+                <input type="hidden" asp-for="@Model.Claims[i].ClaimType" />
+
+                <div class="claim-row  @(Model.Claims[i].IsSelected ? "active" : "") ">
+
+                    <div class="claim-info">
+                        <div class="claim-icon">
+                            <i class="bi @(Model.Claims[i].IsSelected ? "bi-check-circle-fill" : "bi-slash-circle")"></i>
+                        </div>
+
+                        <div class="claim-text">
+                            <div class="claim-name">
+                                @Model.Claims[i].ClaimType
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="claim-action">
+                        <div class="form-check form-switch">
+                            <input asp-for="@Model.Claims[i].IsSelected"
+                                   class="form-check-input claim-switch"
+                                   type="checkbox" />
+                        </div>
+                    </div>
+
+                </div>
+            }
+
+        </div>
+
+        <div class="mt-4 d-flex justify-content-end">
+            <button type="submit"
+                    asp-controller="Users"
+                    asp-action="EditUserClaims"
+                    class="btn btn-primary px-4 py-2 fw-semibold rounded-3">
+                <i class="bi bi-check2-circle me-2"></i>
+                Apply Changes
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light text-center">
+            <h5>No claims for this user</h5>
+        </div>
+    }
+
+</form>
+
+<style>
+    .claims-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .claim-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 22px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, #ffffff, #f8f9fb);
+        border: 1px solid #e6e9ef;
+        transition: all .25s ease;
+    }
+
+        .claim-row:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0,0,0,.08);
+        }
+
+        .claim-row.active {
+            background: linear-gradient(135deg, #e6f5ea, #f0f9f4);
+            border-color: #28a745;
+            box-shadow: 0 12px 30px rgba(40,167,69,.25);
+        }
+
+            .claim-row.active .claim-name {
+                color: #28a745;
+            }
+
+            .claim-row.active .claim-icon {
+                background: linear-gradient(135deg, #28a745, #218838);
+                box-shadow: 0 8px 22px rgba(40,167,69,.45);
+                color: #fff;
+            }
+
+    .claim-info {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+    }
+
+    .claim-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+        background: #eef2f7;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        transition: .25s;
+    }
+
+    .claim-name {
+        font-weight: 700;
+        font-size: 17px;
+        color: #212529;
+    }
+
+    .claim-switch {
+        width: 54px;
+        height: 26px;
+        cursor: pointer;
+    }
+
+</style>
+
+

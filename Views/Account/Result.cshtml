@@ -1,0 +1,76 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["Result"];
+}
+
+<style>
+    .fade-slide {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s ease;
+    }
+
+        .fade-slide.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+</style>
+
+<div class="container pt-5 mt-5" style="min-height:65vh">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+
+            <div class="card shadow-lg border-0 rounded-4 fade-slide" id="resultCard">
+
+                <div class="card-body text-center p-5">
+
+                    @* Success *@
+                    @if (ViewBag.SuccessTitle != null || ViewBag.SuccessMessage != null)
+                    {
+                        <div class="text-success mb-4">
+                            <h3 class="fw-bold">@ViewBag.SuccessTitle</h3>
+                        </div>
+
+                        <hr />
+
+                        <p class="fs-5 text-secondary">@ViewBag.SuccessMessage</p>
+                    }
+
+                    @* Error *@
+                    else if (ViewBag.ErrorTitle != null || ViewBag.ErrorMessage != null)
+                    {
+                        <div class="text-danger mb-4">
+                            <h3 class="fw-bold">@ViewBag.ErrorTitle</h3>
+                        </div>
+
+                        <hr />
+
+                        <p class="fs-5 text-secondary">@ViewBag.ErrorMessage</p>
+
+                        @if (ViewBag.ResetPassword == "Reset Password")
+                        {
+                            <hr />
+                            <p class="mt-3">
+                                <span class="text-secondary">@L["or you can"]</span>
+                                <a asp-action="ResetPassword" class="text-primary text-decoration-none ms-1">
+                                    @L["Reset Password"]
+                                </a>
+                            </p>
+                        }
+                    }
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.addEventListener('load', () => {
+            document.getElementById('resultCard').classList.add('show');
+        });
+    </script>
+}

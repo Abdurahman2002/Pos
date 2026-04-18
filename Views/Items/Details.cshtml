@@ -1,0 +1,239 @@
+﻿@model NewsApp2.Models.Entities.Item
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+<h2>@L["Item Details"]</h2>
+<hr />
+<dl class="row">
+    <dt class="col-sm-2">@L["Name"]</dt>
+    <dd class="col-sm-10">@Model.Name</dd>
+
+    <dt class="col-sm-2">@L["Category"]</dt>
+    <dd class="col-sm-10">@Model.Category?.Name</dd>
+
+    <dt class="col-sm-2">@L["Barcode"]</dt>
+    <dd class="col-sm-10">@(string.IsNullOrWhiteSpace(Model.Barcode) ? "-" : Model.Barcode)</dd>
+
+    <dt class="col-sm-2">@L["Reorder level"]</dt>
+    <dd class="col-sm-10">@(Model.ReorderLevel.HasValue ? Model.ReorderLevel.Value.ToString("0") : "-")</dd>
+
+    <dt class="col-sm-2">@L["Created"]</dt>
+    <dd class="col-sm-10">@Html.DisplayFor(m => m.CreatedDateLocalTime)</dd>
+
+    <dt class="col-sm-2">@L["Modified"]</dt>
+    <dd class="col-sm-10">@Html.DisplayFor(m => m.ModifiedDateLocalTime)</dd>
+</dl>
+
+<hr />
+<h4>@L["Item Barcodes"]</h4>
+<div class="mb-2 text-muted">@L["Primary barcode belongs to this item, and you can add more barcodes for the same product (e.g. MDF from different suppliers)."]</div>
+
+<form id="barcode-form" class="mb-3">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <input type="text" id="barcode-code" class="form-control" placeholder="@L["Enter barcode"]" />
+        </div>
+        <div class="col-md-2">
+            <button type="button" id="barcode-camera-btn" class="btn btn-outline-secondary w-100">@L["Camera"]</button>
+        </div>
+        <div class="col-md-2">
+            <button type="button" id="barcode-add-btn" class="btn btn-primary w-100">@L["Add Barcode"]</button>
+        </div>
+    </div>
+</form>
+
+<form id="details-token-form" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
+<div id="barcode-message" class="mb-2"></div>
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle" id="barcode-table">
+        <thead>
+            <tr>
+                <th>@L["Barcode"]</th>
+                <th style="width:140px;">@L["Type"]</th>
+                <th style="width:140px;">@L["Action"]</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div>
+    <a class="btn btn-success" asp-action="PrintLabel" asp-route-id="@Model.Id">@L["Print Label"]</a>
+    <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">@L["Edit"]</a>
+    <a class="btn btn-secondary" asp-action="Index">@L["Back to List"]</a>
+</div>
+
+<div class="modal fade" id="barcode-camera-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@L["Scan barcode"]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-4x3 bg-dark">
+                    <video id="barcode-video" playsinline></video>
+                </div>
+                <div class="small text-muted mt-2">@L["Point the camera at the barcode. Scanning starts automatically."]</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://unpkg.com/@@zxing/library@latest"></script>
+    <script>
+        (function () {
+            const itemId = '@Model.Id';
+            const token = document.querySelector('#details-token-form input[name="__RequestVerificationToken"]').value;
+            const barcodeMessage = document.getElementById('barcode-message');
+            const barcodeCode = document.getElementById('barcode-code');
+            const barcodeAddBtn = document.getElementById('barcode-add-btn');
+            const barcodeTableBody = document.querySelector('#barcode-table tbody');
+            const cameraBtn = document.getElementById('barcode-camera-btn');
+            const cameraModalEl = document.getElementById('barcode-camera-modal');
+            const videoEl = document.getElementById('barcode-video');
+
+            let reader = null;
+            let scanning = false;
+            let lastScanText = '';
+            let lastScanAt = 0;
+            const cameraModal = cameraModalEl ? new bootstrap.Modal(cameraModalEl) : null;
+
+            function showBarcodeMessage(text, ok) {
+                barcodeMessage.className = ok ? 'alert alert-success' : 'alert alert-danger';
+                barcodeMessage.textContent = text;
+            }
+
+            async function refreshBarcodes() {
+                const res = await fetch(`/Item/${itemId}/barcodes`);
+                if (!res.ok) return;
+
+                const rows = await res.json();
+                barcodeTableBody.innerHTML = rows.map(row => `
+                    <tr>
+                        <td>${row.code}</td>
+                        <td>${row.isPrimary ? '<span class="badge bg-success">@L["Primary"]</span>' : '<span class="badge bg-secondary">@L["Additional"]</span>'}</td>
+                        <td>
+                            ${row.isPrimary ? '-' : `<button type="button" class="btn btn-sm btn-outline-danger barcode-delete-btn" data-id="${row.id}">@L["Delete"]</button>`}
+                        </td>
+                    </tr>
+                `).join('');
+
+                document.querySelectorAll('.barcode-delete-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        await deleteBarcode(btn.getAttribute('data-id'));
+                    });
+                });
+            }
+
+            async function addBarcode() {
+                const code = (barcodeCode.value || '').trim();
+                if (!code) {
+                    showBarcodeMessage('@L["Enter or scan barcode first."]', false);
+                    return;
+                }
+
+                const res = await fetch(`/Item/${itemId}/barcodes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ code })
+                });
+
+                const payload = await res.json();
+                if (!res.ok || !payload.success) {
+                    showBarcodeMessage(payload.error || '@L["Failed to add barcode."]', false);
+                    return;
+                }
+
+                barcodeCode.value = '';
+                showBarcodeMessage('@L["Barcode added."]', true);
+                await refreshBarcodes();
+            }
+
+            async function deleteBarcode(mappingId) {
+                const res = await fetch(`/ItemBarcodes/${mappingId}`, {
+                    method: 'DELETE',
+                    headers: { 'RequestVerificationToken': token }
+                });
+
+                const payload = await res.json();
+                if (!res.ok || !payload.success) {
+                    showBarcodeMessage(payload.error || '@L["Failed to delete barcode."]', false);
+                    return;
+                }
+
+                showBarcodeMessage('@L["Barcode deleted."]', true);
+                await refreshBarcodes();
+            }
+
+            function stopCamera() {
+                if (reader) {
+                    reader.reset();
+                }
+                scanning = false;
+            }
+
+            function startCamera() {
+                if (!cameraModal || !videoEl) {
+                    return;
+                }
+
+                if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+                    showBarcodeMessage('@L["Camera scanner is not available."]', false);
+                    return;
+                }
+
+                if (!reader) {
+                    reader = new ZXing.BrowserMultiFormatReader();
+                }
+
+                stopCamera();
+                scanning = true;
+                lastScanText = '';
+                lastScanAt = 0;
+
+                cameraModal.show();
+
+                reader.decodeFromVideoDevice(null, videoEl, function (result) {
+                    if (!scanning || !result || !result.text) {
+                        return;
+                    }
+
+                    const now = Date.now();
+                    if (result.text === lastScanText && now - lastScanAt < 1500) {
+                        return;
+                    }
+
+                    lastScanText = result.text;
+                    lastScanAt = now;
+
+                    barcodeCode.value = result.text.trim();
+                    stopCamera();
+                    cameraModal.hide();
+                });
+            }
+
+            barcodeAddBtn.addEventListener('click', addBarcode);
+            barcodeCode.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addBarcode();
+                }
+            });
+            if (cameraBtn) {
+                cameraBtn.addEventListener('click', startCamera);
+            }
+            if (cameraModalEl) {
+                cameraModalEl.addEventListener('hidden.bs.modal', stopCamera);
+            }
+            refreshBarcodes();
+        })();
+    </script>
+}
+

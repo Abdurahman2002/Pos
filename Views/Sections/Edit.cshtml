@@ -1,0 +1,58 @@
+﻿@model Section
+
+@{
+    ViewData["Title"] = ViewContext.RouteData.Values["controller"]?.ToString() +
+                        "- " + ViewContext.RouteData.Values["action"]?.ToString();
+}
+
+<h4>
+    @ViewData["Title"]
+</h4>
+<hr />
+
+<div class="container" style="min-height:71.5vh;">
+    <div class="row">
+        @if (ViewBag.Message != null)
+        {
+            <h5 class="alert alert-danger">@ViewBag.Message</h5>
+        }
+        <div class="col-md-4">
+            <form asp-action="Edit">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                
+                <div class="form-group mb-3">
+                    <label asp-for="Name" class="control-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+
+                <div class="alert alert-info" role="alert" style="width:max-content">
+                    <p>
+                        <b>@Html.DisplayNameFor(model => model.Created):</b>
+                        @Html.DisplayFor(model => model.Created)
+
+                    </p>
+                    <p>
+                        <b>@Html.DisplayNameFor(model => model.Modified):</b>
+                        @Html.DisplayFor(model => model.Modified)
+                    </p>
+                </div>
+
+                <input type="hidden" asp-for="Created" />
+                <input type="hidden" asp-for="Modified" value="@DateTime.UtcNow" />
+
+                <div class="form-group">
+                    <input type="submit" value="Save" class="btn btn-primary" />
+                    <a asp-action="Index" class="btn btn-outline-primary">Back to List</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

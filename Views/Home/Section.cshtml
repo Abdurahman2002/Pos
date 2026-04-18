@@ -1,0 +1,56 @@
+﻿@model Section
+
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<div class="container my-5">
+    <div class="text-center mb-4">
+        <h1 class="fw-bold">@Model.Name</h1>
+        <hr class="mx-auto" style="width:60px; border:2px solid #4bb5e6;">
+    </div>
+
+    @if (Model.News != null && Model.News.Any())
+    {
+        <div class="row g-4">
+            @foreach (var news in Model.News)
+            {
+                <div class="col-lg-4 col-md-6">
+                    <div class="card-wrapper fade-scroll">
+                        <a asp-action="News" asp-controller="Home" asp-route-id="@news.Id" class="text-decoration-none text-dark card-link">
+                            <div class="card shadow-sm h-100 border-0 hover-scale">
+                                <div class="card-img-top overflow-hidden position-relative" style="height:180px;">
+                                    <img loading="lazy"
+                                         src="@(news.ImageUrl != null ? Url.Content($"~/upload/{news.ImageUrl}") : Url.Content("~/img/news.jpg"))"
+                                         class="img-fluid w-100 h-100 object-fit-cover" alt="@news.Title">
+                                    <div class="overlay"></div>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">@news.Title.Substring(0, Math.Min(news.Title.Length, 100))@(news.Title.Length > 100 ? "..." : "")</h5>
+                                    <p class="card-text text-muted">@news.Details.Substring(0, Math.Min(news.Details.Length, 400))@(news.Details.Length > 400 ? "..." : "")</p>
+                                </div>
+                                <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center">
+                                    <small class="text-secondary">
+                                        <i class="bi bi-calendar-event me-1"></i> @news.Created.ToString("dd MMM yyyy")
+                                    </small>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info text-center">
+            There is no news for this section at the moment.
+        </div>
+    }
+</div>
+
+<link href="~/css/home/section.css" rel="stylesheet" />
+
+@section Scripts {
+    <script src="~/js/home/section.js"></script>
+}

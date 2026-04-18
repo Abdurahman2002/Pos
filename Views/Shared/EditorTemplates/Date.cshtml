@@ -1,0 +1,21 @@
+@model object
+@using System.Globalization
+@{
+    var value = string.Empty;
+
+    if (Model is DateOnly dateOnly)
+    {
+        value = dateOnly.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    }
+    else if (Model is DateTime dateTime)
+    {
+        value = dateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    }
+    else if (Model is DateTimeOffset dateTimeOffset)
+    {
+        value = dateTimeOffset.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    }
+}
+<div class="date-field">
+    @Html.TextBox("", value, new { @class = "form-control date-input js-date", type = "text", placeholder = "dd/MM/yyyy", dir = "ltr", lang = "en-GB", autocomplete = "off" })
+</div>

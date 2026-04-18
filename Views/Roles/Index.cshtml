@@ -1,0 +1,166 @@
+﻿<style>
+    .role-card {
+        border-radius: 14px;
+        padding: 20px;
+        background: #ffffff;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        transition: .25s;
+    }
+
+        .role-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        }
+
+    .role-header {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .role-count {
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 16px;
+    }
+
+    .role-actions .btn {
+        border-radius: 10px;
+    }
+
+    .add-role-btn {
+        border-radius: 12px;
+        padding: 10px 18px;
+        font-size: 16px;
+        font-weight: 600;
+    }
+</style>
+
+
+@model IEnumerable<RoleVM>
+@{
+    ViewBag.Title = "Roles";
+}
+
+<div class="container pt-4" style="min-height:80vh;">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Roles Management</h2>
+
+
+        @if (User.IsInRole("Prog"))
+        {
+            <a asp-action="CreateRole" class="btn btn-primary add-role-btn">
+                <i class="bi bi-plus-circle me-1"></i> Add New Role
+            </a>
+        }
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info shadow">
+            No roles found.
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var role in Model)
+            {
+                <div class="col-lg-4 col-md-6">
+                    <div class="role-card">
+
+                        <div class="role-header">
+                            <i class="bi bi-people-fill text-primary me-1"></i>
+                            @role.Name
+                        </div>
+
+                        <div class="role-count">
+                            Users in this role:
+                            <span class="fw-semibold">@role.UsersCount</span>
+                        </div>
+
+                        <div class="role-actions d-flex gap-2">
+
+
+                            @if (User.IsInRole("Prog"))
+                            {
+                                <a asp-action="EditRole"
+                                   asp-route-id="@role.Id"
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil-square me-1"></i>Edit
+                                </a>
+
+                                <!-- Delete Modal Trigger -->
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteModal-@role.Id">
+                                    <i class="bi bi-trash me-1"></i>Delete
+                                </button>
+                            }
+
+
+                            @if (role.UsersCount > 0)
+                            {
+                                <a asp-action="SendEmailToRole"
+                                   asp-controller="Mail"
+                                   asp-route-roleId="@role.Id"
+                                   class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-envelope me-1"></i>Email
+                                </a>
+                            }
+
+                        </div>
+
+                        @if (ViewBag.RoleInUse != null && ViewBag.RoleInUse == role.Name)
+                        {
+                            <div class="text-danger mt-2 fw-semibold">
+                                <i class="bi bi-exclamation-circle"></i> Cannot delete role in use
+                            </div>
+                        }
+
+                    </div>
+                </div>
+
+                <!-- Modal Delete -->
+                <div class="modal fade" id="deleteModal-@role.Id" tabindex="-1" aria-labelledby="deleteModalLabel-@role.Id" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="border-radius:15px; background: rgba(255,255,255,0.95); box-shadow:0 10px 25px rgba(0,0,0,0.15);">
+
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title text-danger" id="deleteModalLabel-@role.Id">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Confirm Deletion
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+
+                            <div class="modal-body text-center" style="font-size:1rem; color:#333;">
+                                Are you sure you want to delete the role:
+                                <strong>@role.Name</strong>?
+                            </div>
+
+                            <div class="modal-footer justify-content-center border-0">
+
+                                <form asp-action="DeleteRole" method="post" class="d-inline">
+                                    <input type="hidden" name="id" value="@role.Id" />
+                                    <button type="submit" class="btn btn-danger btn-lg">
+                                        <i class="bi bi-trash-fill me-1"></i> Delete
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-outline-primary btn-lg" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                <!-- End Modal Delete -->
+            }
+        </div>
+    }
+
+</div>
+

@@ -1,0 +1,89 @@
+﻿@model CreateEmployeeVM
+
+@{
+    ViewBag.Title = "Create Employee";
+}
+
+<style>
+    .section-title {
+        font-weight: 600;
+        color: #495057;
+        margin-top: 30px;
+        margin-bottom: 15px;
+        border-left: 4px solid #0d6efd;
+        padding-left: 10px;
+    }
+</style>
+
+<div class="container pt-4" style="min-height:75vh">
+
+    <h3 class="fw-bold mb-4">Create Employee</h3>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4 p-lg-5">
+
+                    <form asp-action="CreateEmployee">
+                        <div asp-validation-summary="All" class="text-danger mb-4"></div>
+
+                        <!-- User Information -->
+                        <div class="section-title">User Information</div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Email" class="form-label fw-semibold"></label>
+                                <input asp-for="Email" class="form-control" />
+                                <span asp-validation-for="Email" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="RoleName" class="form-label fw-semibold"></label>
+                                <select asp-for="RoleName" asp-items="Model.AvailableRoles" class="form-select"></select>
+                                <span asp-validation-for="RoleName" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <!-- Employee Information -->
+                        <div class="section-title">Employee Information</div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Employee.Name" class="form-label fw-semibold"></label>
+                                <input asp-for="Employee.Name" class="form-control" />
+                                <span asp-validation-for="Employee.Name" class="text-danger"></span>
+                            </div>
+
+                        </div>
+
+
+                        <div class="mt-4 pt-3 border-top">
+                            <div class="row">
+                                <div class="col-md-6 mb-2 mb-md-0">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        Create
+                                    </button>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <a asp-action="Index" class="btn btn-outline-primary w-100">
+                                        Employees List
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+

@@ -1,0 +1,54 @@
+﻿@model NewsApp2.Models.Entities.Customer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    var returnUrl = ViewBag.ReturnUrl as string;
+}
+
+<h2>@L["Create Customer"]</h2>
+<hr />
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Phone" class="form-label"></label>
+                <input asp-for="Phone" class="form-control" />
+                <span asp-validation-for="Phone" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Note" class="form-label"></label>
+                <textarea asp-for="Note" class="form-control"></textarea>
+                <span asp-validation-for="Note" class="text-danger"></span>
+            </div>
+
+            @if (ViewBag.Message != null)
+            {
+                <div class="alert alert-warning">@ViewBag.Message</div>
+            }
+
+            <button type="submit" class="btn btn-primary">@L["Save"]</button>
+            @if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                <a href="@returnUrl" class="btn btn-secondary">@L["Cancel"]</a>
+            }
+            else
+            {
+                <a asp-action="Index" class="btn btn-secondary">@L["Cancel"]</a>
+            }
+        </form>
+    </div>
+</div>
+
+@section Scripts{
+    <partial name="_ValidationScriptsPartial" />
+}
+

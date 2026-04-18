@@ -1,0 +1,59 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewBag.Title = L["Error"];
+    Layout = "_Layout";
+}
+
+<div class="container" style="text-align:@(System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft ? "right" : "left")">
+
+    <div style="text-align:center">
+        @if (ViewBag.ErrorTitle == null)
+        {
+            <h4>@L["An occured while processing your request"]</h4>
+            <hr />
+        }
+        else
+        {
+            <h4><b>@ViewBag.ErrorTitle</b></h4>
+            <hr />
+        }
+    </div>
+    <div class="alert alert-danger" style="text-align:center">
+        @if (ViewBag.ErrorMessage == null)
+        {
+            <h6>@L["the support team is notified and we are working on the fix"]</h6>
+        }
+        else
+        {
+            <h5><b>@ViewBag.ErrorMessage</b></h5>
+        }
+    </div>
+
+    @if (ViewBag.ExceptionPath != null)
+    {
+        <div class="alert alert-danger">
+            <b>@L["Exception Path"]</b>
+            <hr />
+            <small>@ViewBag.ExceptionPath</small>
+        </div>
+    }
+   
+    @if (ViewBag.ExceptionMessage != null)
+    {
+        <div class="alert alert-danger">
+            <b>@L["Exception Message"]</b>
+            <hr />
+            <small>@ViewBag.ExceptionMessage</small>
+        </div>
+    }
+  
+    @if (ViewBag.ExceptionStackTrace != null)
+    {
+        <div class="alert alert-danger">
+            <b>@L["Exception StackTrace"]</b>
+            <hr />
+            <small>@ViewBag.ExceptionStackTrace</small>
+        </div>
+    }
+</div>
+

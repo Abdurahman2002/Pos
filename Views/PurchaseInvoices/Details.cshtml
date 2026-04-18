@@ -1,0 +1,68 @@
+﻿@model NewsApp2.Models.Entities.PurchaseInvoice
+@using NewsApp2.Models.Entities
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تفاصيل فاتورة الشراء";
+    var lines = ViewBag.Lines as IEnumerable<PurchaseLine> ?? Enumerable.Empty<PurchaseLine>();
+    var localizedStatus = string.IsNullOrWhiteSpace(Model.Status) ? "-" : L[Model.Status].Value;
+}
+
+<h1>تفاصيل فاتورة الشراء</h1>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<dl class="row">
+    <dt class="col-sm-3">@L["Number"]</dt><dd class="col-sm-9">@Model.Number</dd>
+    <dt class="col-sm-3">@L["Date"]</dt><dd class="col-sm-9"><span dir="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></dd>
+    <dt class="col-sm-3">الحالة</dt><dd class="col-sm-9">@localizedStatus</dd>
+    <dt class="col-sm-3">الإجمالي</dt><dd class="col-sm-9">@Model.TotalDinar.ToString("0.00") دينار</dd>
+</dl>
+
+@if (string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) && (User.IsInRole("Admin") || User.IsInRole("Prog")))
+{
+    <form asp-action="Cancel" method="post" class="mb-3">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-danger" onclick="return confirm('@L["Cancel this purchase invoice?"]');">@L["Cancel Invoice"]</button>
+    </form>
+}
+
+<h4>@L["Lines"]</h4>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>الصنف</th>
+                <th>الكمية</th>
+                <th>سعر الوحدة</th>
+                <th>إجمالي السطر</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var line in lines)
+        {
+            <tr>
+                <td>@line.Item?.Name</td>
+                <td>@line.Qty.ToString("0")</td>
+                <td>@line.UnitPriceEur.ToString("0.00")</td>
+                <td>@line.LineTotalDinar.ToString("0.00")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<p>
+    @if ((User.IsInRole("Admin") || User.IsInRole("Prog")) && string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+    {
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">@L["Edit"]</a>
+    }
+    <a asp-action="Index" class="btn btn-secondary">@L["Back"]</a>
+</p>
+

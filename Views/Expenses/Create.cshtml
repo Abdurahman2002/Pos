@@ -1,0 +1,20 @@
+@model NewsApp2.ViewModels.Expenses.ExpenseEntryFormVM
+@{
+    ViewData["Title"] = "إضافة مصروف/مرتب/سلفة";
+}
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<form asp-action="Create" method="post" class="card shadow-sm">
+    <div class="card-body">
+        <partial name="_Form" model="Model" />
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <button type="submit" class="btn btn-primary">حفظ</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">رجوع</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

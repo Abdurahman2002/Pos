@@ -1,0 +1,82 @@
+﻿@model CreateUserVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["Create User"];
+}
+
+<style>
+    .fade-slide {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s ease;
+    }
+
+        .fade-slide.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+</style>
+
+<div class="container pt-5 mt-5" style="min-height:71vh;">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <div class="card shadow-lg border-0 rounded-4 fade-slide" id="createUserCard">
+                <div class="card-body p-5">
+
+                    <h3 class="fw-bold mb-3 text-center">@L["Create User"]</h3>
+                    <hr />
+
+                    <form asp-action="CreateUser">
+
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label fw-bold"></label>
+                            <input asp-for="Email" class="form-control" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="RoleId" class="form-label fw-bold"></label>
+                            <select asp-for="RoleId" class="form-select" asp-items="ViewBag.Roles">
+                                <option value="" disabled selected>--- @L["Select Role"] ---</option>
+                            </select>
+                            <span asp-validation-for="RoleId" class="text-danger"></span>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    @L["Create"]
+                                </button>
+                            </div>
+
+                            <div class="col-6">
+                                <a asp-action="Index" class="btn btn-outline-primary w-100">
+                                    @L["Users List"]
+                                </a>
+                            </div>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.addEventListener('load', () => {
+            document.getElementById('createUserCard').classList.add('show');
+        });
+    </script>
+
+    <partial name="_ValidationScriptsPartial" />
+}
+
+

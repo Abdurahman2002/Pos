@@ -1,0 +1,148 @@
+﻿@model NewsApp2.Models.Entities.SalesInvoice
+@using NewsApp2.Models.Entities
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تفاصيل فاتورة البيع";
+    var lines = ViewBag.Lines as IEnumerable<SalesLine> ?? Enumerable.Empty<SalesLine>();
+    string paymentText = (Model.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "card" => "بطاقة",
+        "transfer" => "تحويل",
+        "credit" => "آجل",
+        _ => "نقدي"
+    };
+    var canApprovePending = (ViewBag.CanApprovePending as bool?) == true;
+    var addCustomerReturnUrl = Url.Action("Details", "SalesInvoices", new { id = Model.Id, selectedCustomerId = "__customerId__" }) ?? $"/SalesInvoices/Details/{Model.Id}";
+    var localizedStatus = string.IsNullOrWhiteSpace(Model.Status) ? "-" : L[Model.Status].Value;
+    var customerName = Model.Customer?.Name;
+    var shownCustomerName = string.Equals(customerName, "مبيعات يومية", StringComparison.Ordinal) ? "-" : (customerName ?? "-");
+}
+
+<h1>تفاصيل فاتورة البيع</h1>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<dl class="row">
+    <dt class="col-sm-3">@L["Number"]</dt><dd class="col-sm-9">@Model.Number</dd>
+    <dt class="col-sm-3">@L["Date"]</dt><dd class="col-sm-9"><span dir="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></dd>
+    <dt class="col-sm-3">العميل</dt><dd class="col-sm-9">@shownCustomerName</dd>
+    <dt class="col-sm-3">طريقة الدفع</dt><dd class="col-sm-9">@paymentText</dd>
+    <dt class="col-sm-3">وقت الترحيل</dt><dd class="col-sm-9">@(Model.SubmittedAt.HasValue ? Model.SubmittedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") : "-")</dd>
+    <dt class="col-sm-3">وقت الاعتماد</dt><dd class="col-sm-9">@(Model.ApprovedAt.HasValue ? Model.ApprovedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") : "-")</dd>
+    <dt class="col-sm-3">الحالة</dt><dd class="col-sm-9">@localizedStatus</dd>
+    <dt class="col-sm-3">الإجمالي</dt><dd class="col-sm-9">@Model.TotalDinar.ToString("0.00") دينار</dd>
+</dl>
+
+@if (string.Equals(Model.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase) && canApprovePending)
+{
+    <div class="card mb-4 border-0 shadow-sm bg-light">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <span class="fw-semibold">@L["Approve Pending Sales Invoice"]</span>
+            <span class="badge bg-warning text-dark">@L["Pending Approval"]</span>
+        </div>
+        <div class="card-body">
+            <form asp-action="Approve" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="InvoiceId" value="@Model.Id" />
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <label class="form-label fw-semibold mb-0">@L["Customer"]</label>
+                            <a asp-controller="Customers" asp-action="Create" asp-route-returnUrl="@addCustomerReturnUrl" class="btn btn-sm btn-outline-primary">+ @L["Add Customer"]</a>
+                        </div>
+                        <select name="CustomerId" asp-items="@(ViewData["Customers"] as SelectList)" class="form-select" required>
+                            <option value="">@L["Select customer..."]</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">السعر</label>
+                        <input name="EurToDinarRateSnapshot" class="form-control" type="number" step="0.01" min="0.01" value="1" readonly required />
+                    </div>
+                </div>
+
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered align-middle bg-white">
+                        <thead>
+                            <tr class="table-light">
+                                <th>@L["Item"]</th>
+                                <th>@L["Qty"]</th>
+                                <th style="width:220px;">سعر الوحدة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @{
+                            var index = 0;
+                        }
+                        @foreach (var line in lines)
+                        {
+                            <tr>
+                                <td>@line.Item?.Name</td>
+                                <td>@line.Qty.ToString("0")</td>
+                                <td>
+                                    <input type="hidden" name="LinePrices[@index].LineId" value="@line.Id" />
+                                    <input name="LinePrices[@index].UnitPriceEur" class="form-control" type="number" step="0.01" min="0" value="@line.UnitPriceEur.ToString("0.00")" required />
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-success px-4">@L["Approve Invoice"]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@if (string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) && (User.IsInRole("Admin") || User.IsInRole("Prog")))
+{
+    <form asp-action="Cancel" method="post" class="mb-3">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-danger" onclick="return confirm('@L["Cancel this sales invoice?"]');">@L["Cancel Invoice"]</button>
+    </form>
+}
+
+<h4>@L["Lines"]</h4>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>@L["Item"]</th>
+                <th>@L["Qty"]</th>
+                <th>سعر الوحدة</th>
+                <th>إجمالي السطر</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var line in lines)
+        {
+            <tr>
+                <td>@line.Item?.Name</td>
+                <td>@line.Qty.ToString("0")</td>
+                <td>@line.UnitPriceEur.ToString("0.00")</td>
+                <td>@line.LineTotalDinar.ToString("0.00")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<p>
+    @if ((User.IsInRole("Admin") || User.IsInRole("Prog")) && string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+    {
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">@L["Edit"]</a>
+    }
+    <a asp-action="Index" class="btn btn-secondary">@L["Back"]</a>
+</p>
+

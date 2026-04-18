@@ -1,0 +1,79 @@
+﻿@model IEnumerable<NewsApp2.Models.Entities.SalesInvoice>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "فواتير البيع";
+}
+
+<h1>فواتير البيع</h1>
+<p>
+    <a class="btn btn-primary" asp-action="Create">فاتورة بيع جديدة</a>
+    <a class="btn btn-outline-primary" asp-action="Drafts">الفواتير المعلقة</a>
+    <a class="btn btn-outline-secondary" asp-action="Report">تقرير</a>
+</p>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-3">
+        <label class="form-label">@L["From"]</label>
+        <input type="text" name="from" value="@(Context.Request.Query["from"] )" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">@L["To"]</label>
+        <input type="text" name="to" value="@(Context.Request.Query["to"] )" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">@L["Customer"]</label>
+        <select name="customerId" asp-items="@(ViewData["Customers"] as SelectList)" class="form-select">
+            <option value="">@L["All customers"]</option>
+        </select>
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button type="submit" class="btn btn-primary w-100">تصفية</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>@L["Number"]</th>
+                <th>@L["Date"]</th>
+                <th>العميل</th>
+                <th>الحالة</th>
+                <th>طريقة الدفع</th>
+                <th>الإجمالي</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model)
+        {
+            var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;
+            var paymentText = (row.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
+            {
+                "card" => "بطاقة",
+                "transfer" => "تحويل",
+                "credit" => "آجل",
+                _ => "نقدي"
+            };
+            var customerName = row.Customer?.Name;
+            var shownCustomerName = string.Equals(customerName, "مبيعات يومية", StringComparison.Ordinal) ? "-" : (customerName ?? "-");
+            <tr>
+                <td>@row.Number</td>
+                <td><span dir="ltr">@row.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                <td>@shownCustomerName</td>
+                <td>@localizedStatus</td>
+                <td>@paymentText</td>
+                <td>@row.TotalDinar.ToString("0.00")</td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@row.Id">@L["Details"]</a>
+                    @if ((User.IsInRole("Admin") || User.IsInRole("Prog")) && string.Equals(row.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span> | </span><a asp-action="Edit" asp-route-id="@row.Id">@L["Edit"]</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+

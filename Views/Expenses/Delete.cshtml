@@ -1,0 +1,36 @@
+@model NewsApp2.Models.Entities.ExpenseEntry
+@{
+    ViewData["Title"] = "حذف حركة";
+}
+
+<h3 class="text-danger mb-3">هل تريد حذف هذه الحركة؟</h3>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">التاريخ</dt>
+            <dd class="col-sm-9">@Model.ExpenseDate.ToString("dd/MM/yyyy")</dd>
+
+            <dt class="col-sm-3">النوع</dt>
+            <dd class="col-sm-9">@Model.ExpenseKind</dd>
+
+            <dt class="col-sm-3">التصنيف</dt>
+            <dd class="col-sm-9">@Model.Category</dd>
+
+            <dt class="col-sm-3">المبلغ</dt>
+            <dd class="col-sm-9">@Model.Amount.ToString("N2") د.ل</dd>
+
+            <dt class="col-sm-3">الموظف</dt>
+            <dd class="col-sm-9">@(Model.Employee != null ? Model.Employee.Name : "-")</dd>
+
+            <dt class="col-sm-3">ملاحظة</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Note) ? "-" : Model.Note)</dd>
+        </dl>
+    </div>
+</div>
+
+<form asp-action="Delete" method="post" class="d-flex gap-2">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit" class="btn btn-danger">حذف</button>
+    <a asp-action="Index" class="btn btn-outline-secondary">إلغاء</a>
+</form>

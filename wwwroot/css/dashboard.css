@@ -1,0 +1,270 @@
+﻿body {
+    background-color: #EFF0F5;
+}
+
+.ts-dropdown,
+.ts-dropdown .ts-dropdown-content {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.ts-dropdown {
+    z-index: 2000;
+}
+
+.ts-wrapper {
+    width: 100%;
+    display: block;
+}
+
+.ts-wrapper .ts-control {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ts-wrapper.single .ts-control input {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.ts-wrapper.single .ts-control .item {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ts-wrapper .ts-dropdown {
+    min-width: 100%;
+    box-sizing: border-box;
+}
+
+.ts-dropdown .option[data-value=""] {
+    display: none;
+}
+
+.item-select,
+.item-select.ts-wrapper,
+.item-select + .ts-wrapper {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.batch-select,
+.batch-select.ts-wrapper,
+.batch-select + .ts-wrapper {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.batch-select.ts-wrapper .ts-control,
+.batch-select + .ts-wrapper .ts-control {
+    width: 100%;
+}
+
+.batch-select + .ts-wrapper .ts-dropdown {
+    min-width: 100%;
+    width: 100%;
+}
+
+#lines-table input[name*="Quantity"] {
+    width: 100%;
+    min-width: 0;
+}
+
+#lines-table th,
+#lines-table td {
+    padding: 0.55rem 0.6rem;
+    vertical-align: middle;
+}
+
+#lines-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#lines-table th:nth-child(1),
+#lines-table td:nth-child(1) {
+    width: 26%;
+}
+
+#lines-table th:nth-child(2),
+#lines-table td:nth-child(2) {
+    width: 28%;
+}
+
+#lines-table th:nth-child(3),
+#lines-table td:nth-child(3) {
+    width: 10%;
+}
+
+#lines-table th:nth-child(4),
+#lines-table td:nth-child(4) {
+    width: 26%;
+}
+
+#lines-table th:nth-child(5),
+#lines-table td:nth-child(5) {
+    width: 10%;
+}
+
+@media (max-width: 768px) {
+    .item-select,
+    .batch-select,
+    .batch-select.ts-wrapper,
+    .item-select.ts-wrapper,
+    .batch-select + .ts-wrapper {
+        min-width: 100%;
+        width: 100%;
+    }
+
+    #lines-table {
+        min-width: 720px;
+    }
+}
+
+.sidebar-icon-only .sidebar .nav .nav-item .nav-link.disabled,
+.sidebar-icon-only .sidebar .nav .nav-item .nav-link.disabled .menu-title,
+.sidebar-icon-only .sidebar .nav .nav-item .nav-link.disabled .icon-bg {
+    display: none !important;
+}
+
+.sidebar .nav .sub-menu .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sidebar .nav .sub-menu .nav-link i {
+    font-size: 0.95rem;
+}
+
+/* Fix Bootstrap Icons glyph rendering in sidebar when combined with template's menu-icon class. */
+.sidebar .nav .nav-item .nav-link i.bi.menu-icon,
+.sidebar .nav .sub-menu .nav-link i.bi {
+    font-family: "bootstrap-icons" !important;
+    font-style: normal;
+    font-weight: 400;
+}
+
+.container, .container-fluid, .container-xxl, .container-xl, .container-lg, .container-md, .container-sm {
+    padding-left: 0;
+}
+
+
+.canvas {
+    width: 250px;
+    height: 250px;
+}
+
+.canvas1 {
+    /*width: 250px;*/
+    height: 250px;
+}
+
+.table th img, .table td img {
+   
+     border-radius: 0; 
+}
+
+.btn {
+    padding: 1rem 1.6rem;
+    font-size:12px;
+}
+
+.stock-filter-form .ts-wrapper,
+.stock-filter-form select.form-select {
+    flex: 0 0 200px;
+    width: 200px;
+    min-width: 200px;
+}
+
+.stock-filter-form .form-control[name="search"] {
+    flex: 0 0 240px;
+    width: 240px;
+    min-width: 240px;
+}
+
+.stock-filter-form .form-control[name="lowThreshold"] {
+    flex: 0 0 160px;
+    width: 160px;
+    min-width: 160px;
+}
+
+.stock-filter-form .ts-control {
+    width: 100%;
+}
+
+.stock-filter-form .form-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0;
+}
+
+.stock-filter-form .form-check-input {
+    margin-top: 0;
+    width: 1.2rem;
+    height: 1.2rem;
+}
+
+.stock-filter-form .form-check-label {
+    margin: 0;
+    line-height: 1;
+}
+
+.stock-filter-form .btn {
+    padding: 0.85rem 2.2rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.08rem;
+}
+
+.stock-filter-form > .ts-wrapper,
+.stock-filter-form > .form-select {
+    flex: 0 0 220px;
+    width: 220px;
+    min-width: 220px;
+}
+
+.invoice-create-form {
+    width: 100%;
+    max-width: 100%;
+}
+
+.invoice-create-form .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+    .page-body-wrapper,
+    .main-panel,
+    .content-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .invoice-create-form .row.g-3 > [class*="col-"],
+    .invoice-create-form .row.g-2 > [class*="col-"],
+    .invoice-create-form .row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .invoice-create-form .d-flex {
+        flex-wrap: wrap;
+    }
+
+    .invoice-create-form .btn {
+        white-space: normal;
+    }
+
+    #lines-table {
+        min-width: 720px;
+    }
+}
+

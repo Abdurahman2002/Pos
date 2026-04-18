@@ -1,0 +1,25 @@
+﻿
+
+
+<footer class="footer py-3 bg-light text-center mt-3" style="position:absolute;bottom:0;width:100%;">
+    <div class="container">
+        <p class="mb-0 text-muted">
+            &copy; @DateTime.Now.Year - @ViewBag.SiteName | All rights reserved.
+        </p>
+    </div>
+</footer>
+
+<script>
+    $(document).ready(function () {
+        var footer = $(".footer");
+
+        $(window).scroll(function () {
+            if ($("body").height() <= $(window).height()) {
+                footer.css("position", "absolute");
+                footer.css("bottom", "0");
+            } else {
+                footer.css("position", "relative");
+            }
+        });
+    });
+</script>

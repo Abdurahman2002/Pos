@@ -1,0 +1,38 @@
+﻿@model Section
+
+@{
+    ViewData["Title"] = ViewContext.RouteData.Values["controller"]?.ToString() +
+                        "-" + ViewContext.RouteData.Values["action"]?.ToString();
+}
+
+<h4>
+    @ViewData["Title"]
+</h4>
+<hr />
+
+<div class="container" style="min-height:71.5vh;">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="alert alert-light" role="alert">
+                <b> @Html.DisplayNameFor(model => model.Name):</b>
+                @Html.DisplayFor(model => model.Name)
+            </div>
+
+            <div class="alert alert-info" role="alert" style="width:max-content">
+                <p>
+                    <b>@Html.DisplayNameFor(model => model.Created):</b>
+                    @Html.DisplayFor(model => model.Created)
+                </p>
+                <p>
+                    <b>@Html.DisplayNameFor(model => model.Modified):</b>
+                    @Html.DisplayFor(model => model.Modified)
+                </p>
+            </div>
+
+            <div style="margin-top:50px">
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a> |
+                <a asp-action="Index" class="btn btn-outline-primary">Back to List</a>
+            </div>
+        </div>
+    </div>
+</div>

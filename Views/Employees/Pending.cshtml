@@ -1,0 +1,62 @@
+@model IEnumerable<Employee>
+
+@{
+    ViewBag.Title = "Pending Employees";
+    var userRoles = ViewData["UserRoles"] as Dictionary<string, List<string>> ?? new Dictionary<string, List<string>>();
+}
+
+<partial name="Partial/_datatables-css" />
+
+<div class="container-fluid" style="min-height:75vh">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="fw-bold">Pending Approval</h3>
+        <a asp-action="Index" class="btn btn-outline-primary">Back to Employees</a>
+    </div>
+
+    <div class="card shadow-sm p-2 bg-body-tertiary">
+        <table id="tablePending" class="table table-hover table-striped table-bordered w-100">
+            <thead style="background-color:#E0ECEB">
+                <tr class="align-middle">
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Requested At</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ int i = 0; }
+                @foreach (var item in Model)
+                {
+                    i++;
+                    <tr class="align-middle">
+                        <td class="text-center">@i</td>
+                        <td>@item.Name</td>
+                        <td>@item.ApplicationUser.Email</td>
+                        <td>
+                            @{
+                                var roles = userRoles.TryGetValue(item.UserId, out var assignedRoles)
+                                ? assignedRoles.Where(r => r != "Employee" && r != "EmployeePending").ToList()
+                                : new List<string>();
+                            }
+                            @(roles.Any() ? string.Join(", ", roles) : "-")
+                        </td>
+                        <td>@Html.DisplayFor(modelItem => item.CreatedDateLocalTime)</td>
+                        <td class="text-end">
+                            <a asp-action="Approve" asp-route-id="@item.Id" class="btn btn-success btn-sm">Approve</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<partial name="Partial/_datatables-js" />
+
+<script>
+    new DataTable('#tablePending', {
+        scrollX: true
+    });
+</script>

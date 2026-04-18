@@ -1,0 +1,80 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["Email Confirmed"];
+}
+
+<style>
+    .fade-slide {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s ease;
+    }
+
+        .fade-slide.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+</style>
+
+<div class="container pt-5 mt-5" style="min-height:65vh">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+
+            <div class="card shadow-lg border-0 rounded-4 fade-slide" id="emailCard">
+
+                <div class="card-body text-center p-5">
+
+                
+                    @if (ViewBag.ErrorMessage == null)
+                    {
+                        <div class="text-success mb-4">
+                            <h3 class="fw-bold">@L["Email confirmation successful"]</h3>
+                        </div>
+
+                        <hr />
+
+                        @if (ViewBag.Message != null)
+                        {
+                            <p class="fs-5 text-warning">@ViewBag.Message</p>
+                        }
+                        else
+                        {
+                            <p class="fs-5 text-secondary">
+                                @L["Your email has been successfully confirmed and your account is now activated."]
+                            </p>
+                        }
+
+                        <div class="mt-4">
+                            <a asp-action="Login" asp-controller="Account" class="btn btn-primary px-4">
+                                @L["Login"]
+                            </a>
+                        </div>
+                    }
+
+                    @* Error *@
+                    else
+                    {
+                        <div class="text-danger mb-4">
+                            <h3 class="fw-bold">@L["Email confirmation failed"]</h3>
+                        </div>
+
+                        <hr />
+
+                        <p class="fs-5 text-secondary">@ViewBag.ErrorMessage</p>
+                    }
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.addEventListener('load', () => {
+            document.getElementById('emailCard').classList.add('show');
+        });
+    </script>
+}

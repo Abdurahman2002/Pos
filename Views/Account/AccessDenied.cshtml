@@ -1,0 +1,56 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+<div class="container pt-5 mt-5" style="min-height:65vh">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+
+            <div class="card shadow-lg border-0 rounded-4 fade-slide" id="accessCard">
+                <div class="card-body text-center p-5">
+
+                    <i class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3"></i>
+
+                    <h3 class="fw-bold text-danger mb-3">@L["Access Denied"]</h3>
+                    <hr />
+
+                    @if (ViewBag.Message != null)
+                    {
+                        <p class="fs-5 text-secondary">@ViewBag.Message</p>
+                    }
+                    else
+                    {
+                        <p class="fs-5 text-secondary">@L["You don't have permission to access this page."]</p>
+                    }
+
+                    <div class="mt-4">
+                        <a asp-action="Index" asp-controller="Home" class="btn btn-outline-secondary px-4 py-2 rounded-3">
+                            @L["Back to Home"]
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .fade-slide {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .fade-slide.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        window.addEventListener('load', () => {
+            document.getElementById('accessCard').classList.add('show');
+        });
+    </script>
+}

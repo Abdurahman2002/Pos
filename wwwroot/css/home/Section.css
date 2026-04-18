@@ -1,0 +1,79 @@
+﻿
+.card-wrapper {
+    display: block;
+}
+
+
+.hover-scale {
+    display: block; 
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+
+.card-link:hover .hover-scale {
+    transform: translateY(-5px) scale(1.03);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+}
+
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(75, 181, 230, 0.2), rgba(232, 235, 237, 0.2));
+    transition: background 0.3s ease;
+}
+
+.card:hover .overlay {
+    background: linear-gradient(to bottom, rgba(75, 181, 230, 0.3), rgba(232, 235, 237, 0.3));
+}
+
+
+.fade-scroll {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.6s ease-out;
+}
+
+
+.object-fit-cover {
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+    .object-fit-cover.loaded {
+        opacity: 1;
+    }
+
+
+.card a {
+    color: inherit;
+    text-decoration: none;
+}
+
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: transform 0.3s ease;
+}
+
+
+.card-link:hover .card-title {
+    transform: translateY(-2px);
+}
+
+.card-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+
+.card-link:hover .card-text {
+    transform: translateY(-2px);
+    color: #4bb5e6;
+}

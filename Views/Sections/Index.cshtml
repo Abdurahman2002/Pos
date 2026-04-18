@@ -1,0 +1,105 @@
+﻿
+@model IEnumerable<Section>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+
+@{
+    ViewData["Title"] = L["Sections"];
+}
+
+
+
+<div style="min-height:80vh;">
+    <h4>
+        <b>@L["Sections"]</b>
+    </h4>
+
+    <hr />
+
+    @if (Model.Any())
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <a asp-action="Create" class="btn btn-primary">@L["Create New"]</a>
+
+            <div class="alert alert-info mb-0 px-3">
+                <strong>@L["Sections Count"]:</strong> @ViewData["SectionsCount"] - @ViewBag.SectionsCount
+            </div>
+        </div>
+
+
+
+
+        @* @ViewBag.SectionsCount; *@
+
+        <table id="table1" class="table table-hover table-striped table-bordered">
+            <thead class=" table-primary">
+                <tr>
+                    <th>
+                        @L["Number"]
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Name)
+                    </th>
+                    <th>
+                        @L["News Count"]
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Created)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Modified)
+                    </th>
+                    <th>
+
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int i = 0;
+                    foreach (var item in Model)
+                    {
+                        i++;
+                        <tr>
+                            <td>
+                                @i
+                            </td>
+                            <td>
+                                @Html.DisplayFor(modelItem => item.Name)
+                            </td>
+                            <td>
+                                @Html.DisplayFor(modelItem => item.News.Count)
+                            </td>
+                            <td>
+                                @Html.DisplayFor(modelItem => item.Created)
+                            </td>
+                            <td>
+                                @Html.DisplayFor(modelItem => item.Modified)
+                            </td>
+                            <td>
+                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-info">@L["Edit"]</a>
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-warning">@L["Details"]</a>
+                                <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-danger">@L["Delete"]</a>
+                            </td>
+                        </tr>
+
+                      
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                @L["No Sections"]
+            </div>
+            <div class="card-body">
+                <a asp-controller="Sections" asp-action="Create" class="btn btn-primary">@L["Create section"]</a>
+            </div>
+        </div>
+    }
+</div>
+
+

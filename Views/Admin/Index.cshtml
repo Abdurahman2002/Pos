@@ -1,0 +1,264 @@
+﻿
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewData["Title"] = L["Dashboard"];
+}
+
+
+@* <div class="row mt-3" style="min-height:75vh;"> *@
+<div class="row mt-3" >
+    @if (User.IsInRole("Prog"))
+    {
+        <div class="col-md-6 col-lg-3">
+            <div class="card  mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-8">
+                            <p class="card-text">@L["Users"]</p>
+                            <h5 class="card-title">20</h5>
+                        </div>
+                        <div class="col-4 d-flex align-items-center">
+                            <i class="bi bi-people fs-1 text-secondary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="col-md-6 col-lg-3">
+        <div class="card  mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <p class="card-text">@L["Online"]</p>
+                        <h5 class="card-title">10</h5>
+                    </div>
+                    <div class="col-4 d-flex align-items-center">
+                        <i class="bi bi-person-video3 fs-1 text-secondary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card  mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <p class="card-text">@L["Sections"]</p>
+                        <h5 class="card-title">@ViewBag.sectionCount</h5>
+                    </div>
+                    <div class="col-4 d-flex align-items-center">
+                        <i class="bi bi-diagram-3 fs-1 text-secondary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card  mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <p class="card-text">@L["News"]</p>
+                        <h5 class="card-title">@ViewBag.newsCount</h5>
+                    </div>
+                    <div class="col-4 d-flex align-items-center">
+                        <i class="bi bi-newspaper fs-1 text-secondary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ----------------------------charts.js-------------------------------- *@
+
+
+<div class="row mt-2">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white border-bottom-0">
+                <h5 class="card-title text-center">@L["News in sections"]</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <div class="canvas1">
+                        <canvas id="NewsSectionsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white border-bottom-0">
+                <h5 class="card-title text-center">@L["News in months"]</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <div class="canvas">
+                        <canvas id="NewsMonthPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white border-bottom-0">
+                <h5 class="card-title text-center">@L["News in sections"]</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <div class="canvas">
+                        <canvas id="NewsSectionLineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white border-bottom-0">
+                <h5 class="card-title text-center">@L["News in months"]</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <div class="canvas1">
+                        <canvas id="NewsMonthbarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@* ------------------------------------------------------------- *@
+
+@section scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    
+    <script>
+        $(document).ready(function () {
+
+            $.ajax({
+                url: '@Url.Action("NewsSectionsChart", "Admin")',
+                type: 'GET',
+                success: function (data) {
+                    var ctx = document.getElementById('NewsSectionsBarChart').getContext('2d');
+                    var chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(data),
+                            datasets: [{
+                                label: '@L["News Count"]',
+                                data: Object.values(data),
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            }]
+                        }
+                    });
+                }
+            });
+        });
+
+        $(document).ready(function () {
+
+            $.ajax({
+                url: '@Url.Action("NewsMonthChart", "Admin")',
+                type: 'GET',
+                success: function (data) {
+                    var ctx = document.getElementById('NewsMonthPieChart').getContext('2d');
+                    var labels = Object.keys(data);
+                    var values = Object.values(data);
+
+                    var backgroundColors = labels.map(function () {
+                        return getRandomColor();
+                    });
+
+                    var chart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: backgroundColors
+                            }]
+                        }
+                    });
+                }
+            });
+        });
+
+        $(document).ready(function () {
+
+            $.ajax({
+                url: '@Url.Action("NewsSectionsChart", "Admin")',
+                type: 'GET',
+                success: function (data) {
+                    var ctx = document.getElementById('NewsSectionLineChart').getContext('2d');
+
+                    var projectNames = Object.keys(data);
+                    var taskCounts = Object.values(data);
+
+                    var backgroundColors = Array.from({ length: projectNames.length }, getRandomColor);
+
+                    var chart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: projectNames,
+                            datasets: [{
+                                data: taskCounts,
+                                backgroundColor: backgroundColors
+                            }]
+                        }
+                    });
+                }
+            });
+        });
+
+        $(document).ready(function () {
+
+            $.ajax({
+                url: '@Url.Action("NewsMonthChart", "Admin")',
+                type: 'GET',
+                success: function (data) {
+                    var ctx = document.getElementById('NewsMonthbarChart').getContext('2d');
+                    var chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(data),
+                            datasets: [{
+                                label: '@L["News Count"]',
+                                data: Object.values(data),
+                                backgroundColor: getRandomColor,
+                                borderColor: getRandomColor,
+                                borderWidth: 1
+                            }]
+                        }
+                    });
+                }
+            });
+        });
+
+        function getRandomColor() {
+            var letters = '0123456789ABCDEF';
+            var color = '#';
+            for (var i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+    </script>
+}
+
+

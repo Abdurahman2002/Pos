@@ -1,0 +1,22 @@
+html[dir="rtl"] body {
+    text-align: right;
+    direction: rtl;
+}
+
+html[dir="rtl"] .language-switcher {
+    direction: rtl;
+}
+
+html[dir="rtl"] .dropdown-menu {
+    text-align: right;
+}
+
+html[dir="rtl"] .table,
+html[dir="rtl"] .form-control,
+html[dir="rtl"] .form-select {
+    direction: rtl;
+}
+
+html[dir="rtl"] .input-group > .form-control {
+    text-align: right;
+}

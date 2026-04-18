@@ -1,0 +1,12 @@
+﻿@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["User Profile"];
+}
+
+<div class="container pt-4" style="min-height:75vh">
+    <div class="alert alert-warning">
+        @L["User profile is not available."]
+    </div>
+</div>
+

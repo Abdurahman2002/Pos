@@ -1,0 +1,91 @@
+﻿@model LoginVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+<style>
+
+    .fade-slide {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s ease;
+    }
+
+        .fade-slide.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+</style>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+
+
+            <div class="card shadow-lg border-0 rounded-4 fade-slide" id="loginCard">
+
+                <div class="card-header text-center bg-light border-0 rounded-top-4 py-4">
+                    <h3 class="fw-bold text-secondary">@L["Login"]</h3>
+                </div>
+
+                <div class="card-body px-4 py-4">
+
+                    <form asp-action="Login" method="post">
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label fw-semibold"></label>
+                            <input asp-for="Email" class="form-control form-control-lg" placeholder="example@example.com" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 position-relative">
+                            <label asp-for="Password" class="form-label fw-semibold"></label>
+                            <input asp-for="Password"  class="form-control form-control-lg" id="pass" />
+                            <i class="bi bi-eye-slash position-absolute top-50 end-0 me-3 translate-middle-y text-secondary" style="cursor:pointer" onclick="togglePass()"></i>
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input asp-for="RememberMe" class="form-check-input" />
+                            <label class="form-check-label fw-semibold" asp-for="RememberMe"></label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-3 mt-2">
+                            @L["Login"]
+                        </button>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <a asp-action="ForgotPassword" class="text-decoration-none">
+                            @L["Forgot password?"]
+                        </a>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <span class="text-secondary">@L["Don't have an account?"]</span>
+                        <a asp-action="EmployeeRegister" asp-controller="Account" class="text-primary text-decoration-none">
+                            @L["Register as employee"]
+                        </a>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        function togglePass() {
+            const input = document.getElementById("pass");
+            input.type = input.type === "password" ? "text" : "password";
+        }
+
+        // تشغيل الحركة بعد تحميل الصفحة
+        window.addEventListener('load', () => {
+            document.getElementById('loginCard').classList.add('show');
+        });
+    </script>
+}

@@ -1,0 +1,71 @@
+@model NewsApp2.ViewModels.Customers.CustomerDebtReportVM
+
+@{
+    ViewData["Title"] = "ديون العملاء";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2>ديون العملاء (البيع الآجل)</h2>
+    <a class="btn btn-outline-secondary" asp-action="Index">العملاء</a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<form class="row g-2 mb-3" method="get" asp-action="Debts">
+    <div class="col-md-4">
+        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="بحث بالاسم أو الهاتف" />
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100" type="submit">بحث</button>
+    </div>
+</form>
+
+<div class="alert alert-light border mb-3">
+    <strong>إجمالي الديون:</strong> @Model.TotalDebt.ToString("0.00") دينار
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>العميل</th>
+                <th>الهاتف</th>
+                <th>آخر بيع آجل</th>
+                <th>آخر تحصيل</th>
+                <th class="text-end">المديونية (دينار)</th>
+                <th style="width:180px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Rows.Any())
+        {
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td>@row.CustomerName</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.Phone) ? "-" : row.Phone)</td>
+                    <td>@(row.LastCreditSaleDate.HasValue ? row.LastCreditSaleDate.Value.ToString("dd/MM/yyyy") : "-")</td>
+                    <td>@(row.LastPaymentDate.HasValue ? row.LastPaymentDate.Value.ToString("dd/MM/yyyy") : "-")</td>
+                    <td class="text-end fw-semibold">@row.DebtAmount.ToString("0.00")</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Statement" asp-route-id="@row.CustomerId">كشف الحساب والتحصيل</a>
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">لا توجد ديون آجل على العملاء حاليا.</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

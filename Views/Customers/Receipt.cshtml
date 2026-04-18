@@ -1,0 +1,33 @@
+@model NewsApp2.Models.Entities.CustomerReceipt
+
+@{
+    ViewData["Title"] = "سند قبض";
+    var paymentMethod = (Model.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "card" => "بطاقة",
+        "transfer" => "تحويل",
+        _ => "نقدي"
+    };
+}
+
+<div class="d-print-none mb-3 d-flex gap-2">
+    <a class="btn btn-outline-secondary" asp-action="Statement" asp-route-id="@Model.CustomerId">الرجوع لكشف الحساب</a>
+    <button class="btn btn-primary" onclick="window.print()">طباعة</button>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h3 class="mb-3">سند قبض</h3>
+        <div class="row g-2 mb-3">
+            <div class="col-md-6"><strong>رقم السند:</strong> @Model.Id</div>
+            <div class="col-md-6"><strong>التاريخ:</strong> @Model.ReceiptDate.ToString("dd/MM/yyyy")</div>
+            <div class="col-md-6"><strong>العميل:</strong> @(Model.Customer?.Name ?? "-")</div>
+            <div class="col-md-6"><strong>طريقة التحصيل:</strong> @paymentMethod</div>
+            <div class="col-md-6"><strong>المبلغ:</strong> @Model.Amount.ToString("0.00") دينار</div>
+            <div class="col-md-6"><strong>المستخدم:</strong> @(string.IsNullOrWhiteSpace(Model.CreatedByUserName) ? "-" : Model.CreatedByUserName)</div>
+        </div>
+        <div>
+            <strong>ملاحظة:</strong> @(string.IsNullOrWhiteSpace(Model.Note) ? "-" : Model.Note)
+        </div>
+    </div>
+</div>

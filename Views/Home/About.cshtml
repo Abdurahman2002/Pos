@@ -1,0 +1,60 @@
+﻿@model SiteVM
+
+@{
+    ViewData["Title"] = "About";
+}
+
+<section class="about-page">
+
+    <!-- Header -->
+    <div class="text-center" >
+            <img src="@(Model.SiteInfo?.LogoUrl != null ? Url.Content($"~/upload/{Model.SiteInfo.LogoUrl}") : Url.Content("~/img/logo.png"))"
+             class="shadow-lg mb-3 logo" />
+            <h1 class="fw-bold text-primary">@(Model.SiteInfo?.Name ?? "Professional Company")</h1>
+            <p class="lead text-primary-emphasis">@Model.SiteInfo?.Activity</p>
+    </div>
+
+    <!-- About Content -->
+    <div class="container py-5 fade-slide">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <img src="@(Model.SiteInfo?.CoverImageUrl != null ? Url.Content($"~/upload/{Model.SiteInfo.CoverImageUrl}") : Url.Content("~/img/bg-masthead.jpg"))"
+                     class="img-fluid rounded shadow-lg content-img" />
+            </div>
+            <div class="col-lg-6">
+                <h2 class="fw-bold mb-3 text-primary">About Us</h2>
+                <p class="text-dark">@Model.SiteInfo?.About</p>
+
+                <div class="mt-4 d-flex align-items-center">
+                    <p class="mb-0 me-4"><i class="fas fa-envelope me-2 text-primary"></i>@Model.Contact?.Email</p>
+                    <p class="mb-0"><i class="fas fa-phone me-2 text-success"></i>@Model.Contact?.Phone</p>
+                </div>
+
+                <div class="mt-4">
+                    <a href="@Model.Contact?.Twitter" class="me-3 social-icon twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="@Model.Contact?.Facebook" class="me-3 social-icon facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="@Model.Contact?.Instagram" class="social-icon instagram"><i class="bi bi-instagram"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mission / Highlights Section -->
+    <div class="about-mission py-5 text-white fade-slide">
+        <div class="container text-center">
+            <h2 class="fw-bold mb-4">Our Mission</h2>
+            <p class="lead mb-4" style="max-width:700px; margin:auto;">
+                We aim to deliver professional and high-quality services to our clients, ensuring satisfaction and innovation in every project.
+            </p>
+
+            <a href="@Url.Action("Index", "Home")#signup" class="btn btn-primary btn-lg shadow-lg">Contact Us</a>
+        </div>
+    </div>
+
+</section>
+
+<link href="~/css/home/about.css" rel="stylesheet" />
+
+@section Scripts {
+    <script src="~/js/home/about.js"></script>
+}

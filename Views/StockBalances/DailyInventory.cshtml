@@ -1,0 +1,126 @@
+@model NewsApp2.ViewModels.Inventory.DailyInventoryReportVM
+@{
+    ViewData["Title"] = "تقرير الجرد اليومي";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 text-gray-800"><i class="mdi mdi-clipboard-text-outline text-primary me-2"></i> @ViewData["Title"]</h2>
+    <div class="d-none d-md-block">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة التقرير</button>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 search-form-card">
+    <div class="card-body">
+        <form asp-action="DailyInventory" method="get" class="row g-3 align-items-end">
+            <div class="col-md-4 col-sm-6">
+                <label class="form-label text-muted small fw-bold">تاريخ الجرد</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="mdi mdi-calendar"></i></span>
+                    <input type="date" name="date" class="form-control" value="@Model.ReportDate.ToString("yyyy-MM-dd")" />
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <button type="submit" class="btn btn-primary w-100"><i class="mdi mdi-magnify me-1"></i> عرض التقرير</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!Model.Rows.Any())
+{
+    <div class="alert alert-info text-center py-5 shadow-sm">
+        <i class="mdi mdi-information-outline display-4 d-block mb-3"></i>
+        <h5>لا يوجد حركة أو أرصدة أصناف مسجلة لهذا اليوم.</h5>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm print-area">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped table-bordered align-middle mb-0">
+                    <thead class="table-light text-secondary small text-uppercase">
+                        <tr>
+                            <th style="width: 250px;">الصنف</th>
+                            <th>التصنيف</th>
+                            <th class="text-end">الرصيد الافتتاحي</th>
+                            <th class="text-end text-success">الوارد / المشتريات</th>
+                            <th class="text-end text-danger">المباع</th>
+                            <th class="text-end text-warning">المرتجعات</th>
+                            <th class="text-end fw-bold text-dark">الرصيد הختامي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            string currentCategory = null;
+                        }
+                        @foreach (var row in Model.Rows)
+                        {
+                            if (currentCategory != row.CategoryName)
+                            {
+                                currentCategory = row.CategoryName;
+                                <tr class="table-secondary">
+                                    <td colspan="7" class="fw-bold text-primary"><i class="mdi mdi-tag-outline me-1"></i> @currentCategory</td>
+                                </tr>
+                            }
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-dark">@row.ItemName</div>
+                                    @if (!string.IsNullOrEmpty(row.Barcode))
+                                    {
+                                        <div class="small text-muted"><i class="mdi mdi-barcode me-1"></i>@row.Barcode</div>
+                                    }
+                                </td>
+                                <td><span class="badge bg-light text-dark border">@row.CategoryName</span></td>
+                                <td class="text-end fw-bold">@row.OpeningBalance.ToString("0.##")</td>
+                                <td class="text-end text-success fw-bold">@row.Received.ToString("0.##")</td>
+                                <td class="text-end text-danger fw-bold">@row.Sold.ToString("0.##")</td>
+                                <td class="text-end text-warning fw-bold">@row.Returns.ToString("0.##")</td>
+                                <td class="text-end fw-bold fs-6 text-dark border-start">@row.ClosingBalance.ToString("0.##")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <td colspan="2" class="text-end fw-bold">الإجمالي المجمع</td>
+                            <td class="text-end fw-bold">@Model.TotalOpening.ToString("0.##")</td>
+                            <td class="text-end text-success fw-bold">@Model.TotalReceived.ToString("0.##")</td>
+                            <td class="text-end text-danger fw-bold">@Model.TotalSold.ToString("0.##")</td>
+                            <td class="text-end text-warning fw-bold">@Model.TotalReturns.ToString("0.##")</td>
+                            <td class="text-end fw-bold fs-6 border-start">@Model.TotalClosing.ToString("0.##")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    @@media print {
+        body * {
+            visibility: hidden;
+        }
+        .print-area, .print-area * {
+            visibility: visible;
+        }
+        .print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .search-form-card, .navbar, .sidebar {
+            display: none !important;
+        }
+        .table-dark {
+            color: #000 !important;
+            background-color: #e9ecef !important;
+        }
+        .badge {
+            border: 1px solid #ccc !important;
+            color: #000 !important;
+        }
+    }
+</style>

@@ -1,0 +1,154 @@
+﻿@model SiteVM
+
+@{
+    ViewData["Title"] = "Site Details";
+    // Layout = "_LayoutDashboard";
+}
+
+<div class="container">
+    <h4>Company</h4>
+    <hr />
+    @if (Model.SiteInfo != null)
+    {
+        <dl class="row">
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.SiteInfo.Name)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.SiteInfo.Name)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.SiteInfo.Activity)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.SiteInfo.Activity)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.SiteInfo.About)
+            </dt>
+            <dd class="col-md-10 border p-3 mb-4 rounded bg-body-secondary">
+                @Html.DisplayFor(model => model.SiteInfo.About)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.SiteInfo.LogoUrl)
+            </dt>
+
+            <dd class="col-md-10">
+
+                @if (Model.SiteInfo.LogoUrl != null)
+                {
+                    <img src="~/upload/@Model.SiteInfo.LogoUrl" style="width: 200px; height: 200px" class="img-thumbnail" />
+
+                }
+                else
+                {
+                    <img src="~/img/logo.png" alt="no img" style="width:200px;height:200px" class="img-thumbnail" />
+                    <small>the default Picture</small>
+                }
+
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.SiteInfo.CoverImageUrl)
+            </dt>
+            <dd class="col-md-10">
+
+                @if (Model.SiteInfo.CoverImageUrl != null)
+                {
+                    <img id="imgAttach" src="~/upload/@Model.SiteInfo.CoverImageUrl" style="width:200px;height:200px" class="img-thumbnail" />
+                }
+                else
+                {
+                    <img src="~/img/bg-masthead.jpg" alt="no img" style="width:200px;height:200px" class="img-thumbnail" />
+                    <small>the default Picture</small>
+                }
+
+            </dd>
+        </dl>
+
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                No Site Information
+            </div>
+            <div class="card-body">
+                <a asp-controller="Admin" asp-action="SiteEdit" class="btn btn-primary">Edit Site Information</a>
+            </div>
+        </div>
+    }
+</div>
+
+
+<div class="container mt-3">
+
+    <h4>Contact</h4>
+    <hr />
+    @if (Model.Contact != null)
+    {
+        <dl class="row">
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.Contact.Email)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.Contact.Email)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.Contact.Phone)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.Contact.Phone)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.Contact.Facebook)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.Contact.Facebook)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.Contact.Twitter)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.Contact.Twitter)
+            </dd>
+            <dt class="col-md-2">
+                @Html.DisplayNameFor(model => model.Contact.Instagram)
+            </dt>
+            <dd class="col-md-10">
+                @Html.DisplayFor(model => model.Contact.Instagram)
+            </dd>
+        </dl>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">
+                No Contact Information
+            </div>
+            <div class="card-body">
+                <a asp-controller="Admin" asp-action="SiteEdit" class="btn btn-primary">Edit Contact Information</a>
+            </div>
+        </div>
+    }
+</div>
+<hr />
+<div class="alert alert-info" role="alert" style="width:max-content;">
+    <p>
+        <b>@Html.DisplayNameFor(model => model.SiteInfo.Created):</b>
+        @Html.DisplayFor(model => model.SiteInfo.Created)
+        @Html.HiddenFor(model => model.SiteInfo.Created)
+    </p>
+    <p>
+        <b>@Html.DisplayNameFor(model => model.SiteInfo.Modified):</b>
+        @Html.DisplayFor(model => model.SiteInfo.Modified)
+    </p>
+</div>
+@if (Model.SiteInfo != null | Model.Contact != null)
+{
+    <div>
+        <a asp-action="SiteEdit" asp-controller="Admin" class="btn btn-primary">Edit</a>
+    </div>
+}
+
+
+

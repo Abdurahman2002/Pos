@@ -1,0 +1,6 @@
+@model DateTime?
+@using System.Globalization
+@if (Model.HasValue)
+{
+    @Model.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss tt", CultureInfo.InvariantCulture)
+}

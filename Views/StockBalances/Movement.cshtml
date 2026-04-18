@@ -1,0 +1,73 @@
+﻿@model NewsApp2.ViewModels.Inventory.StockMovementReportVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = L["Stock Movement"];
+}
+
+<h2>@L["Stock Movement Report"]</h2>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-3">
+        <label class="form-label">@L["From"]</label>
+        @Html.EditorFor(m => m.From)
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">@L["To"]</label>
+        @Html.EditorFor(m => m.To)
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">@L["Item"]</label>
+        <select name="itemId" class="form-select" asp-items="@(ViewData["Items"] as SelectList)">
+            <option value="">@L["All items"]</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">@L["Reference"]</label>
+        <select name="referenceType" class="form-select" asp-items="@(ViewData["ReferenceTypes"] as SelectList)">
+            <option value="">@L["All references"]</option>
+        </select>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">@L["Filter"]</button>
+        <a asp-action="Movement" class="btn btn-secondary">@L["Reset"]</a>
+    </div>
+</form>
+
+<div class="mb-3">
+    <strong>@L["Total In"]:</strong> @Model.TotalIn.ToString("0")
+    &nbsp;|&nbsp;
+    <strong>@L["Total Out"]:</strong> @Model.TotalOut.ToString("0")
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>@L["Date"]</th>
+                <th>@L["Item"]</th>
+                <th>@L["Type"]</th>
+                <th>@L["Reference"]</th>
+                <th>@L["Qty Change"]</th>
+                <th>@L["Balance After"]</th>
+                <th>@L["Note"]</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            var localizedMovementType = string.IsNullOrWhiteSpace(row.MovementType) ? "-" : L[row.MovementType].Value;
+            var localizedReferenceType = string.IsNullOrWhiteSpace(row.ReferenceType) ? "-" : L[row.ReferenceType].Value;
+            <tr>
+                <td><span dir="ltr">@row.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</span></td>
+                <td>@row.ItemName</td>
+                <td>@localizedMovementType</td>
+                <td>@localizedReferenceType</td>
+                <td>@row.QuantityChange.ToString("0")</td>
+                <td>@row.BalanceAfter.ToString("0")</td>
+                <td>@(row.Note ?? string.Empty)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+

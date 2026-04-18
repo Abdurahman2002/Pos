@@ -1,0 +1,51 @@
+﻿@model NewsVM
+
+<div class="news-page container py-5 fade-slide">
+    <div class="row g-4">
+
+        <div class="col-lg-8">
+            <div class="news-main-card shadow-lg p-4 rounded-4">
+                <img src="@(Model.News.ImageUrl != null ? Url.Content($"~/upload/{Model.News.ImageUrl}") : Url.Content("~/img/news.jpg"))"
+                     alt="@Model.News.Title" class="news-main-image rounded-4 mb-4" />
+                <h1 class="news-title mb-2">@Model.News.Title</h1>
+                <p class="news-date text-muted mb-4">
+                    @(Model.News.Modified?.ToString("dd/MM/yyyy") ?? Model.News.Created.ToString("dd/MM/yyyy"))
+                </p>
+                <div class="news-body fs-5 text-secondary">@Html.Raw(Model.News.Details)</div>
+            </div>
+        </div>
+
+
+        <div class="col-lg-4">
+            <h4 class="text-secondary mb-3 border-bottom pb-2">News from the same section</h4>
+            <div class="related-news d-flex flex-column gap-3">
+                @foreach (var n in Model.NewsList)
+                {
+                    <a href="@Url.Action("News", "Home", new { id = n.Id })" class="related-card d-flex align-items-start p-2 rounded-3 shadow-sm hover-card">
+                        <img src="@(n.ImageUrl != null ? Url.Content($"~/upload/{n.ImageUrl}") : Url.Content("~/img/news.jpg"))"
+                              class="related-thumb me-3" />
+                        <div class="related-info flex-grow-1">
+                            <h6 class="related-title">@n.Title.Substring(0, Math.Min(@n.Title.Length, 50))@(@n.Title.Length > 50 ? "..." : "")</h6>
+                            <small class="text-muted">@n.Created.ToString("dd/MM/yyyy")</small>
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<link href="~/css/home/news.css" rel="stylesheet" />
+
+<script>
+    function handleFadeSlide() {
+        const elements = document.querySelectorAll('.fade-slide');
+        const windowHeight = window.innerHeight;
+        elements.forEach(el => {
+            const position = el.getBoundingClientRect().top;
+            if (position - windowHeight <= -100) el.classList.add('show');
+        });
+    }
+    window.addEventListener('scroll', handleFadeSlide);
+    window.addEventListener('load', handleFadeSlide);
+</script>

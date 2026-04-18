@@ -1,0 +1,158 @@
+@model NewsApp2.ViewModels.Customers.CustomerStatementVM
+
+@{
+    ViewData["Title"] = "كشف حساب العميل";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2>كشف حساب العميل</h2>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Debts">ديون العملاء</a>
+        <a class="btn btn-outline-secondary" asp-action="Index">العملاء</a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4"><strong>العميل:</strong> @Model.CustomerName</div>
+            <div class="col-md-4"><strong>الهاتف:</strong> @(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)</div>
+            <div class="col-md-4"><strong>الرصيد الحالي:</strong> @Model.ClosingBalance.ToString("0.00") دينار</div>
+        </div>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="id" value="@Model.CustomerId" />
+    <div class="col-md-3">
+        <label class="form-label">من تاريخ</label>
+        <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">إلى تاريخ</label>
+        <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button class="btn btn-primary w-100" type="submit">تصفية</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">رصيد أول الفترة</div><div class="fw-bold">@Model.OpeningBalance.ToString("0.00")</div></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">مبيعات آجل</div><div class="fw-bold">@Model.TotalDebit.ToString("0.00")</div></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">تحصيلات</div><div class="fw-bold">@Model.TotalCredit.ToString("0.00")</div></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">الرصيد الختامي</div><div class="fw-bold @(Model.ClosingBalance > 0 ? "text-danger" : "text-success")">@Model.ClosingBalance.ToString("0.00")</div></div></div>
+    </div>
+</div>
+
+<div class="card mb-3 border-success-subtle">
+    <div class="card-header bg-white fw-semibold">تسجيل تحصيل جديد</div>
+    <div class="card-body">
+        <form asp-action="AddPayment" method="post" class="row g-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="CustomerId" value="@Model.CustomerId" />
+            <div class="col-md-2">
+                <label class="form-label">التاريخ</label>
+                <input name="ReceiptDate" type="date" class="form-control" value="@Model.PaymentInput.ReceiptDate.ToString("yyyy-MM-dd")" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">المبلغ</label>
+                <input name="Amount" type="number" step="0.01" min="0.01" class="form-control" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">طريقة التحصيل</label>
+                <select name="PaymentMethod" class="form-select">
+                    <option value="Cash">نقدي</option>
+                    <option value="Card">بطاقة</option>
+                    <option value="Transfer">تحويل</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">ملاحظة</label>
+                <input name="Note" class="form-control" maxlength="500" />
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button class="btn btn-success w-100" type="submit">حفظ التحصيل</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>التاريخ</th>
+                <th>المرجع</th>
+                <th>النوع</th>
+                <th class="text-end">مدين</th>
+                <th class="text-end">دائن</th>
+                <th class="text-end">الرصيد</th>
+                <th>ملاحظة</th>
+                <th class="d-print-none" style="width:220px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Rows.Any())
+        {
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy HH:mm")</span></td>
+                    <td>@row.Reference</td>
+                    <td>@row.Type</td>
+                    <td class="text-end">@row.Debit.ToString("0.00")</td>
+                    <td class="text-end">@row.Credit.ToString("0.00")</td>
+                    <td class="text-end fw-semibold">@row.Balance.ToString("0.00")</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.Note) ? "-" : row.Note)</td>
+                    <td class="text-end d-print-none">
+                        @if (row.ReceiptId.HasValue)
+                        {
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@row.ReceiptId.Value" target="_blank">سند قبض</a>
+                            @if (User.IsInRole("Admin") || User.IsInRole("Prog"))
+                            {
+                                @if (row.IsLockedByClosedShift)
+                                {
+                                    <span class="badge bg-secondary">وردية مغلقة</span>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-sm btn-outline-warning" asp-action="EditPayment" asp-route-id="@row.ReceiptId.Value">تعديل</a>
+                                    <form asp-action="DeletePayment" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@row.ReceiptId.Value" />
+                                        <input type="hidden" name="customerId" value="@Model.CustomerId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف سند التحصيل؟');">حذف</button>
+                                    </form>
+                                }
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="8" class="text-center text-muted">لا توجد حركات خلال الفترة المحددة.</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

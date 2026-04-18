@@ -1,0 +1,123 @@
+﻿
+.news-page {
+    color: #333;
+    background-color: #f5f6f7;
+}
+
+
+.news-main-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.news-main-image {
+    width: 100%;
+    height: 400px;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+}
+
+    .news-main-image:hover {
+        transform: scale(1.03);
+    }
+
+.news-title {
+    font-size: 1.9rem;
+    color: #1a3952;
+    font-weight: bold;
+    word-break: break-word; /* يمنع خروج الكلمات الطويلة */
+}
+
+.news-body {
+    line-height: 1.8;
+    color: #444;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* الأخبار الجانبية  */
+.related-news {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.related-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-left: 5px solid #3a86c1;
+    overflow: hidden;
+}
+
+    .related-card:hover {
+        background: linear-gradient(135deg, #dce3ea, #f8f9fa);
+        transform: translateX(-4px);
+    }
+
+.related-thumb {
+    width: 90px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+}
+
+
+.related-title {
+    font-size: 0.95rem;
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 3px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* يمنع خروج العنوان الطويل */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.fade-slide {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all 0.8s ease-out;
+}
+
+    .fade-slide.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+
+.hover-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+    .hover-card:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+    }
+
+/* Responsive */
+@media (max-width: 991px) {
+    .news-main-image {
+        height: 300px;
+    }
+}
+
+@media (max-width: 767px) {
+    .news-main-image {
+        height: 200px;
+    }
+
+    .related-card {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .related-thumb {
+        width: 70px;
+        height: 55px;
+    }
+}

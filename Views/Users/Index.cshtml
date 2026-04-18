@@ -1,0 +1,226 @@
+﻿@model IEnumerable<ApplicationUser>
+@inject UserManager<ApplicationUser> _userManager
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+
+@{
+    ViewBag.Title = L["Users Management"];
+}
+
+<partial name="Partial/_datatables-css" />
+
+<style>
+    .stats-card {
+        transition: 0.2s;
+        border-radius: 14px;
+        border: none;
+    }
+
+        .stats-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+        }
+
+    .stats-icon {
+        font-size: 38px;
+        opacity: 0.8;
+    }
+
+    #table1_wrapper .dt-search label {
+        font-weight: bold;
+    }
+
+    #table1 {
+        border-radius: 12px !important;
+    }
+
+    tr {
+        height: 55px;
+    }
+</style>
+
+<div class="container-fluid" style="min-height:75vh">
+
+    <h3 class="fw-bold mb-4">
+        @L["Users Management"]
+        @if (!string.IsNullOrEmpty(ViewBag.UserList))
+        {
+            <text> - <small>@ViewBag.UserList</small></text>
+        }
+    </h3>
+
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <a asp-action="Index" class="text-decoration-none text-dark">
+                <div class="card stats-card shadow-sm p-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <p class="m-0">@L["All Users"]</p>
+                            <h3>@ViewBag.AllUsers</h3>
+                        </div>
+                        <i class="bi bi-people stats-icon text-primary"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a asp-action="Index" asp-route-userList="Confirmed" class="text-decoration-none text-dark">
+                <div class="card stats-card shadow-sm p-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <p class="m-0">@L["Confirmed"]</p>
+                            <h3>@ViewBag.Confirmed</h3>
+                        </div>
+                        <i class="bi bi-check2-circle stats-icon text-success"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a asp-action="Index" asp-route-userList="Unconfirmed" class="text-decoration-none text-dark">
+                <div class="card stats-card shadow-sm p-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <p class="m-0">@L["Unconfirmed"]</p>
+                            <h3>@ViewBag.Unconfirmed</h3>
+                        </div>
+                        <i class="bi bi-exclamation-circle stats-icon text-warning"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a asp-action="Index" asp-route-userList="Locked" class="text-decoration-none text-dark">
+                <div class="card stats-card shadow-sm p-3">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <p class="m-0">@L["Locked"]</p>
+                            <h3>@ViewBag.Locked</h3>
+                        </div>
+                        <i class="bi bi-lock-fill stats-icon text-danger"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+
+    <div class="d-flex justify-content-between mb-3">
+        <a asp-action="Index" asp-controller="Employees" class="btn btn-outline-primary px-4">@L["Employees"]</a>
+    </div>
+
+
+    <div class="card shadow-sm p-2 bg-body-tertiary">
+        <table id="table1" class="table  table-hover table-striped table-bordered w-100">
+            <thead style="background-color:#E0ECEB">
+                <tr class="align-middle">
+                    <th>#</th>
+                    <th>@L["Confirm"]</th>
+                    <th>@L["User"]</th>
+                    <th>@L["Roles"]</th>
+                    <th>@L["Created"]</th>
+                    <th>@L["Last Access"]</th>
+                    <th>@L["Lockout"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int i = 0;
+                }
+                @foreach (var user in Model)
+                {
+                    i++;
+
+                    var roles = await _userManager.GetRolesAsync(user);
+
+                    <tr>
+                        <td class="text-center">@i</td>
+
+                        <td class="text-center">
+                            <span class="d-inline-block rounded-circle"
+                                  style="width:20px; height:20px; background-color:@(user.EmailConfirmed ? "#28a745" : "#ff7b7b"); box-shadow:0 0 5px rgba(0,0,0,0.3);">
+                            </span>
+                        </td>
+
+                        <td>
+                            @if ((await authorizationService.AuthorizeAsync(User, "EditUserPolicy")).Succeeded)
+                            @* @if (true) *@
+                            {
+                                <a asp-action="EditUser" asp-route-id="@user.Id">
+                                    <strong>@user.UserName</strong>
+                                </a>
+                            }
+                            else
+                            {
+                                <strong>@user.UserName</strong>
+
+                            }
+
+                        </td>
+
+                        <td>
+                            @foreach (var role in roles)
+                            {
+                                <span class="text-dark-emphasis font-weight-bolder shadow-sm p-1">
+                                    @role
+                                </span>
+                                <br />
+                                <br />
+                            }
+                        </td>
+
+
+                        <td><small>@Html.DisplayFor(modelItem => user.CreatedDateLocal)</small></td>
+
+                        <td><small>@Html.DisplayFor(modelItem => user.LastAccessTimeLocal)</small></td>
+
+                        <td class="text-center">
+
+                            @if (user.LockoutEnd != null && user.LockoutEnd.Value.Year > DateTime.Now.Year)
+                            {
+                                <span class="badge bg-danger mb-2">@L["Locked"]</span>
+                                <br />
+                                @* <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd-MM-yyyy hh:mm:ss tt") (UTC+02:00)</small> *@
+                                @* <small>@user.LockoutEnd.Value.UtcDateTime.ToString("dd-MM-yyyy hh:mm:ss tt")</small> *@
+                                <small>@Html.DisplayFor(modelItem => user.LockoutEndLocal)</small>
+                            }
+                            else if (user.LockoutEnd != null && user.LockoutEnd.Value > DateTime.UtcNow)
+                            {
+                                <span class="badge bg-warning mb-2">@L["Locked"]</span>
+                                <br />
+                                <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt")</small>
+                            }
+                            else if (user.LockoutEnd != null)
+                            {
+                                <span class="badge bg-white text-dark mb-2">@L["Locked"]</span>
+                                <br />
+                                <small>@*@user.LockoutEnd.Value.ToString("dd-MM-yyyy hh:MM:ss tt")*@</small>
+                                <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt")</small>
+                            }
+                            else
+                            {
+
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+
+        </table>
+    </div>
+</div>
+
+<partial name="Partial/_datatables-js" />
+
+<script>
+    new DataTable('#table1', {
+        language: {
+            // url: '//cdn.datatables.net/plug-ins/2.0.3/i18n/ar.json',
+        },
+        scrollX: true
+    });
+</script>
+

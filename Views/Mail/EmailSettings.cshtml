@@ -1,0 +1,48 @@
+﻿@using NewsApp2.Classes
+@model MailSettings
+
+@{
+    ViewBag.Title = "Email Settings";
+}
+
+<h4>Email Sender Details</h4>
+<small style="color:blue;">Edit email sender data from the 'appsettings.json' file </small>
+<hr />
+
+<div class="container" style="min-height:67vh;">
+        <div class="row">
+            <dl class="row">
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => model.DisplayName)
+                </dt>
+                <dd class="col-sm-10">
+                    @Html.DisplayFor(model => model.DisplayName)
+                </dd>
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => model.UserName)
+                </dt>
+                <dd class="col-sm-10">
+                    @Html.DisplayFor(model => model.UserName)
+                </dd>
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => model.Password)
+                </dt>
+                <dd class="col-sm-10">
+                    ●●●●●●●●●●●
+                </dd>
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => model.Host)
+                </dt>
+                <dd class="col-sm-10">
+                    @Html.DisplayFor(model => model.Host)
+                </dd>
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => model.Port)
+                </dt>
+                <dd class="col-sm-10">
+                    @Html.DisplayFor(model => model.Port)
+                </dd>
+            </dl>
+        </div>
+</div>
+

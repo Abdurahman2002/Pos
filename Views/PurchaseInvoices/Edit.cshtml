@@ -1,0 +1,116 @@
+﻿@model NewsApp2.ViewModels.Purchasing.PurchaseEditVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تعديل فاتورة الشراء";
+    var lineCount = Model?.Lines?.Count > 0 ? Model.Lines.Count : 1;
+    var itemSalePricesJson = ViewBag.ItemSalePricesJson as string ?? "{}";
+}
+
+<h1>تعديل فاتورة الشراء</h1>
+<script id="item-sale-prices-json" type="application/json">@Html.Raw(itemSalePricesJson)</script>
+<form asp-action="Edit" method="post" class="invoice-create-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="InvoiceId" />
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="InvoiceDate" class="form-label"></label>
+            @Html.EditorFor(m => m.InvoiceDate)
+            <span asp-validation-for="InvoiceDate" class="text-danger"></span>
+        </div>
+        <input asp-for="CurrencyCode" type="hidden" value="LYD" />
+        <input asp-for="EurToDinarRateSnapshot" type="hidden" value="1" />
+    </div>
+
+    <div class="mt-3">
+        <label asp-for="Note" class="form-label"></label>
+        <textarea asp-for="Note" class="form-control"></textarea>
+        <span asp-validation-for="Note" class="text-danger"></span>
+    </div>
+
+    <h4 class="mt-4">الأصناف</h4>
+    <div class="table-responsive">
+        <table class="table" id="lines-table">
+            <thead>
+                <tr>
+                    <th>الصنف</th>
+                    <th>الكمية</th>
+                    <th>سعر الوحدة</th>
+                    <th>إجمالي السطر</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @for (int i = 0; i < lineCount; i++)
+            {
+                <tr>
+                    <td>
+                        <select asp-for="Lines[i].ItemId" asp-items="@(ViewData["Items"] as SelectList)" class="form-select item-select">
+                            <option value="">اختر الصنف...</option>
+                        </select>
+                        <span asp-validation-for="Lines[i].ItemId" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input asp-for="Lines[i].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" />
+                        <span asp-validation-for="Lines[i].Qty" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" />
+                        <input asp-for="Lines[i].SellPriceLyd" class="form-control sell-price-input mt-2" type="number" step="0.01" min="0" placeholder="سعر البيع (اختياري)" />
+                        <span asp-validation-for="Lines[i].UnitPriceEur" class="text-danger"></span>
+                        <span asp-validation-for="Lines[i].SellPriceLyd" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input class="form-control line-total" type="text" value="0.00" readonly />
+                    </td>
+                    <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <button type="button" class="btn btn-secondary" id="add-line">إضافة سطر</button>
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6"><strong>الإجمالي:</strong> <span id="live-total-eur">0.00</span></div>
+                <div class="col-md-6"><strong>الصافي:</strong> <span id="live-total-secondary">0.00</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+        <a asp-action="Details" asp-route-id="@Model.InvoiceId" class="btn btn-secondary">إلغاء</a>
+    </div>
+</form>
+
+<template id="line-template">
+    <td>
+        <select name="Lines[__index__].ItemId" class="form-select item-select">
+            <option value="">اختر الصنف...</option>
+            @if (ViewData["Items"] is SelectList items)
+            {
+                foreach (var item in items)
+                {
+                    <option value="@item.Value">@item.Text</option>
+                }
+            }
+        </select>
+    </td>
+    <td><input name="Lines[__index__].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" /></td>
+    <td>
+        <input name="Lines[__index__].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" />
+        <input name="Lines[__index__].SellPriceLyd" class="form-control sell-price-input mt-2" type="number" step="0.01" min="0" placeholder="سعر البيع (اختياري)" />
+    </td>
+    <td><input class="form-control line-total" type="text" value="0.00" readonly /></td>
+    <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/lines-table.js"></script>
+}
+

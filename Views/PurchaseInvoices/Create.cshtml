@@ -1,0 +1,201 @@
+﻿@model NewsApp2.ViewModels.Purchasing.PurchaseCreateVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "فاتورة شراء جديدة";
+    var lineCount = Model?.Lines?.Count > 0 ? Model.Lines.Count : 1;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var canCreateItem = User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
+    var createItemUrl = Url.Action("Create", "Items", new { returnUrl }) ?? "/Items/Create";
+    var itemDefaultPricesJson = ViewBag.ItemDefaultPricesJson as string ?? "{}";
+    var itemSalePricesJson = ViewBag.ItemSalePricesJson as string ?? "{}";
+}
+
+<h1>فاتورة شراء جديدة</h1>
+<script id="item-default-prices-json" type="application/json">@Html.Raw(itemDefaultPricesJson)</script>
+<script id="item-sale-prices-json" type="application/json">@Html.Raw(itemSalePricesJson)</script>
+<form asp-action="Create" method="post" class="invoice-create-form"
+    data-resolve-url="@Url.Action("Resolve", "BarcodeScan")"
+    data-map-url="@Url.Action("Map", "BarcodeScan")"
+    data-create-item-url="@createItemUrl"
+    data-can-create-item="@(canCreateItem ? "true" : "false")"
+    data-msg-barcode-mapping-unavailable="خدمة ربط الباركود غير متاحة."
+    data-msg-select-existing-item-first="اختر صنفا موجودا أولا."
+    data-msg-unable-map-barcode="تعذر ربط الباركود بالصنف المحدد."
+    data-msg-barcode-service-unavailable="خدمة الباركود غير متاحة."
+    data-msg-unable-resolve-barcode="تعذر قراءة الباركود."
+    data-msg-barcode-not-found="الباركود غير موجود."
+    data-msg-camera-unavailable="ماسح الكاميرا غير متاح."
+    data-msg-scan-or-type-first="امسح أو اكتب الباركود أولا."
+    data-msg-unknown-with-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود أو إنشاء صنف جديد."
+    data-msg-unknown-without-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود."
+    data-item-default-prices='@itemDefaultPricesJson'
+    data-item-sale-prices='@itemSalePricesJson'>
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="InvoiceDate" class="form-label"></label>
+            @Html.EditorFor(m => m.InvoiceDate)
+            <span asp-validation-for="InvoiceDate" class="text-danger"></span>
+        </div>
+        <input asp-for="CurrencyCode" type="hidden" value="LYD" />
+        <input asp-for="EurToDinarRateSnapshot" type="hidden" value="1" />
+    </div>
+
+    <div class="mt-3">
+        <label asp-for="Note" class="form-label"></label>
+        <textarea asp-for="Note" class="form-control"></textarea>
+        <span asp-validation-for="Note" class="text-danger"></span>
+    </div>
+
+    <h4 class="mt-4">الأصناف</h4>
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-7">
+                    <label for="barcode-input" class="form-label">إضافة صنف بالباركود</label>
+                    <input type="text" id="barcode-input" class="form-control" placeholder="امسح أو اكتب الباركود" autocomplete="off" />
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="button" class="btn btn-primary" id="barcode-add-btn">إضافة</button>
+                </div>
+                <div class="col-md-3 d-grid">
+                    <button type="button" class="btn btn-outline-secondary" id="barcode-camera-btn">مسح بالكاميرا</button>
+                </div>
+                @if (canCreateItem)
+                {
+                    <div class="col-md-3 d-grid">
+                        <a href="@createItemUrl" class="btn btn-outline-primary" target="_blank">إضافة صنف جديد</a>
+                    </div>
+                }
+            </div>
+            <div id="barcode-warning" class="alert alert-warning mt-3 d-none"></div>
+            <div id="barcode-unknown-wrapper" class="alert alert-info mt-3 d-none">
+                <div class="d-flex flex-column gap-2">
+                    <span id="barcode-unknown-message"></span>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            <select id="barcode-map-item-select" class="form-select form-select-sm">
+                                <option value="">اختر صنف موجود...</option>
+                                @if (ViewData["Items"] is SelectList mapItems)
+                                {
+                                    foreach (var item in mapItems)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <button type="button" id="barcode-map-existing-btn" class="btn btn-sm btn-success">ربط بصنف موجود</button>
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <a id="barcode-create-item-link" class="btn btn-sm btn-primary @(canCreateItem ? "" : "d-none")" target="_blank">إضافة صنف جديد</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table" id="lines-table">
+            <thead>
+                <tr>
+                    <th>الصنف</th>
+                    <th>الكمية</th>
+                    <th>سعر الوحدة</th>
+                    <th>إجمالي السطر</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @for (int i = 0; i < lineCount; i++)
+            {
+                <tr>
+                    <td>
+                        <select asp-for="Lines[i].ItemId" asp-items="@(ViewData["Items"] as SelectList)" class="form-select item-select">
+                            <option value="">اختر الصنف...</option>
+                        </select>
+                        <span asp-validation-for="Lines[i].ItemId" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input asp-for="Lines[i].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" />
+                        <span asp-validation-for="Lines[i].Qty" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" />
+                        <input asp-for="Lines[i].SellPriceLyd" class="form-control sell-price-input mt-2" type="number" step="0.01" min="0" placeholder="سعر البيع (اختياري)" />
+                        <span asp-validation-for="Lines[i].UnitPriceEur" class="text-danger"></span>
+                        <span asp-validation-for="Lines[i].SellPriceLyd" class="text-danger"></span>
+                    </td>
+                    <td>
+                        <input class="form-control line-total" type="text" value="0.00" readonly />
+                    </td>
+                    <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <button type="button" class="btn btn-secondary" id="add-line">إضافة سطر</button>
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6"><strong>الإجمالي:</strong> <span id="live-total-eur">0.00</span></div>
+                <div class="col-md-6"><strong>الصافي:</strong> <span id="live-total-secondary">0.00</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">ترحيل الفاتورة</button>
+        <a asp-action="Index" class="btn btn-secondary">إلغاء</a>
+    </div>
+</form>
+
+<template id="line-template">
+    <td>
+        <select name="Lines[__index__].ItemId" class="form-select item-select">
+            <option value="">اختر الصنف...</option>
+            @if (ViewData["Items"] is SelectList items)
+            {
+                foreach (var item in items)
+                {
+                    <option value="@item.Value">@item.Text</option>
+                }
+            }
+        </select>
+    </td>
+    <td><input name="Lines[__index__].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" /></td>
+    <td>
+        <input name="Lines[__index__].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" />
+        <input name="Lines[__index__].SellPriceLyd" class="form-control sell-price-input mt-2" type="number" step="0.01" min="0" placeholder="سعر البيع (اختياري)" />
+    </td>
+    <td><input class="form-control line-total" type="text" value="0.00" readonly /></td>
+    <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
+</template>
+
+<div class="modal fade" id="barcode-camera-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">مسح الباركود</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-4x3 bg-dark">
+                    <video id="barcode-video" playsinline></video>
+                </div>
+                <div class="small text-muted mt-2">وجّه الكاميرا إلى الباركود وسيتم إضافة الصنف تلقائيا.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/lines-table.js"></script>
+    <script src="https://unpkg.com/@@zxing/library@latest"></script>
+}
+

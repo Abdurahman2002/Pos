@@ -1,0 +1,56 @@
+﻿.fade-slide {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+    .fade-slide.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+.hover-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+    .hover-card:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+
+.hover-img {
+    transition: transform 0.4s ease, filter 0.4s ease;
+}
+
+    .hover-img:hover {
+        transform: scale(1.05);
+        filter: brightness(1);
+    }
+
+/*  Highlights Right Column Hover  */
+.highlight-hover {
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+    .highlight-hover:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.25);
+    }
+
+        .highlight-hover:hover .highlight-bg {
+            transform: scale(1.1);
+            opacity: 0.5;
+            transition: transform 0.5s ease, opacity 0.5s ease;
+        }
+
+.highlight-title, .highlight-text, .highlight-btn {
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    color: aliceblue;
+}
+
+.highlight-hover:hover .highlight-title,
+.highlight-hover:hover .highlight-text,
+.highlight-hover:hover .highlight-btn {
+    transform: translateY(-5px);
+    opacity: 1;
+}

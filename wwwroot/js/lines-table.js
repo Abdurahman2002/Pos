@@ -9,6 +9,14 @@
         return parseDecimal(value).toFixed(2);
     }
 
+    function isEffectivelyEmptyNumericInput(rawValue) {
+        if (rawValue === null || typeof rawValue === 'undefined') return true;
+        var text = String(rawValue).trim();
+        if (!text) return true;
+        var numeric = parseDecimal(text);
+        return numeric === 0;
+    }
+
     function getToken(form) {
         var tokenInput = form.querySelector('input[name="__RequestVerificationToken"]');
         return tokenInput ? tokenInput.value : '';
@@ -457,8 +465,8 @@
 
             var mapped = itemDefaultPrices[selectedItemId];
             var defaultPrice = parseDecimal(mapped);
-            if (forceOverride || !priceInput.value) {
-                priceInput.value = fixed2(defaultPrice);
+            if (forceOverride || isEffectivelyEmptyNumericInput(priceInput.value)) {
+                priceInput.value = defaultPrice > 0 ? fixed2(defaultPrice) : '';
                 priceInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }
@@ -481,7 +489,7 @@
 
             var mapped = itemSalePrices[selectedItemId];
             var defaultPrice = parseDecimal(mapped);
-            if (forceOverride || !sellPriceInput.value) {
+            if (forceOverride || isEffectivelyEmptyNumericInput(sellPriceInput.value)) {
                 sellPriceInput.value = defaultPrice > 0 ? fixed2(defaultPrice) : '';
                 sellPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
@@ -654,10 +662,25 @@
 
         function removeLine(button) {
             var rows = tableBody.querySelectorAll('tr');
-            if (rows.length <= 1) return;
-
             var row = button.closest('tr');
             if (!row) return;
+
+            if (rows.length <= 1) {
+                var itemSelect = row.querySelector('.item-select');
+                var qtyInput = row.querySelector('.qty-input');
+                var priceInput = row.querySelector('.price-input');
+                var sellPriceInput = row.querySelector('.sell-price-input');
+                var lineTotalInput = row.querySelector('.line-total');
+
+                setSelectValue(itemSelect, '');
+                if (qtyInput) qtyInput.value = '';
+                if (priceInput) priceInput.value = '';
+                if (sellPriceInput) sellPriceInput.value = '';
+                if (lineTotalInput) lineTotalInput.value = '0.00';
+
+                calculateTotals();
+                return;
+            }
 
             row.remove();
             reindexLines();

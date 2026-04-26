@@ -99,25 +99,43 @@ namespace NewsApp2.Controllers
             if (!string.IsNullOrWhiteSpace(referenceType))
                 query = query.Where(l => l.ReferenceType == referenceType);
 
-            if (from.HasValue)
-            {
-                var fromDate = from.Value.ToDateTime(TimeOnly.MinValue);
-                query = query.Where(l => l.Created >= fromDate);
-            }
+            var ledgerRows = await query
+                .Select(l => new
+                {
+                    l.Created,
+                    l.ItemId,
+                    ItemName = l.Item != null ? l.Item.Name : string.Empty,
+                    l.MovementType,
+                    l.ReferenceType,
+                    l.ReferenceId,
+                    l.QuantityChange,
+                    l.BalanceAfter,
+                    l.Note
+                })
+                .ToListAsync();
 
-            if (to.HasValue)
-            {
-                var toDateExclusive = to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
-                query = query.Where(l => l.Created < toDateExclusive);
-            }
+            var businessDateMap = await BuildBusinessDateMapAsync(ledgerRows.Select(l => (l.ReferenceType, l.ReferenceId)));
 
-            var rows = await query
-                .OrderByDescending(l => l.Created)
+            var filteredRows = ledgerRows
+                .Where(l =>
+                {
+                    var businessDate = ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap);
+                    if (from.HasValue && businessDate < from.Value)
+                        return false;
+                    if (to.HasValue && businessDate > to.Value)
+                        return false;
+                    return true;
+                })
+                .OrderByDescending(l => ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap))
+                .ThenByDescending(l => l.Created)
+                .ToList();
+
+            var rows = filteredRows
                 .Select(l => new StockMovementRowVM
                 {
-                    Created = l.Created,
+                    Created = ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap).ToDateTime(TimeOnly.MinValue),
                     ItemId = l.ItemId,
-                    ItemName = l.Item != null ? l.Item.Name : string.Empty,
+                    ItemName = l.ItemName,
                     MovementType = l.MovementType,
                     ReferenceType = l.ReferenceType,
                     ReferenceId = l.ReferenceId,
@@ -125,7 +143,7 @@ namespace NewsApp2.Controllers
                     BalanceAfter = l.BalanceAfter,
                     Note = l.Note
                 })
-                .ToListAsync();
+                .ToList();
 
             var vm = new StockMovementReportVM
             {
@@ -158,24 +176,32 @@ namespace NewsApp2.Controllers
                 return Forbid();
 
             var targetDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
-            // using local time logic conceptually, but DB is storing Utc.
-            // for simple day grouping on UTC:
-            var fromDateTime = targetDate.ToDateTime(TimeOnly.MinValue);
-            var toDateTime = targetDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
-
             var itemsQuery = _context.Items.AsNoTracking().Include(i => i.Category).AsQueryable();
 
-            var openingBalances = await _context.Set<InvStockLedger>()
-                .Where(l => l.Created < fromDateTime)
-                .GroupBy(l => l.ItemId)
-                .Select(g => new { ItemId = g.Key, Opening = g.Sum(l => l.QuantityChange) })
-                .ToDictionaryAsync(x => x.ItemId, x => x.Opening);
+            var allLedgers = await _context.Set<InvStockLedger>()
+                .AsNoTracking()
+                .Select(l => new
+                {
+                    l.ItemId,
+                    l.ReferenceType,
+                    l.ReferenceId,
+                    l.QuantityChange,
+                    l.Created
+                })
+                .ToListAsync();
 
-            var dailyMovements = await _context.Set<InvStockLedger>()
-                .Where(l => l.Created >= fromDateTime && l.Created < toDateTime)
+            var businessDateMap = await BuildBusinessDateMapAsync(allLedgers.Select(l => (l.ReferenceType, l.ReferenceId)));
+
+            var openingBalances = allLedgers
+                .Where(l => ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap) < targetDate)
+                .GroupBy(l => l.ItemId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.QuantityChange));
+
+            var dailyMovements = allLedgers
+                .Where(l => ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap) == targetDate)
                 .GroupBy(l => new { l.ItemId, l.ReferenceType })
                 .Select(g => new { g.Key.ItemId, g.Key.ReferenceType, TotalChange = g.Sum(l => l.QuantityChange) })
-                .ToListAsync();
+                .ToList();
 
             var resultList = new List<NewsApp2.ViewModels.Inventory.DailyInventoryRowVM>();
             var items = await itemsQuery.ToListAsync();
@@ -219,6 +245,76 @@ namespace NewsApp2.Controllers
             };
 
             return View(vm);
+        }
+
+        private static string BuildBusinessDateKey(string referenceType, Guid referenceId)
+            => $"{referenceType}:{referenceId}";
+
+        private static DateOnly ResolveBusinessDate(string referenceType, Guid referenceId, DateTime createdUtc, IReadOnlyDictionary<string, DateOnly> businessDateMap)
+        {
+            var key = BuildBusinessDateKey(referenceType, referenceId);
+            if (businessDateMap.TryGetValue(key, out var businessDate))
+                return businessDate;
+
+            return DateOnly.FromDateTime(createdUtc);
+        }
+
+        private async Task<Dictionary<string, DateOnly>> BuildBusinessDateMapAsync(IEnumerable<(string ReferenceType, Guid ReferenceId)> refs)
+        {
+            var map = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
+            var grouped = refs
+                .Where(x => !string.IsNullOrWhiteSpace(x.ReferenceType) && x.ReferenceId != Guid.Empty)
+                .GroupBy(x => x.ReferenceType, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.ReferenceId).Distinct().ToList(), StringComparer.OrdinalIgnoreCase);
+
+            void AddValues(IEnumerable<(string ReferenceType, Guid Id, DateOnly Date)> values)
+            {
+                foreach (var v in values)
+                {
+                    map[BuildBusinessDateKey(v.ReferenceType, v.Id)] = v.Date;
+                }
+            }
+
+            var salesTypes = new[] { "SalesInvoice", "SalesReturn", "SalesInvoiceEdit", "SalesInvoiceCancel" };
+            var salesIds = grouped
+                .Where(g => salesTypes.Contains(g.Key, StringComparer.OrdinalIgnoreCase))
+                .SelectMany(g => g.Value)
+                .Distinct()
+                .ToList();
+            if (salesIds.Count > 0)
+            {
+                var salesMap = await _context.Set<SalesInvoice>()
+                    .AsNoTracking()
+                    .Where(i => salesIds.Contains(i.Id))
+                    .Select(i => new { i.Id, i.InvoiceDate })
+                    .ToListAsync();
+
+                AddValues(salesMap.Select(i => ("SalesInvoice", i.Id, i.InvoiceDate)));
+                AddValues(salesMap.Select(i => ("SalesReturn", i.Id, i.InvoiceDate)));
+                AddValues(salesMap.Select(i => ("SalesInvoiceEdit", i.Id, i.InvoiceDate)));
+                AddValues(salesMap.Select(i => ("SalesInvoiceCancel", i.Id, i.InvoiceDate)));
+            }
+
+            var purchaseTypes = new[] { "PurchaseInvoice", "PurchaseInvoiceEdit", "PurchaseInvoiceCancel" };
+            var purchaseIds = grouped
+                .Where(g => purchaseTypes.Contains(g.Key, StringComparer.OrdinalIgnoreCase))
+                .SelectMany(g => g.Value)
+                .Distinct()
+                .ToList();
+            if (purchaseIds.Count > 0)
+            {
+                var purchaseMap = await _context.Set<PurchaseInvoice>()
+                    .AsNoTracking()
+                    .Where(i => purchaseIds.Contains(i.Id))
+                    .Select(i => new { i.Id, i.InvoiceDate })
+                    .ToListAsync();
+
+                AddValues(purchaseMap.Select(i => ("PurchaseInvoice", i.Id, i.InvoiceDate)));
+                AddValues(purchaseMap.Select(i => ("PurchaseInvoiceEdit", i.Id, i.InvoiceDate)));
+                AddValues(purchaseMap.Select(i => ("PurchaseInvoiceCancel", i.Id, i.InvoiceDate)));
+            }
+
+            return map;
         }
 
         private async Task LoadLookups(Guid? categoryId)

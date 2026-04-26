@@ -1,0 +1,26 @@
+@model NewsApp2.Models.Entities.Supplier
+@{
+    ViewData["Title"] = "حذف مورد";
+}
+
+<h1>حذف مورد</h1>
+
+@if (ViewBag.Message != null)
+{
+    <div class="alert alert-danger">@ViewBag.Message</div>
+}
+
+<div class="alert alert-warning">هل أنت متأكد من حذف المورد @Model.Name ؟</div>
+
+<dl class="row">
+    <dt class="col-sm-2">الاسم</dt>
+    <dd class="col-sm-10">@Model.Name</dd>
+    <dt class="col-sm-2">الهاتف</dt>
+    <dd class="col-sm-10">@Model.Phone</dd>
+</dl>
+
+<form asp-action="Delete" method="post">
+    <input asp-for="Id" type="hidden" />
+    <button type="submit" class="btn btn-danger">تأكيد الحذف</button>
+    <a asp-action="Index" class="btn btn-secondary">إلغاء</a>
+</form>

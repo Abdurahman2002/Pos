@@ -1,0 +1,63 @@
+﻿
+/* Sidebar Active State Enhancements */
+.sidebar .nav.sub-menu .nav-item .nav-link.active {
+    color: #10b981 !important;
+    font-weight: bold;
+}
+
+/* Remove default template arrow that doubles with MDI */
+.sidebar .nav.sub-menu .nav-item .nav-link::before {
+    display: none !important;
+    content: none !important;
+}
+
+/* Fix submenu icon sizes */
+.sidebar .nav.sub-menu .nav-item .nav-link i {
+    font-size: 1.15rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+[dir='rtl'] .sidebar .nav.sub-menu .nav-item .nav-link i {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+/* RTL mobile: keep logo black panel exactly aligned with sidebar width */
+@media (max-width: 991.98px) {
+    html[dir='rtl'] .navbar.default-layout-navbar {
+        display: flex;
+        align-items: stretch;
+    }
+
+    html[dir='rtl'] .navbar.default-layout-navbar .navbar-brand-wrapper {
+        width: 258px !important;
+        min-width: 258px !important;
+        max-width: 258px !important;
+        flex: 0 0 258px !important;
+        margin-inline-start: auto;
+        margin-inline-end: 0;
+    }
+
+    html[dir='rtl'] .navbar.default-layout-navbar .navbar-menu-wrapper {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        padding-inline: 8px;
+    }
+
+    /* Avoid duplicate toggle width consuming extra white space in mobile RTL */
+    html[dir='rtl'] .navbar.default-layout-navbar .navbar-menu-wrapper .navbar-toggler {
+        display: none;
+    }
+
+    html[dir='rtl'] .navbar.default-layout-navbar .navbar-toggler-right {
+        flex: 0 0 auto;
+        margin-inline-start: 0;
+        margin-inline-end: 0.5rem;
+    }
+
+    html[dir='rtl'] .sidebar {
+        width: 258px;
+    }
+}
+

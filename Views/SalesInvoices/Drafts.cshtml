@@ -22,11 +22,11 @@
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["From"]</label>
-        <input type="text" name="from" value="@(ViewBag.From?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" placeholder="yyyy-MM-dd" />
+        <input type="text" name="from" value="@(ViewBag.From?.ToString("dd/MM/yyyy") ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["To"]</label>
-        <input type="text" name="to" value="@(ViewBag.To?.ToString("yyyy-MM-dd") ?? string.Empty)" class="form-control" placeholder="yyyy-MM-dd" />
+        <input type="text" name="to" value="@(ViewBag.To?.ToString("dd/MM/yyyy") ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-2 d-flex align-items-end">
         <div class="form-check">
@@ -72,7 +72,7 @@
                             <div class="small text-muted">تحديث @draft.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                         }
                     </td>
-                    <td><span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                    <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@draft.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                     <td>@(string.IsNullOrWhiteSpace(draft.CustomerName) ? "-" : draft.CustomerName)</td>
                     <td>
                         <span class="badge @(draft.IsReturn ? "bg-warning text-dark" : "bg-success")">@(draft.IsReturn ? "مرتجع" : "بيع")</span>

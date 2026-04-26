@@ -47,6 +47,8 @@ namespace NewsApp2.ViewModels.Sales
 
         public bool IsReturn { get; set; }
 
+        public bool AutoPrintReceipt { get; set; } = true;
+
         [MinLength(1, ErrorMessage = "Add at least one line")]
         public List<SalesLineInputVM> Lines { get; set; } = new();
     }

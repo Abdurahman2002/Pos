@@ -38,6 +38,14 @@ namespace NewsApp2.ViewModels.Purchasing
         [StringLength(500)]
         public string? Note { get; set; }
 
+        public Guid? SupplierId { get; set; }
+
+        [StringLength(20)]
+        public string PaymentMethod { get; set; } = "Cash";
+
+        [DataType(DataType.Date)]
+        public DateOnly? DueDate { get; set; }
+
         [MinLength(1, ErrorMessage = "Add at least one line")]
         public List<PurchaseEditLineVM> Lines { get; set; } = new();
     }

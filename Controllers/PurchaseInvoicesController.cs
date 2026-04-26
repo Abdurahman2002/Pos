@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text.Json;
 using NewsApp2.Classes;
 using NewsApp2.Classes.Helpers;
@@ -18,6 +19,9 @@ namespace NewsApp2.Controllers
     [Authorize(Policy = "ApprovedUserPolicy")]
     public class PurchaseInvoicesController : Controller
     {
+        private const string PaymentCash = "Cash";
+        private const string PaymentCredit = "Credit";
+
         private readonly AppDbContext _context;
         private readonly PurchaseService _purchaseService;
         private readonly UserManager<ApplicationUser> _userManager;
@@ -50,6 +54,7 @@ namespace NewsApp2.Controllers
         {
             var invoice = await _context.Set<PurchaseInvoice>()
                 .AsNoTracking()
+                .Include(i => i.Supplier)
                 .FirstOrDefaultAsync(i => i.Id == id);
 
             if (invoice == null)
@@ -107,6 +112,9 @@ namespace NewsApp2.Controllers
                 InvoiceDate = invoice.InvoiceDate,
                 CurrencyCode = "LYD",
                 EurToDinarRateSnapshot = 1m,
+                SupplierId = invoice.SupplierId,
+                PaymentMethod = NormalizePaymentMethod(invoice.PaymentMethod),
+                DueDate = invoice.DueDate,
                 Note = invoice.Note,
                 Lines = lines.Select(l => new PurchaseEditLineVM
                 {
@@ -128,10 +136,33 @@ namespace NewsApp2.Controllers
         [Authorize(Roles = "Admin,Prog")]
         public async Task<IActionResult> Edit(PurchaseEditVM vm)
         {
+            if (TryResolveInvoiceDateFromRequest(out var resolvedInvoiceDate))
+            {
+                vm.InvoiceDate = resolvedInvoiceDate;
+                ModelState.Remove(nameof(PurchaseEditVM.InvoiceDate));
+            }
+
             vm.Lines = vm.Lines?.Where(l => l != null).ToList() ?? new List<PurchaseEditLineVM>();
 
             vm.CurrencyCode = "LYD";
             vm.EurToDinarRateSnapshot = 1m;
+            vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+
+            if (string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                    ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد عند الشراء الآجل.");
+
+                if (!vm.DueDate.HasValue)
+                    ModelState.AddModelError(nameof(vm.DueDate), "حدد تاريخ الاستحقاق عند الشراء الآجل.");
+
+                if (vm.DueDate.HasValue && vm.DueDate.Value < vm.InvoiceDate)
+                    ModelState.AddModelError(nameof(vm.DueDate), "تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ الفاتورة.");
+            }
+            else
+            {
+                vm.DueDate = null;
+            }
 
             if (!vm.Lines.Any())
                 ModelState.AddModelError("Lines", "أضف سطر صنف واحد على الأقل.");
@@ -165,6 +196,9 @@ namespace NewsApp2.Controllers
                     vm.InvoiceDate,
                     vm.EurToDinarRateSnapshot!.Value,
                     vm.Note,
+                    vm.SupplierId,
+                    vm.PaymentMethod,
+                    vm.DueDate,
                     lines,
                     User?.Identity?.Name);
 
@@ -187,7 +221,8 @@ namespace NewsApp2.Controllers
             var vm = new PurchaseCreateVM
             {
                 CurrencyCode = "LYD",
-                EurToDinarRateSnapshot = 1m
+                EurToDinarRateSnapshot = 1m,
+                PaymentMethod = PaymentCash
             };
             vm.Lines.Add(new PurchaseLineInputVM());
             return View(vm);
@@ -196,11 +231,34 @@ namespace NewsApp2.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(PurchaseCreateVM vm)
-        {
+            {
+            if (TryResolveInvoiceDateFromRequest(out var resolvedInvoiceDate))
+            {
+                vm.InvoiceDate = resolvedInvoiceDate;
+                ModelState.Remove(nameof(PurchaseCreateVM.InvoiceDate));
+            }
+
             vm.Lines = vm.Lines?.Where(l => l != null).ToList() ?? new List<PurchaseLineInputVM>();
 
             vm.CurrencyCode = "LYD";
             vm.EurToDinarRateSnapshot = 1m;
+            vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+
+            if (string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                    ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد عند الشراء الآجل.");
+
+                if (!vm.DueDate.HasValue)
+                    ModelState.AddModelError(nameof(vm.DueDate), "حدد تاريخ الاستحقاق عند الشراء الآجل.");
+
+                if (vm.DueDate.HasValue && vm.DueDate.Value < vm.InvoiceDate)
+                    ModelState.AddModelError(nameof(vm.DueDate), "تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ الفاتورة.");
+            }
+            else
+            {
+                vm.DueDate = null;
+            }
 
             if (!vm.Lines.Any())
                 ModelState.AddModelError("Lines", "أضف سطر صنف واحد على الأقل.");
@@ -225,6 +283,9 @@ namespace NewsApp2.Controllers
                 InvoiceDate = vm.InvoiceDate,
                 CurrencyCode = "LYD",
                 EurToDinarRateSnapshot = vm.EurToDinarRateSnapshot!.Value,
+                SupplierId = vm.SupplierId,
+                PaymentMethod = vm.PaymentMethod,
+                DueDate = vm.DueDate,
                 Note = vm.Note,
                 CreatedByUserId = _userManager.GetUserId(User),
                 CreatedByUserName = User?.Identity?.Name
@@ -272,7 +333,9 @@ namespace NewsApp2.Controllers
         [HttpGet]
         public async Task<IActionResult> Report(DateOnly? from, DateOnly? to)
         {
-            var query = _context.Set<PurchaseInvoice>().AsNoTracking();
+            var query = _context.Set<PurchaseInvoice>()
+                .AsNoTracking()
+                .Where(i => i.Status == null || (i.Status != "Cancelled" && i.Status != "Canceled"));
             if (from.HasValue)
                 query = query.Where(i => i.InvoiceDate >= from.Value);
             if (to.HasValue)
@@ -309,6 +372,13 @@ namespace NewsApp2.Controllers
 
             ViewData["Items"] = new SelectList(items, "Id", "Name");
 
+            var suppliers = await _context.Set<Supplier>()
+                .AsNoTracking()
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            ViewData["Suppliers"] = new SelectList(suppliers, "Id", "Name");
+
             var recentPrices = await _context.Set<PurchaseLine>()
                 .AsNoTracking()
                 .Where(l => l.PurchaseInvoice != null && l.PurchaseInvoice.Status == "Posted")
@@ -338,9 +408,42 @@ namespace NewsApp2.Controllers
             ViewBag.ItemSalePricesJson = JsonSerializer.Serialize(salePriceByItem);
         }
 
+        private bool TryResolveInvoiceDateFromRequest(out DateOnly invoiceDate)
+        {
+            invoiceDate = default;
+
+            var rawDate = Request.Form["InvoiceDate"].FirstOrDefault()?.Trim();
+            if (string.IsNullOrWhiteSpace(rawDate))
+                return false;
+
+            var acceptedFormats = new[]
+            {
+                "yyyy-MM-dd",
+                "dd/MM/yyyy",
+                "d/M/yyyy",
+                "MM/dd/yyyy",
+                "M/d/yyyy"
+            };
+
+            return DateOnly.TryParseExact(rawDate, acceptedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out invoiceDate)
+                || DateOnly.TryParse(rawDate, CultureInfo.CurrentCulture, DateTimeStyles.None, out invoiceDate)
+                || DateOnly.TryParse(rawDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out invoiceDate);
+        }
+
         private string GetSecondaryCurrencyCode()
         {
             return "دينار";
+        }
+
+        private static string NormalizePaymentMethod(string? paymentMethod)
+        {
+            if (string.IsNullOrWhiteSpace(paymentMethod))
+                return PaymentCash;
+
+            if (string.Equals(paymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
+                return PaymentCredit;
+
+            return PaymentCash;
         }
     }
 }

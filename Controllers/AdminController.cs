@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -29,7 +28,6 @@ namespace NewsApp2.Controllers
         private readonly IUnitOfWork<Section> _section;
         private readonly IUnitOfWork<News> _news;
         private readonly IWebHostEnvironment _host;
-        private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
 
         public AdminController(IUnitOfWork<SiteState> siteState,
@@ -38,7 +36,6 @@ namespace NewsApp2.Controllers
                                IUnitOfWork<Section> section,
                                IUnitOfWork<News> news,
                                IWebHostEnvironment host,
-                               IMapper mapper,
                                IMemoryCache cache)
 
         {
@@ -48,7 +45,6 @@ namespace NewsApp2.Controllers
             _section = section;
             _news = news;
             _host = host;
-            _mapper = mapper;
             _cache = cache;
         }
 
@@ -187,7 +183,13 @@ namespace NewsApp2.Controllers
                     var contact = await _contact.Repository.GetAll().FirstOrDefaultAsync();
                     if (contact != null)
                     {
-                        contact = _mapper.Map<Contact>(siteVM); // صيغة مختصرة
+                        contact.Email = siteVM.Contact.Email;
+                        contact.Phone = siteVM.Contact.Phone;
+                        contact.Facebook = siteVM.Contact.Facebook;
+                        contact.Twitter = siteVM.Contact.Twitter;
+                        contact.Instagram = siteVM.Contact.Instagram;
+                        contact.Created = siteVM.Contact.Created;
+                        contact.Modified = DateTime.Now;
 
                         _contact.Repository.Update(contact);
                     }
@@ -195,7 +197,11 @@ namespace NewsApp2.Controllers
                     var siteInfo = await _siteInfo.Repository.GetAll().FirstOrDefaultAsync();
                     if (siteInfo != null)
                     {
-                        siteInfo = _mapper.Map<SiteVM, SiteInfo>(source: siteVM); // صيغة مطولة
+                        siteInfo.Name = siteVM.SiteInfo.Name;
+                        siteInfo.Activity = siteVM.SiteInfo.Activity;
+                        siteInfo.About = siteVM.SiteInfo.About;
+                        siteInfo.Created = siteVM.SiteInfo.Created;
+                        siteInfo.Modified = DateTime.Now;
 
                         siteInfo.LogoUrl = logoFileName;
                         siteInfo.CoverImageUrl = coverFileName;

@@ -5,8 +5,18 @@ namespace NewsApp2.Classes.Helpers
 {
     public class DateOnlyModelBinder : IModelBinder
     {
-        private static readonly string[] Formats = { "dd/MM/yyyy", "d/M/yyyy" };
-        private static readonly CultureInfo Culture = new("en-GB");
+        private static readonly string[] Formats =
+        {
+            "dd/MM/yyyy", "d/M/yyyy",
+            "yyyy-MM-dd", "yyyy/M/d", "yyyy/MM/dd",
+            "MM/dd/yyyy", "M/d/yyyy"
+        };
+        private static readonly CultureInfo[] Cultures =
+        {
+            new("en-GB"),
+            new("ar-IQ"),
+            CultureInfo.InvariantCulture
+        };
 
         public Task BindModelAsync(ModelBindingContext bindingContext)
         {
@@ -29,14 +39,17 @@ namespace NewsApp2.Classes.Helpers
                 return Task.CompletedTask;
             }
 
-            if (DateOnly.TryParseExact(rawValue, Formats, Culture, DateTimeStyles.None, out var parsed))
+            foreach (var culture in Cultures)
             {
-                bindingContext.Result = ModelBindingResult.Success(parsed);
+                if (DateOnly.TryParseExact(rawValue, Formats, culture, DateTimeStyles.None, out var parsed)
+                    || DateOnly.TryParse(rawValue, culture, DateTimeStyles.None, out parsed))
+                {
+                    bindingContext.Result = ModelBindingResult.Success(parsed);
+                    return Task.CompletedTask;
+                }
             }
-            else
-            {
-                bindingContext.ModelState.TryAddModelError(bindingContext.ModelName, "Invalid date format. Use dd/MM/yyyy.");
-            }
+
+            bindingContext.ModelState.TryAddModelError(bindingContext.ModelName, "صيغة التاريخ غير صحيحة. الصيغة المعتمدة: dd/MM/yyyy.");
 
             return Task.CompletedTask;
         }

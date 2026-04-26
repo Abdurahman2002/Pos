@@ -1,0 +1,50 @@
+@model NewsApp2.ViewModels.Suppliers.SupplierDebtReportVM
+@{
+    ViewData["Title"] = "ديون الموردين";
+}
+
+<h1>ديون الموردين</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input name="search" value="@Model.Search" class="form-control" placeholder="بحث بالمورد" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" type="submit">بحث</button>
+        <a asp-action="Debts" class="btn btn-outline-secondary">إعادة ضبط</a>
+    </div>
+    <div class="col-auto ms-auto">
+        <a asp-action="Index" class="btn btn-secondary">الموردون</a>
+    </div>
+</form>
+
+<div class="alert alert-info">إجمالي الديون: <strong>@Model.TotalDebt.ToString("0.00")</strong> دينار</div>
+
+<table class="table table-striped table-hover">
+    <thead>
+        <tr>
+            <th>المورد</th>
+            <th>الهاتف</th>
+            <th>الدين</th>
+            <th>آخر شراء آجل</th>
+            <th>آخر سداد</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.Rows)
+    {
+        <tr>
+            <td>@row.SupplierName</td>
+            <td>@row.Phone</td>
+            <td>@row.DebtAmount.ToString("0.00")</td>
+            <td>@(row.LastCreditPurchaseDate?.ToString("dd/MM/yyyy") ?? "-")</td>
+            <td>@(row.LastPaymentDate?.ToString("dd/MM/yyyy") ?? "-")</td>
+            <td>
+                <a asp-action="Statement" asp-route-id="@row.SupplierId" class="btn btn-sm btn-outline-dark">كشف الحساب والسداد</a>
+                <a asp-action="Pay" asp-route-supplierId="@row.SupplierId" asp-route-returnUrl="@Url.Action("Debts", "Suppliers")" class="btn btn-sm btn-outline-success">سداد</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

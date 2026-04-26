@@ -5,6 +5,16 @@ namespace NewsApp2.Models.Services
 {
     public class PurchaseService
     {
+        private const string JournalSourceType = "PurchaseInvoice";
+        private const string AccountInventoryCode = "1301";
+        private const string AccountInventoryName = "المخزون";
+        private const string AccountCashCode = "1101";
+        private const string AccountCashName = "الصندوق";
+        private const string AccountBankCode = "1102";
+        private const string AccountBankName = "البنك";
+        private const string AccountSupplierCode = "2101";
+        private const string AccountSupplierName = "ذمم الموردين";
+
         private readonly AppDbContext _context;
         private readonly ILogger<PurchaseService> _logger;
 
@@ -31,6 +41,31 @@ namespace NewsApp2.Models.Services
                 invoice.EurToDinarRateSnapshot = 1m;
             else if (invoice.EurToDinarRateSnapshot <= 0)
                 throw new InvalidOperationException("Rate must be greater than zero.");
+
+            invoice.PaymentMethod = NormalizePaymentMethod(invoice.PaymentMethod);
+            if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!invoice.SupplierId.HasValue || invoice.SupplierId == Guid.Empty)
+                    throw new InvalidOperationException("حدد المورد عند الشراء الآجل.");
+
+                if (!invoice.DueDate.HasValue)
+                    throw new InvalidOperationException("حدد تاريخ الاستحقاق عند الشراء الآجل.");
+
+                if (invoice.DueDate.Value < invoice.InvoiceDate)
+                    throw new InvalidOperationException("تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ الفاتورة.");
+            }
+            else
+            {
+                invoice.DueDate = null;
+            }
+
+            if (invoice.SupplierId.HasValue && invoice.SupplierId != Guid.Empty)
+            {
+                var supplierExists = await _context.Set<Supplier>().AnyAsync(s => s.Id == invoice.SupplierId.Value);
+                if (!supplierExists)
+                    throw new InvalidOperationException("المورد المحدد غير موجود.");
+            }
+
             invoice.Number = string.IsNullOrWhiteSpace(invoice.Number)
                 ? await GenerateNumberAsync(invoice.InvoiceDate)
                 : invoice.Number.Trim();
@@ -135,6 +170,8 @@ namespace NewsApp2.Models.Services
             invoice.TotalEur = RoundMoney(totalEur);
             invoice.TotalDinar = RoundMoney(totalDinar);
 
+            await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
+
             _context.Set<AuditLog>().Add(new AuditLog
             {
                 Action = "Create",
@@ -206,6 +243,7 @@ namespace NewsApp2.Models.Services
             }
 
             invoice.Status = "Cancelled";
+            await RemoveFinancialEntriesAsync(invoice.Id);
 
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -227,6 +265,9 @@ namespace NewsApp2.Models.Services
             DateOnly invoiceDate,
             decimal rate,
             string? note,
+            Guid? supplierId,
+            string? paymentMethod,
+            DateOnly? dueDate,
             IEnumerable<(Guid ItemId, decimal Qty, decimal UnitPriceEur, decimal? SellPriceLyd)> lines,
             string? editedBy)
         {
@@ -239,6 +280,30 @@ namespace NewsApp2.Models.Services
 
             if (rate <= 0)
                 throw new InvalidOperationException("Rate must be greater than zero.");
+
+            var normalizedPaymentMethod = NormalizePaymentMethod(paymentMethod);
+            if (string.Equals(normalizedPaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!supplierId.HasValue || supplierId == Guid.Empty)
+                    throw new InvalidOperationException("حدد المورد عند الشراء الآجل.");
+
+                if (!dueDate.HasValue)
+                    throw new InvalidOperationException("حدد تاريخ الاستحقاق عند الشراء الآجل.");
+
+                if (dueDate.Value < invoiceDate)
+                    throw new InvalidOperationException("تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ الفاتورة.");
+            }
+            else
+            {
+                dueDate = null;
+            }
+
+            if (supplierId.HasValue && supplierId != Guid.Empty)
+            {
+                var supplierExists = await _context.Set<Supplier>().AnyAsync(s => s.Id == supplierId.Value);
+                if (!supplierExists)
+                    throw new InvalidOperationException("المورد المحدد غير موجود.");
+            }
 
             foreach (var line in lineList)
             {
@@ -395,8 +460,13 @@ namespace NewsApp2.Models.Services
             invoice.CurrencyCode = string.Equals(invoice.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase) ? "LYD" : "EUR";
             invoice.EurToDinarRateSnapshot = string.Equals(invoice.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase) ? 1m : rate;
             invoice.Note = note;
+            invoice.SupplierId = supplierId;
+            invoice.PaymentMethod = normalizedPaymentMethod;
+            invoice.DueDate = dueDate;
             invoice.TotalEur = RoundMoney(totalEur);
             invoice.TotalDinar = RoundMoney(totalDinar);
+
+            await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
 
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -439,6 +509,86 @@ namespace NewsApp2.Models.Services
         private static decimal RoundMoney(decimal value)
         {
             return Math.Round(value, 2, MidpointRounding.ToEven);
+        }
+
+        private async Task ReplaceFinancialEntriesAsync(PurchaseInvoice invoice, string? userId, string? userName)
+        {
+            await RemoveFinancialEntriesAsync(invoice.Id);
+
+            var total = RoundMoney(invoice.TotalDinar);
+            if (total <= 0)
+                return;
+
+            var (counterCode, counterName) = ResolvePurchaseCounterAccount(invoice.PaymentMethod);
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = invoice.InvoiceDate,
+                SourceType = JournalSourceType,
+                SourceId = invoice.Id,
+                DocumentNo = invoice.Number,
+                AccountCode = AccountInventoryCode,
+                AccountName = AccountInventoryName,
+                Debit = total,
+                Credit = 0m,
+                Note = invoice.Note,
+                CreatedByUserId = userId,
+                CreatedByUserName = userName
+            });
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = invoice.InvoiceDate,
+                SourceType = JournalSourceType,
+                SourceId = invoice.Id,
+                DocumentNo = invoice.Number,
+                AccountCode = counterCode,
+                AccountName = counterName,
+                Debit = 0m,
+                Credit = total,
+                Note = invoice.Note,
+                CreatedByUserId = userId,
+                CreatedByUserName = userName
+            });
+        }
+
+        private async Task RemoveFinancialEntriesAsync(Guid invoiceId)
+        {
+            var existing = await _context.Set<FinJournalEntry>()
+                .Where(e => e.SourceType == JournalSourceType && e.SourceId == invoiceId)
+                .ToListAsync();
+
+            if (existing.Count > 0)
+                _context.Set<FinJournalEntry>().RemoveRange(existing);
+        }
+
+        private static (string Code, string Name) ResolvePurchaseCounterAccount(string? paymentMethod)
+        {
+            if (string.Equals(paymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+                return (AccountSupplierCode, AccountSupplierName);
+
+            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return (AccountBankCode, AccountBankName);
+
+            return (AccountCashCode, AccountCashName);
+        }
+
+        private static string NormalizePaymentMethod(string? paymentMethod)
+        {
+            if (string.IsNullOrWhiteSpace(paymentMethod))
+                return "Cash";
+
+            if (string.Equals(paymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+                return "Credit";
+
+            if (string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return "Transfer";
+
+            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase))
+                return "Card";
+
+            return "Cash";
         }
 
         private static string FormatQuantity(decimal value)

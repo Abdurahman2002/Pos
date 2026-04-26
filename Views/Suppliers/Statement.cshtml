@@ -1,0 +1,100 @@
+@model NewsApp2.ViewModels.Suppliers.SupplierStatementVM
+@{
+    ViewData["Title"] = "كشف حساب مورد";
+}
+
+<h1>كشف حساب المورد: @Model.SupplierName</h1>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="id" value="@Model.SupplierId" />
+    <div class="col-md-3">
+        <label class="form-label">من</label>
+        <input type="text" name="from" value="@Model.From.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">إلى</label>
+        <input type="text" name="to" value="@Model.To.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-auto align-self-end">
+        <button type="submit" class="btn btn-primary">عرض</button>
+    </div>
+</form>
+
+<div class="card mb-3 border-success-subtle">
+    <div class="card-header bg-white fw-semibold">تسجيل سداد جديد</div>
+    <div class="card-body">
+        <form asp-action="Pay" method="post" class="row g-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="SupplierId" value="@Model.SupplierId" />
+            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+            <div class="col-md-2">
+                <label class="form-label">التاريخ</label>
+                <input name="PaymentDate" type="text" class="form-control" value="@DateOnly.FromDateTime(DateTime.UtcNow).ToString("dd/MM/yyyy")" placeholder="dd/MM/yyyy" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">المبلغ</label>
+                <input name="Amount" type="number" step="0.01" min="0.01" class="form-control" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">طريقة السداد</label>
+                <select name="PaymentMethod" class="form-select">
+                    <option value="Cash">نقدي</option>
+                    <option value="Card">بطاقة</option>
+                    <option value="Transfer">تحويل</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">ملاحظة</label>
+                <input name="Note" class="form-control" maxlength="500" />
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button class="btn btn-success w-100" type="submit">حفظ السداد</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-4"><div class="alert alert-secondary mb-0">الرصيد الافتتاحي: <strong>@Model.OpeningBalance.ToString("0.00")</strong></div></div>
+    <div class="col-md-4"><div class="alert alert-info mb-0">الرصيد الختامي: <strong>@Model.ClosingBalance.ToString("0.00")</strong></div></div>
+</div>
+
+<table class="table table-striped table-bordered">
+    <thead>
+        <tr>
+            <th>التاريخ</th>
+            <th>المرجع</th>
+            <th>مدين</th>
+            <th>دائن</th>
+            <th>الرصيد</th>
+            <th>ملاحظات</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.Entries)
+    {
+        <tr>
+            @* Old format kept for reference: @row.At.ToString("dd/MM/yyyy HH:mm") *@
+            <td>@row.At.ToString("dd/MM/yyyy")</td>
+            <td>@row.Reference</td>
+            <td>@row.Debit.ToString("0.00")</td>
+            <td>@row.Credit.ToString("0.00")</td>
+            <td>@row.RunningBalance.ToString("0.00")</td>
+            <td>@row.Note</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<p>
+    <a asp-action="Debts" class="btn btn-secondary">رجوع لديون الموردين</a>
+</p>

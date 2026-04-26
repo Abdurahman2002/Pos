@@ -1,0 +1,48 @@
+@model IEnumerable<NewsApp2.Models.Entities.Supplier>
+@{
+    ViewData["Title"] = "الموردون";
+    var search = ViewBag.Search as string;
+}
+
+<h1>الموردون</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input name="search" value="@search" class="form-control" placeholder="بحث باسم المورد أو الهاتف" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" type="submit">بحث</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">إعادة ضبط</a>
+    </div>
+    <div class="col-auto ms-auto">
+        <a asp-action="Create" class="btn btn-success">إضافة مورد</a>
+        <a asp-action="Debts" class="btn btn-warning">ديون الموردين</a>
+    </div>
+</form>
+
+<table class="table table-striped table-hover">
+    <thead>
+        <tr>
+            <th>الاسم</th>
+            <th>الهاتف</th>
+            <th>ملاحظات</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var supplier in Model)
+    {
+        <tr>
+            <td>@supplier.Name</td>
+            <td>@supplier.Phone</td>
+            <td>@supplier.Note</td>
+            <td class="text-nowrap">
+                <a asp-action="Statement" asp-route-id="@supplier.Id" class="btn btn-sm btn-outline-dark">كشف حساب</a>
+                <a asp-action="Pay" asp-route-supplierId="@supplier.Id" class="btn btn-sm btn-outline-success">سداد</a>
+                <a asp-action="Edit" asp-route-id="@supplier.Id" class="btn btn-sm btn-outline-primary">تعديل</a>
+                <a asp-action="Delete" asp-route-id="@supplier.Id" class="btn btn-sm btn-outline-danger">حذف</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

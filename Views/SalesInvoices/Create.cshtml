@@ -1,6 +1,7 @@
 ﻿@model NewsApp2.ViewModels.Sales.SalesCreateVM
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
 @{
+    Layout = "_LayoutPOS";
     ViewData["Title"] = "نقطة البيع";
     var lineCount = Model?.Lines?.Count > 0 ? Model.Lines.Count : 1;
     var simplePosMode = ViewBag.SimplePosMode is bool mode && mode;
@@ -14,6 +15,8 @@
     var shiftReturnUrl = ViewBag.ShiftReturnUrl as string ?? Url.Action("Create", "SalesInvoices") ?? "/SalesInvoices/Create";
     var heldDrafts = ViewBag.HeldDrafts as IEnumerable<NewsApp2.ViewModels.Sales.SalesInvoiceDraftSummaryVM> ?? Enumerable.Empty<NewsApp2.ViewModels.Sales.SalesInvoiceDraftSummaryVM>();
     var createUrl = Url.Action("Create", "SalesInvoices") ?? "/SalesInvoices/Create";
+    var autoPrintInvoiceId = ViewBag.AutoPrintInvoiceId as Guid?;
+    var receiptUrlTemplate = Url.Action("Receipt", "SalesInvoices", new { id = "__invoiceId__", autoPrint = true }) ?? "/SalesInvoices/Receipt/__invoiceId__?autoPrint=true";
     var soundUserKey = (User?.Identity?.Name ?? "anonymous").Trim().ToLowerInvariant();
 }
 
@@ -47,34 +50,92 @@
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <input asp-for="DraftId" type="hidden" />
 
-    <div class="card mb-3 border-success-subtle">
-        <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+    <div class="card mb-3 border-success-subtle shadow-sm" style="border-radius: 10px;">
+        <div class="card-body d-flex flex-wrap gap-3 align-items-center bg-light">
             @if (!simplePosMode)
             {
-                <div class="form-check form-switch m-0">
-                    <input asp-for="IsReturn" class="form-check-input" id="is-return-toggle" />
-                    <label class="form-check-label fw-semibold" for="is-return-toggle">وضع المرتجع</label>
+                <div class="d-flex align-items-center gap-3 border rounded px-3 py-1 bg-white shadow-sm">
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+                        <input asp-for="IsReturn" class="form-check-input mt-0 fs-5" id="is-return-toggle" style="cursor: pointer;" />
+                        <label class="form-check-label fw-bold text-danger m-0" for="is-return-toggle" style="cursor: pointer;">
+                            <i class="mdi mdi-keyboard-return"></i> إسترجاع
+                        </label>
+                    </div>
+                    <div class="vr mx-1 bg-secondary opacity-25"></div>
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+                        <input asp-for="AutoPrintReceipt" class="form-check-input mt-0 fs-5" id="auto-print-toggle" style="cursor: pointer;" />
+                        <label class="form-check-label fw-bold text-primary m-0" for="auto-print-toggle" style="cursor: pointer;">
+                            <i class="mdi mdi-printer"></i> طباعة تلقائية
+                        </label>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="hold-invoice-btn">تعليق الفاتورة</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" id="restore-invoice-btn">بيع جديد</button>
+                <!-- Hold Invoice Button -->
+                <button type="button" class="btn btn-warning fw-bold d-flex align-items-center shadow-sm" id="hold-invoice-btn" title="تعليق الفاتورة (F4)">
+                    <i class="mdi mdi-pause-circle fs-5 me-1"></i> تعليق مؤقت
+                </button>
+                
+                <!-- Held Drafts Button Trigger for Offcanvas -->
+                <button type="button" class="btn btn-info text-white fw-bold d-flex align-items-center position-relative shadow-sm" data-bs-toggle="offcanvas" data-bs-target="#draftsOffcanvas" aria-controls="draftsOffcanvas" title="عرض الفواتير المعلقة (F9)">
+                    <i class="mdi mdi-list-status fs-5 me-1"></i> المعلقة
+                    @if (heldDrafts.Any())
+                    {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+                            @heldDrafts.Count()
+                            <span class="visually-hidden">فواتير معلقة</span>
+                        </span>
+                    }
+                </button>
+
+                <!-- New Sale -->
+                <a asp-action="Create" class="btn btn-primary fw-bold d-flex align-items-center shadow-sm" id="restore-invoice-btn" title="فاتورة جديدة">
+                    <i class="mdi mdi-plus-box fs-5 me-1"></i> بيع جديد
+                </a>
+
                 @if (canManagePricing)
                 {
-                    <a asp-controller="Pricing" asp-action="Index" class="btn btn-outline-dark btn-sm">سياسة التسعير</a>
+                    <a asp-controller="Pricing" asp-action="Index" class="btn btn-secondary fw-bold d-flex align-items-center shadow-sm" title="التسعير">
+                         <i class="mdi mdi-tag-multiple fs-5 me-1"></i> سياسة التسعير
+                    </a>
                 }
-                <span class="text-muted small">يمكن حفظ الفاتورة مؤقتا واسترجاعها لاحقا.</span>
             }
             else
             {
-                <input asp-for="IsReturn" type="hidden" />
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="hold-invoice-btn">تعليق الفاتورة</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" id="restore-invoice-btn">بيع جديد</button>
-                <a asp-action="Drafts" class="btn btn-outline-info btn-sm">المعلقات</a>
-                <a asp-controller="PosShifts" asp-action="Current" asp-route-returnUrl="@shiftReturnUrl" class="btn btn-outline-secondary btn-sm">الوردية</a>
+                <div class="d-flex align-items-center gap-3 border rounded px-3 py-1 bg-white shadow-sm">
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+                        <input asp-for="IsReturn" class="form-check-input mt-0 fs-5" id="is-return-toggle-pos" style="cursor: pointer;" />
+                        <label class="form-check-label fw-bold text-danger m-0" for="is-return-toggle-pos" style="cursor: pointer;">
+                            <i class="mdi mdi-keyboard-return"></i> إسترجاع
+                        </label>
+                    </div>
+                    <div class="vr mx-1 bg-secondary opacity-25"></div>
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+                        <input asp-for="AutoPrintReceipt" class="form-check-input mt-0 fs-5" id="auto-print-toggle-pos" style="cursor: pointer;" />
+                        <label class="form-check-label fw-bold text-primary m-0" for="auto-print-toggle-pos" style="cursor: pointer;">
+                            <i class="mdi mdi-printer"></i> طباعة تلقائية
+                        </label>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-warning fw-bold d-flex align-items-center shadow-sm" id="hold-invoice-btn" title="تعليق">
+                    <i class="mdi mdi-pause-circle fs-5 me-1"></i> تعليق
+                </button>
+                <a asp-action="Create" class="btn btn-primary fw-bold d-flex align-items-center shadow-sm" title="جديد">
+                    <i class="mdi mdi-plus-box fs-5 me-1"></i> جديد
+                </a>
+                <a asp-action="Drafts" class="btn btn-info text-white fw-bold d-flex align-items-center shadow-sm position-relative">
+                     <i class="mdi mdi-list-status fs-5 me-1"></i> المعلقات
+                     @if (heldDrafts.Any())
+                    {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">@heldDrafts.Count()</span>
+                    }
+                </a>
+                <a asp-controller="PosShifts" asp-action="Current" asp-route-returnUrl="@shiftReturnUrl" class="btn btn-secondary fw-bold d-flex align-items-center shadow-sm">
+                    <i class="mdi mdi-cash-register fs-5 me-1"></i> الوردية
+                </a>
                 @if (canManagePricing)
                 {
-                    <a asp-controller="Pricing" asp-action="Index" class="btn btn-outline-dark btn-sm">سياسة التسعير</a>
+                    <a asp-controller="Pricing" asp-action="Index" class="btn btn-outline-dark fw-bold d-flex align-items-center shadow-sm">سياسة التسعير</a>
                 }
-                <span class="text-muted small">وضع كاشير سريع وبسيط.</span>
+                <span class="text-muted small fw-bold ms-auto bg-white px-2 py-1 rounded border">كاشير سريع</span>
             }
         </div>
     </div>
@@ -145,8 +206,8 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm border-0">
-                <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="table-responsive" style="min-height: 200px; max-height: calc(100vh - 450px); overflow-y: auto;">
                     <table class="table table-sm table-hover mb-0" id="lines-table">
                         <thead class="table-light sticky-top" style="z-index: 5;">
                             <tr>
@@ -168,11 +229,11 @@
                                     <span asp-validation-for="Lines[i].ItemId" class="text-danger small"></span>
                                 </td>
                                 <td>
-                                    <input asp-for="Lines[i].Qty" class="form-control form-control-sm qty-input" type="number" step="1" min="1" inputmode="numeric" />
+                                    <input asp-for="Lines[i].Qty" class="form-control form-control-sm qty-input" type="number" step="1" min="1" inputmode="numeric" placeholder="0" />
                                     <span asp-validation-for="Lines[i].Qty" class="text-danger small"></span>
                                 </td>
                                 <td>
-                                    <input asp-for="Lines[i].UnitPriceEur" class="form-control form-control-sm price-input" type="number" step="0.01" min="0" readonly="@(simplePosMode ? "readonly" : null)" />
+                                    <input asp-for="Lines[i].UnitPriceEur" class="form-control form-control-sm price-input" type="number" step="0.01" min="0" placeholder="0.00" readonly="@(simplePosMode ? "readonly" : null)" />
                                     <span asp-validation-for="Lines[i].UnitPriceEur" class="text-danger small"></span>
                                 </td>
                                 <td>
@@ -184,8 +245,10 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer bg-white p-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="add-line">+ إضافة سطر</button>
+                <div class="card-footer bg-white p-2 text-center text-md-start">
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="add-line" title="إضافة صنف يدوياً من القائمة">
+                        <i class="mdi mdi-plus-box-outline"></i> إضافة صنف يدوياً
+                    </button>
                 </div>
             </div>
         </div>
@@ -207,8 +270,9 @@
 
                     <div class="mb-3">
                         <label asp-for="InvoiceDate" class="form-label form-label-sm mb-1 fw-bold text-muted small"></label>
-                        <input asp-for="InvoiceDate" class="form-control form-control-sm" type="date" readonly />
-                        <span asp-validation-for="InvoiceDate" class="text-danger small"></span>
+                        @* Old line kept for reference: <input asp-for="InvoiceDate" type="hidden" value="@(Model.InvoiceDate.ToString("dd/MM/yyyy"))" /> *@
+                        @* Old line kept for reference: <input id="InvoiceDateDisplay" class="form-control form-control-sm text-center fw-bold" type="text" value="@(Model.InvoiceDate.ToString("dd/MM/yyyy"))" readonly dir="ltr" lang="en-GB" style="unicode-bidi: plaintext;" /> *@
+                        <input id="InvoiceDateDisplay" class="form-control form-control-sm text-center fw-bold" type="text" value="@((Model?.InvoiceDate ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToString("dd/MM/yyyy"))" readonly dir="ltr" lang="en-GB" style="direction:ltr; unicode-bidi:isolate;" />
                     </div>
                     <input asp-for="CurrencyCode" type="hidden" />
                     <input asp-for="EurToDinarRateSnapshot" type="hidden" value="1" />
@@ -278,9 +342,8 @@
                         <span asp-validation-for="CustomerId" class="text-danger small"></span>
                     </div>
 
-                    <div class="d-grid gap-2 mt-4 pt-2 border-top">
-                        <button type="submit" class="btn btn-primary btn-lg fw-bold" id="submit-pos-btn">ترحيل البيع</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">إلغاء الرجوع للقائمة</a>
+                    <div class="d-grid mt-4 pt-2 border-top">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold w-100" id="submit-pos-btn">ترحيل البيع</button>
                     </div>
                 </div>
             </div>
@@ -290,63 +353,64 @@
 
 @if (!simplePosMode)
 {
-<div class="card mt-4 shadow-sm border-secondary border-opacity-25">
-    <div class="card-header bg-light d-flex align-items-center justify-content-between">
-        <span class="fw-bold text-secondary"><i class="mdi mdi-pause-circle-outline me-1"></i> الفواتير المعلقة</span>
-        <span class="badge bg-secondary rounded-pill">@heldDrafts.Count()</span>
-    </div>
-    <div class="card-body p-0">
-        @if (!heldDrafts.Any())
-        {
-            <div class="p-4 text-center text-muted">لا توجد فواتير معلقة.</div>
-        }
-        else
-        {
-            <ul class="list-group list-group-flush">
-                @foreach (var draft in heldDrafts)
-                {
-                    <li class="list-group-item p-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="ms-2 me-auto">
-                                <div class="fw-bold mb-1">
-                                    @draft.Title
-                                    @if (draft.IsReturn)
-                                    {
-                                        <span class="badge bg-danger ms-2">ترجيع</span>
-                                    }
-                                </div>
-                                @if (draft.ItemNames.Any())
-                                {
-                                    <div class="small text-secondary mb-1 mb-md-2" style="white-space: normal; line-height: 1.4;">
-                                        <i class="mdi mdi-cube-outline me-1"></i>
-                                        @string.Join("، ", draft.ItemNames)
+    <!-- Offcanvas for Held Drafts -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="draftsOffcanvas" aria-labelledby="draftsOffcanvasLabel">
+        <div class="offcanvas-header bg-light border-bottom">
+            <h5 class="offcanvas-title fw-bold text-secondary" id="draftsOffcanvasLabel">
+                <i class="mdi mdi-pause-circle-outline me-1"></i> الفواتير المعلقة
+                <span class="badge bg-danger rounded-pill ms-2" style="font-size: 0.8rem;">@heldDrafts.Count()</span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            @if (!heldDrafts.Any())
+            {
+                <div class="p-4 text-center text-muted">لا توجد فواتير معلقة حالياً.</div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var draft in heldDrafts)
+                    {
+                        <div class="list-group-item p-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-bold fs-6">
+                                        @draft.Title
+                                        @if (draft.IsReturn)
+                                        {
+                                            <span class="badge bg-danger ms-2">ترجيع</span>
+                                        }
                                     </div>
-                                }
-                                <div class="small text-secondary d-flex flex-wrap gap-3 align-items-center">
-                                    <span><i class="mdi mdi-calendar"></i> <span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></span>
-                                    <span><i class="mdi mdi-format-list-bulleted"></i> @draft.LineCount أصناف</span>
-                                    <span class="fw-bold text-dark"><i class="mdi mdi-cash"></i> @draft.NetDinar.ToString("0.00") دينار</span>
+                                    <div class="small text-muted mt-1"><i class="mdi mdi-calendar"></i> <span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></div>
                                 </div>
+                                <div class="fw-bold text-success fs-6">@draft.NetDinar.ToString("0.00") د.ل</div>
                             </div>
-                            <div class="d-flex gap-2 ms-3 align-items-start">
-                                <a class="btn btn-sm btn-outline-primary d-flex align-items-center shadow-sm" asp-action="Create" asp-route-draftId="@draft.Id" title="استرجاع الفاتورة">
-                                    <i class="mdi mdi-restore me-1 fs-6"></i> استرجاع
+                            @if (draft.ItemNames.Any())
+                            {
+                                <div class="small text-secondary mb-3 bg-light p-2 rounded" style="white-space: normal; line-height: 1.4;">
+                                    <i class="mdi mdi-format-list-bulleted me-1"></i> @draft.LineCount أصناف: <br/>
+                                    @string.Join("، ", draft.ItemNames)
+                                </div>
+                            }
+                            <div class="d-flex gap-2">
+                                <a class="btn btn-sm btn-primary flex-grow-1 fw-bold" asp-action="Create" asp-route-draftId="@draft.Id" title="استرجاع الفاتورة للمتابعة">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> إسترجاع
                                 </a>
                                 <form asp-action="DeleteDraft" method="post" class="m-0">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@draft.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center" onclick="return confirm('هل أنت متأكد من حذف هذه الفاتورة المعلقة نهائياً؟');" title="حذف الفاتورة">
-                                        <i class="mdi mdi-delete fs-6"></i>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الفاتورة المعلقة نهائياً؟');" title="حذف الفاتورة">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </div>
                         </div>
-                    </li>
-                }
-            </ul>
-        }
+                    }
+                </div>
+            }
+        </div>
     </div>
-</div>
 }
 
 <template id="line-template">
@@ -362,8 +426,8 @@
             }
         </select>
     </td>
-    <td><input name="Lines[__index__].Qty" class="form-control form-control-sm qty-input" type="number" step="1" min="1" inputmode="numeric" /></td>
-    <td><input name="Lines[__index__].UnitPriceEur" class="form-control form-control-sm price-input" type="number" step="0.01" min="0" readonly="@(simplePosMode ? "readonly" : null)" /></td>
+    <td><input name="Lines[__index__].Qty" class="form-control form-control-sm qty-input" type="number" step="1" min="1" inputmode="numeric" placeholder="0" /></td>
+    <td><input name="Lines[__index__].UnitPriceEur" class="form-control form-control-sm price-input" type="number" step="0.01" min="0" placeholder="0.00" readonly="@(simplePosMode ? "readonly" : null)" /></td>
     <td><input class="form-control form-control-sm line-total" type="text" value="0.00" readonly /></td>
     <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-line px-2" title="حذف"><i class="bi bi-trash"></i>حذف</button></td>
 </template>
@@ -417,5 +481,37 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/lines-table.js"></script>
     <script src="https://unpkg.com/@@zxing/library@latest"></script>
+    <script>
+        (function () {
+            var autoPrintInvoiceId = '@(autoPrintInvoiceId?.ToString() ?? string.Empty)';
+            if (!autoPrintInvoiceId) {
+                return;
+            }
+
+              var receiptUrlTemplate = '@Html.Raw(receiptUrlTemplate)';
+              var receiptUrl = receiptUrlTemplate.replace('__invoiceId__', autoPrintInvoiceId);
+              
+              // إضافة متغير لمعرفة أنها في نافذة خفية والطباعة الصامتة
+              receiptUrl += "&isIframe=true";
+
+              // إنشاء نافذة خفية للطباعة بدون تغيير الصفحة الحالية ولا نوافذ منبثقة جديدة
+              var printFrame = document.createElement("iframe");
+              printFrame.style.position = "absolute";
+              printFrame.style.width = "0px";
+              printFrame.style.height = "0px";
+              printFrame.style.border = "none";
+              printFrame.src = receiptUrl;
+              
+              document.body.appendChild(printFrame);
+              
+              // بمجرد أن يحصل الطباعة سيظل ال iframe موجودا لفترة ثم يحذف لتنظيف الصفحة من الذاكرة
+              setTimeout(function () {
+                  if (document.body.contains(printFrame)) {
+                      document.body.removeChild(printFrame);
+                  }
+              }, 10000);
+        })();
+    </script>
 }
+
 

@@ -21,6 +21,9 @@
 <dl class="row">
     <dt class="col-sm-3">@L["Number"]</dt><dd class="col-sm-9">@Model.Number</dd>
     <dt class="col-sm-3">@L["Date"]</dt><dd class="col-sm-9"><span dir="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></dd>
+    <dt class="col-sm-3">المورد</dt><dd class="col-sm-9">@(Model.Supplier?.Name ?? "-")</dd>
+    <dt class="col-sm-3">طريقة الدفع</dt><dd class="col-sm-9">@(string.Equals(Model.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase) ? "آجل" : "نقدي")</dd>
+    <dt class="col-sm-3">تاريخ الاستحقاق</dt><dd class="col-sm-9">@(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("dd/MM/yyyy") : "-")</dd>
     <dt class="col-sm-3">الحالة</dt><dd class="col-sm-9">@localizedStatus</dd>
     <dt class="col-sm-3">الإجمالي</dt><dd class="col-sm-9">@Model.TotalDinar.ToString("0.00") دينار</dd>
 </dl>

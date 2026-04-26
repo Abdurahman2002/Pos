@@ -16,6 +16,13 @@ namespace NewsApp2.Controllers
         private const string DailySalesCustomerName = "مبيعات يومية";
         private const string StatusOpen = "Open";
         private const string StatusClosed = "Closed";
+        private const string JournalSourceType = "CustomerReceipt";
+        private const string AccountCashCode = "1101";
+        private const string AccountCashName = "الصندوق";
+        private const string AccountBankCode = "1102";
+        private const string AccountBankName = "البنك";
+        private const string AccountCustomerCode = "1201";
+        private const string AccountCustomerName = "ذمم العملاء";
         private static readonly Guid DailySalesCustomerSeedId = Guid.Parse("7e2efb6c-0cb2-430f-92af-6e0ad720f105");
 
         private readonly IUnitOfWork<Customer> _customers;
@@ -302,7 +309,8 @@ namespace NewsApp2.Controllers
                 .Select(r => new
                 {
                     ReceiptId = (Guid?)r.Id,
-                    At = r.Created,
+                    At = r.ReceiptDate.ToDateTime(TimeOnly.MinValue),
+                    CreatedAt = r.Created,
                     Ref = "قبض",
                     Debit = 0m,
                     Credit = r.Amount,
@@ -324,7 +332,8 @@ namespace NewsApp2.Controllers
                 .Select(i => new
                 {
                     ReceiptId = (Guid?)null,
-                    At = i.Created,
+                    At = i.InvoiceDate.ToDateTime(TimeOnly.MinValue),
+                    CreatedAt = i.Created,
                     Ref = i.Number,
                     Debit = i.TotalDinar,
                     Credit = 0m,
@@ -337,6 +346,7 @@ namespace NewsApp2.Controllers
             var rowsRaw = salesRows
                 .Concat(paymentRows)
                 .OrderBy(x => x.At)
+                .ThenBy(x => x.CreatedAt)
                 .ToList();
 
             var runningBalance = openingBalance;
@@ -428,6 +438,8 @@ namespace NewsApp2.Controllers
             };
 
             _context.Set<CustomerReceipt>().Add(receipt);
+
+            AddFinancialEntriesForReceipt(receipt);
 
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -538,6 +550,9 @@ namespace NewsApp2.Controllers
             receipt.Note = string.IsNullOrWhiteSpace(input.Note) ? null : input.Note.Trim();
             receipt.Modified = DateTime.UtcNow;
 
+            await RemoveFinancialEntriesAsync(receipt.Id);
+            AddFinancialEntriesForReceipt(receipt);
+
             _context.Set<AuditLog>().Add(new AuditLog
             {
                 Action = "Edit",
@@ -575,6 +590,7 @@ namespace NewsApp2.Controllers
                 return RedirectToAction(nameof(Statement), new { id = receipt.CustomerId });
             }
 
+            await RemoveFinancialEntriesAsync(receipt.Id);
             _context.Set<CustomerReceipt>().Remove(receipt);
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -590,6 +606,64 @@ namespace NewsApp2.Controllers
 
             TempData["SuccessMessage"] = "تم حذف التحصيل بنجاح.";
             return RedirectToAction(nameof(Statement), new { id = customerId });
+        }
+
+        private void AddFinancialEntriesForReceipt(CustomerReceipt receipt)
+        {
+            var amount = Math.Round(receipt.Amount, 2, MidpointRounding.ToEven);
+            if (amount <= 0)
+                return;
+
+            var (debitCode, debitName) = ResolveReceiptDebitAccount(receipt.PaymentMethod);
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = receipt.ReceiptDate,
+                SourceType = JournalSourceType,
+                SourceId = receipt.Id,
+                DocumentNo = $"CR-{receipt.ReceiptDate:yyyyMMdd}-{receipt.Id.ToString("N")[..6].ToUpperInvariant()}",
+                AccountCode = debitCode,
+                AccountName = debitName,
+                Debit = amount,
+                Credit = 0m,
+                Note = receipt.Note,
+                CreatedByUserId = receipt.CreatedByUserId,
+                CreatedByUserName = receipt.CreatedByUserName
+            });
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = receipt.ReceiptDate,
+                SourceType = JournalSourceType,
+                SourceId = receipt.Id,
+                DocumentNo = $"CR-{receipt.ReceiptDate:yyyyMMdd}-{receipt.Id.ToString("N")[..6].ToUpperInvariant()}",
+                AccountCode = AccountCustomerCode,
+                AccountName = AccountCustomerName,
+                Debit = 0m,
+                Credit = amount,
+                Note = receipt.Note,
+                CreatedByUserId = receipt.CreatedByUserId,
+                CreatedByUserName = receipt.CreatedByUserName
+            });
+        }
+
+        private async Task RemoveFinancialEntriesAsync(Guid receiptId)
+        {
+            var entries = await _context.Set<FinJournalEntry>()
+                .Where(e => e.SourceType == JournalSourceType && e.SourceId == receiptId)
+                .ToListAsync();
+
+            if (entries.Count > 0)
+                _context.Set<FinJournalEntry>().RemoveRange(entries);
+        }
+
+        private static (string Code, string Name) ResolveReceiptDebitAccount(string? paymentMethod)
+        {
+            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return (AccountBankCode, AccountBankName);
+
+            return (AccountCashCode, AccountCashName);
         }
 
         private static string ToArabicPaymentMethod(string? paymentMethod)

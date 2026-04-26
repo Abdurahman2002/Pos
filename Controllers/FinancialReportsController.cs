@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
 using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
@@ -266,6 +267,347 @@ namespace NewsApp2.Controllers
 
             ViewBag.SecondaryCurrencyCode = "LYD";
             return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Journal(DateOnly? from, DateOnly? to, string? accountCode, string? sourceType, string? search)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate.AddDays(-30);
+
+            if (fromDate > toDate)
+            {
+                var temp = fromDate;
+                fromDate = toDate;
+                toDate = temp;
+            }
+
+            var query = _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Where(e => e.EntryDate >= fromDate && e.EntryDate <= toDate);
+
+            if (!string.IsNullOrWhiteSpace(accountCode))
+            {
+                var code = accountCode.Trim();
+                query = query.Where(e => e.AccountCode == code);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceType))
+            {
+                var source = sourceType.Trim();
+                query = query.Where(e => e.SourceType == source);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(e =>
+                    (e.DocumentNo != null && e.DocumentNo.Contains(term))
+                    || (e.AccountName != null && e.AccountName.Contains(term))
+                    || (e.Note != null && e.Note.Contains(term))
+                    || (e.CreatedByUserName != null && e.CreatedByUserName.Contains(term)));
+            }
+
+            var rows = await query
+                .OrderBy(e => e.EntryDate)
+                .ThenBy(e => e.SourceType)
+                .ThenBy(e => e.DocumentNo)
+                .ThenBy(e => e.Created)
+                .Select(e => new JournalEntryRowVM
+                {
+                    EntryDate = e.EntryDate,
+                    SourceType = e.SourceType,
+                    DocumentNo = e.DocumentNo,
+                    AccountCode = e.AccountCode,
+                    AccountName = e.AccountName,
+                    Debit = e.Debit,
+                    Credit = e.Credit,
+                    Note = e.Note,
+                    CreatedByUserName = e.CreatedByUserName
+                })
+                .ToListAsync();
+
+            var accountCodes = await _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Select(e => e.AccountCode)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+
+            var sourceTypes = await _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Select(e => e.SourceType)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToListAsync();
+
+            var vm = new JournalReportVM
+            {
+                From = fromDate,
+                To = toDate,
+                AccountCode = string.IsNullOrWhiteSpace(accountCode) ? null : accountCode.Trim(),
+                SourceType = string.IsNullOrWhiteSpace(sourceType) ? null : sourceType.Trim(),
+                Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+                TotalDebit = Round2(rows.Sum(r => r.Debit)),
+                TotalCredit = Round2(rows.Sum(r => r.Credit)),
+                Rows = rows,
+                AccountCodes = accountCodes,
+                SourceTypes = sourceTypes
+            };
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportJournalExcel(DateOnly? from, DateOnly? to, string? accountCode, string? sourceType, string? search)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate.AddDays(-30);
+
+            if (fromDate > toDate)
+            {
+                var temp = fromDate;
+                fromDate = toDate;
+                toDate = temp;
+            }
+
+            var query = _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Where(e => e.EntryDate >= fromDate && e.EntryDate <= toDate);
+
+            if (!string.IsNullOrWhiteSpace(accountCode))
+            {
+                var code = accountCode.Trim();
+                query = query.Where(e => e.AccountCode == code);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceType))
+            {
+                var source = sourceType.Trim();
+                query = query.Where(e => e.SourceType == source);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(e =>
+                    (e.DocumentNo != null && e.DocumentNo.Contains(term))
+                    || (e.AccountName != null && e.AccountName.Contains(term))
+                    || (e.Note != null && e.Note.Contains(term))
+                    || (e.CreatedByUserName != null && e.CreatedByUserName.Contains(term)));
+            }
+
+            var rows = await query
+                .OrderBy(e => e.EntryDate)
+                .ThenBy(e => e.SourceType)
+                .ThenBy(e => e.DocumentNo)
+                .ThenBy(e => e.Created)
+                .Select(e => new JournalEntryRowVM
+                {
+                    EntryDate = e.EntryDate,
+                    SourceType = e.SourceType,
+                    DocumentNo = e.DocumentNo,
+                    AccountCode = e.AccountCode,
+                    AccountName = e.AccountName,
+                    Debit = e.Debit,
+                    Credit = e.Credit,
+                    Note = e.Note,
+                    CreatedByUserName = e.CreatedByUserName
+                })
+                .ToListAsync();
+
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("Journal");
+
+            sheet.Cell(1, 1).Value = "التاريخ";
+            sheet.Cell(1, 2).Value = "المصدر";
+            sheet.Cell(1, 3).Value = "المستند";
+            sheet.Cell(1, 4).Value = "رمز الحساب";
+            sheet.Cell(1, 5).Value = "اسم الحساب";
+            sheet.Cell(1, 6).Value = "مدين";
+            sheet.Cell(1, 7).Value = "دائن";
+            sheet.Cell(1, 8).Value = "البيان";
+            sheet.Cell(1, 9).Value = "المستخدم";
+            sheet.Range(1, 1, 1, 9).Style.Font.Bold = true;
+
+            var rowIndex = 2;
+            foreach (var row in rows)
+            {
+                sheet.Cell(rowIndex, 1).Value = row.EntryDate.ToString("yyyy-MM-dd");
+                sheet.Cell(rowIndex, 2).Value = row.SourceType;
+                sheet.Cell(rowIndex, 3).Value = row.DocumentNo ?? string.Empty;
+                sheet.Cell(rowIndex, 4).Value = row.AccountCode;
+                sheet.Cell(rowIndex, 5).Value = row.AccountName;
+                sheet.Cell(rowIndex, 6).Value = row.Debit;
+                sheet.Cell(rowIndex, 7).Value = row.Credit;
+                sheet.Cell(rowIndex, 8).Value = row.Note ?? string.Empty;
+                sheet.Cell(rowIndex, 9).Value = row.CreatedByUserName ?? string.Empty;
+                rowIndex++;
+            }
+
+            sheet.Cell(rowIndex, 5).Value = "الإجمالي";
+            sheet.Cell(rowIndex, 6).Value = rows.Sum(r => r.Debit);
+            sheet.Cell(rowIndex, 7).Value = rows.Sum(r => r.Credit);
+            sheet.Range(rowIndex, 5, rowIndex, 7).Style.Font.Bold = true;
+
+            sheet.Columns().AdjustToContents();
+
+            await using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"journal_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> TrialBalance(DateOnly? from, DateOnly? to)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate.AddDays(-30);
+
+            if (fromDate > toDate)
+            {
+                var temp = fromDate;
+                fromDate = toDate;
+                toDate = temp;
+            }
+
+            var rows = await _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Where(e => e.EntryDate >= fromDate && e.EntryDate <= toDate)
+                .GroupBy(e => new { e.AccountCode, e.AccountName })
+                .Select(g => new TrialBalanceRowVM
+                {
+                    AccountCode = g.Key.AccountCode,
+                    AccountName = g.Key.AccountName,
+                    Debit = Round2(g.Sum(x => x.Debit)),
+                    Credit = Round2(g.Sum(x => x.Credit))
+                })
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                var diff = Round2(row.Debit - row.Credit);
+                if (diff >= 0)
+                {
+                    row.NetDebit = diff;
+                    row.NetCredit = 0m;
+                }
+                else
+                {
+                    row.NetDebit = 0m;
+                    row.NetCredit = Math.Abs(diff);
+                }
+            }
+
+            rows = rows
+                .OrderBy(r => r.AccountCode)
+                .ThenBy(r => r.AccountName)
+                .ToList();
+
+            var vm = new TrialBalanceReportVM
+            {
+                From = fromDate,
+                To = toDate,
+                TotalDebit = Round2(rows.Sum(r => r.Debit)),
+                TotalCredit = Round2(rows.Sum(r => r.Credit)),
+                TotalNetDebit = Round2(rows.Sum(r => r.NetDebit)),
+                TotalNetCredit = Round2(rows.Sum(r => r.NetCredit)),
+                Rows = rows
+            };
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportTrialBalanceExcel(DateOnly? from, DateOnly? to)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate.AddDays(-30);
+
+            if (fromDate > toDate)
+            {
+                var temp = fromDate;
+                fromDate = toDate;
+                toDate = temp;
+            }
+
+            var rows = await _context.Set<FinJournalEntry>()
+                .AsNoTracking()
+                .Where(e => e.EntryDate >= fromDate && e.EntryDate <= toDate)
+                .GroupBy(e => new { e.AccountCode, e.AccountName })
+                .Select(g => new TrialBalanceRowVM
+                {
+                    AccountCode = g.Key.AccountCode,
+                    AccountName = g.Key.AccountName,
+                    Debit = Round2(g.Sum(x => x.Debit)),
+                    Credit = Round2(g.Sum(x => x.Credit))
+                })
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                var diff = Round2(row.Debit - row.Credit);
+                if (diff >= 0)
+                {
+                    row.NetDebit = diff;
+                    row.NetCredit = 0m;
+                }
+                else
+                {
+                    row.NetDebit = 0m;
+                    row.NetCredit = Math.Abs(diff);
+                }
+            }
+
+            rows = rows
+                .OrderBy(r => r.AccountCode)
+                .ThenBy(r => r.AccountName)
+                .ToList();
+
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("TrialBalance");
+
+            sheet.Cell(1, 1).Value = "رمز الحساب";
+            sheet.Cell(1, 2).Value = "اسم الحساب";
+            sheet.Cell(1, 3).Value = "إجمالي مدين";
+            sheet.Cell(1, 4).Value = "إجمالي دائن";
+            sheet.Cell(1, 5).Value = "رصيد مدين";
+            sheet.Cell(1, 6).Value = "رصيد دائن";
+            sheet.Range(1, 1, 1, 6).Style.Font.Bold = true;
+
+            var rowIndex = 2;
+            foreach (var row in rows)
+            {
+                sheet.Cell(rowIndex, 1).Value = row.AccountCode;
+                sheet.Cell(rowIndex, 2).Value = row.AccountName;
+                sheet.Cell(rowIndex, 3).Value = row.Debit;
+                sheet.Cell(rowIndex, 4).Value = row.Credit;
+                sheet.Cell(rowIndex, 5).Value = row.NetDebit;
+                sheet.Cell(rowIndex, 6).Value = row.NetCredit;
+                rowIndex++;
+            }
+
+            sheet.Cell(rowIndex, 2).Value = "الإجمالي";
+            sheet.Cell(rowIndex, 3).Value = rows.Sum(r => r.Debit);
+            sheet.Cell(rowIndex, 4).Value = rows.Sum(r => r.Credit);
+            sheet.Cell(rowIndex, 5).Value = rows.Sum(r => r.NetDebit);
+            sheet.Cell(rowIndex, 6).Value = rows.Sum(r => r.NetCredit);
+            sheet.Range(rowIndex, 2, rowIndex, 6).Style.Font.Bold = true;
+
+            sheet.Columns().AdjustToContents();
+
+            await using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = $"trial_balance_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
         private static decimal Round2(decimal value)

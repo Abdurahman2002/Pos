@@ -77,8 +77,8 @@
 
                                 </td>
                                 <td>
-                                    @*  @Html.DisplayFor(modelItem => @item.Created.ToShortDateString()) *@  @* سيعطي Error *@
-                                    @*  @item.Created.ToShortDateString()*@
+                                    @*  @Html.DisplayFor(modelItem => @item.Created.ToString("dd/MM/yyyy")) *@  @* سيعطي Error *@
+                                    @*  @item.Created.ToString("dd/MM/yyyy")*@
                                     @* @Html.DisplayFor(modelItem => @item.Created)*@
 
                                     <small>@Html.DisplayFor(modelItem => item.Created)</small>

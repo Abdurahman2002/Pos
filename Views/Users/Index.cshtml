@@ -183,8 +183,8 @@
                             {
                                 <span class="badge bg-danger mb-2">@L["Locked"]</span>
                                 <br />
-                                @* <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd-MM-yyyy hh:mm:ss tt") (UTC+02:00)</small> *@
-                                @* <small>@user.LockoutEnd.Value.UtcDateTime.ToString("dd-MM-yyyy hh:mm:ss tt")</small> *@
+                                @* <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt") (UTC+02:00)</small> *@
+                                @* <small>@user.LockoutEnd.Value.UtcDateTime.ToString("dd/MM/yyyy hh:mm:ss tt")</small> *@
                                 <small>@Html.DisplayFor(modelItem => user.LockoutEndLocal)</small>
                             }
                             else if (user.LockoutEnd != null && user.LockoutEnd.Value > DateTime.UtcNow)
@@ -197,7 +197,7 @@
                             {
                                 <span class="badge bg-white text-dark mb-2">@L["Locked"]</span>
                                 <br />
-                                <small>@*@user.LockoutEnd.Value.ToString("dd-MM-yyyy hh:MM:ss tt")*@</small>
+                                <small>@*@user.LockoutEnd.Value.ToString("dd/MM/yyyy hh:MM:ss tt")*@</small>
                                 <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt")</small>
                             }
                             else

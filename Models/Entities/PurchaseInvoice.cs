@@ -27,6 +27,13 @@ namespace NewsApp2.Models.Entities
         [StringLength(20)]
         public string Status { get; set; } = "Posted";
 
+        public Guid? SupplierId { get; set; }
+
+        [StringLength(20)]
+        public string PaymentMethod { get; set; } = "Cash";
+
+        public DateOnly? DueDate { get; set; }
+
         [StringLength(500)]
         public string? Note { get; set; }
 
@@ -36,6 +43,7 @@ namespace NewsApp2.Models.Entities
         [StringLength(256)]
         public string? CreatedByUserName { get; set; }
 
+        public Supplier? Supplier { get; set; }
         public ICollection<PurchaseLine>? Lines { get; set; }
     }
 }

@@ -1,0 +1,193 @@
+@model NewsApp2.Models.Entities.SalesInvoice
+@using NewsApp2.Models.Entities
+@{
+    Layout = null;
+    var lines = ViewBag.Lines as IEnumerable<SalesLine> ?? Enumerable.Empty<SalesLine>();
+    var autoPrint = ViewBag.AutoPrint is bool shouldPrint && shouldPrint;
+    var paymentText = (Model.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "card" => "بطاقة",
+        "transfer" => "تحويل",
+        "credit" => "آجل",
+        _ => "نقدي"
+    };
+    var customerName = string.Equals(Model.Customer?.Name, NewsApp2.Controllers.SalesInvoicesController.DailySalesCustomerName, StringComparison.Ordinal)
+        ? "-"
+        : (Model.Customer?.Name ?? "-");
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>إيصال بيع @Model.Number</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            background: #fff;
+            color: #111;
+        }
+
+        .receipt {
+            width: 80mm;
+            margin: 0 auto;
+            padding: 10px 8px;
+            box-sizing: border-box;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .muted {
+            color: #555;
+            font-size: 12px;
+        }
+
+        .title {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .divider {
+            border-top: 1px dashed #444;
+            margin: 8px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th,
+        td {
+            padding: 3px 0;
+            vertical-align: top;
+        }
+
+        th {
+            font-weight: 700;
+        }
+
+        .ltr {
+            direction: ltr;
+            unicode-bidi: isolate;
+            display: inline-block;
+        }
+
+        .totals td {
+            padding: 2px 0;
+        }
+
+        .grand-total {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        @@media print {
+            @@page {
+                size: 80mm auto;
+                margin: 0;
+            }
+
+            body {
+                margin: 0;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <div class="center">
+            <div class="title">إيصال مبيعات</div>
+            <div class="muted">فاتورة رقم: <span class="ltr">@Model.Number</span></div>
+            <div class="muted">التاريخ: <span class="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <table>
+            <tr>
+                <td>العميل</td>
+                <td class="center">:</td>
+                <td>@customerName</td>
+            </tr>
+            <tr>
+                <td>الدفع</td>
+                <td class="center">:</td>
+                <td>@paymentText</td>
+            </tr>
+        </table>
+
+        <div class="divider"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>الصنف</th>
+                    <th class="center">ك</th>
+                    <th class="center">سعر</th>
+                    <th class="center">إجمالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in lines)
+                {
+                    <tr>
+                        <td>@line.Item?.Name</td>
+                        <td class="center"><span class="ltr">@line.Qty.ToString("0")</span></td>
+                        <td class="center"><span class="ltr">@line.UnitPriceEur.ToString("0.00")</span></td>
+                        <td class="center"><span class="ltr">@line.LineTotalDinar.ToString("0.00")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <table class="totals">
+            <tr>
+                <td>الإجمالي</td>
+                <td class="center">:</td>
+                <td class="center"><span class="ltr">@Model.TotalDinar.ToString("0.00") د.ل</span></td>
+            </tr>
+            <tr>
+                <td colspan="3" class="center grand-total">شكرا لزيارتكم</td>
+            </tr>
+        </table>
+
+        <div class="divider"></div>
+
+        <div class="center no-print" style="margin-top:8px;">
+            <button type="button" onclick="window.print()" style="padding: 5px 15px; cursor: pointer;">طباعة</button>  
+            <button type="button" onclick="window.location.href='@Url.Action("Create", "SalesInvoices")'" style="padding: 5px 15px; cursor: pointer;">عودة للبيع</button>  
+        </div>
+    </div>
+
+    @if (autoPrint)
+    {
+        <script>
+            var isIframe = window.location.search.indexOf('isIframe=true') > -1;
+
+            // الطباعة التلقائية عند فتح الصفحة
+            window.addEventListener('load', function () {
+                window.print();
+            });
+
+            // العودة التلقائية للشاشة السابقة (نقطة البيع) بمجرد إغلاق نافذة الطباعة
+            window.addEventListener('afterprint', function () {
+                if (!isIframe) {
+                    window.location.href = '@Url.Action("Create", "SalesInvoices")';
+                }
+            });
+        </script>
+    }
+</body>
+</html>

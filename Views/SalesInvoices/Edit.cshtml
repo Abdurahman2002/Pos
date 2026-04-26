@@ -57,11 +57,11 @@
                         <span asp-validation-for="Lines[i].ItemId" class="text-danger"></span>
                     </td>
                     <td>
-                        <input asp-for="Lines[i].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" />
+                        <input asp-for="Lines[i].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" placeholder="0" />
                         <span asp-validation-for="Lines[i].Qty" class="text-danger"></span>
                     </td>
                     <td>
-                        <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" />
+                        <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" placeholder="0.00" />
                         <span asp-validation-for="Lines[i].UnitPriceEur" class="text-danger"></span>
                     </td>
                     <td>
@@ -103,8 +103,8 @@
             }
         </select>
     </td>
-    <td><input name="Lines[__index__].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" /></td>
-    <td><input name="Lines[__index__].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" /></td>
+    <td><input name="Lines[__index__].Qty" class="form-control qty-input" type="number" step="1" min="1" inputmode="numeric" placeholder="0" /></td>
+    <td><input name="Lines[__index__].UnitPriceEur" class="form-control price-input" type="number" step="0.01" min="0" placeholder="0.00" /></td>
     <td><input class="form-control line-total" type="text" value="0.00" readonly /></td>
     <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
 </template>

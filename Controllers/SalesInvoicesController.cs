@@ -163,6 +163,18 @@ namespace NewsApp2.Controllers
             if (vm.CustomerId.HasValue && vm.CustomerId.Value == Guid.Empty)
                 vm.CustomerId = null;
 
+            var invoicePaymentMethod = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Where(i => i.Id == vm.InvoiceId)
+                .Select(i => i.PaymentMethod)
+                .FirstOrDefaultAsync();
+
+            if (string.Equals(invoicePaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase)
+                && !vm.CustomerId.HasValue)
+            {
+                ModelState.AddModelError(nameof(vm.CustomerId), "لا يمكن ترك العميل فارغا في فاتورة بيع آجل.");
+            }
+
             if (vm.Lines.Any(l => !l.Qty.HasValue || l.Qty.Value <= 0))
                 ModelState.AddModelError("Lines", "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
 
@@ -212,6 +224,10 @@ namespace NewsApp2.Controllers
         {
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
             ViewBag.SimplePosMode = IsSimplePosMode();
+            if (TempData["AutoPrintInvoiceId"] is string autoPrintInvoiceIdText && Guid.TryParse(autoPrintInvoiceIdText, out var autoPrintInvoiceId))
+            {
+                ViewBag.AutoPrintInvoiceId = autoPrintInvoiceId;
+            }
             ViewBag.MaxCashierDiscountPercent = await GetMaxCashierDiscountPercentAsync();
             ViewBag.ShiftReturnUrl = Url.Action(nameof(Create), new { customerId, draftId });
 
@@ -250,6 +266,7 @@ namespace NewsApp2.Controllers
                 vm.DiscountType = "Percent";
                 vm.DiscountValue ??= 0m;
                 vm.Note = null;
+                vm.AutoPrintReceipt = true;
             }
 
             if (!vm.Lines.Any())
@@ -326,6 +343,10 @@ namespace NewsApp2.Controllers
             ViewBag.SimplePosMode = simplePosMode;
             var maxCashierDiscountPercent = await GetMaxCashierDiscountPercentAsync();
             ViewBag.MaxCashierDiscountPercent = maxCashierDiscountPercent;
+
+            // Old behavior kept in comment for traceability: InvoiceDate relied on posted value and could fail due client-side format differences.
+            ModelState.Remove(nameof(vm.InvoiceDate));
+            vm.InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
             var activeShiftId = await GetOpenShiftIdAsync();
             if (simplePosMode && !activeShiftId.HasValue)
@@ -468,6 +489,21 @@ namespace NewsApp2.Controllers
                     ? "تم ترحيل فاتورة المرتجع بنجاح."
                     : "تم ترحيل فاتورة البيع بنجاح.";
 
+                if (simplePosMode)
+                {
+                    // Old behavior kept in comment for traceability: always redirected to Create without any print hint.
+                    if (vm.AutoPrintReceipt)
+                    {
+                        TempData["AutoPrintInvoiceId"] = id.ToString();
+                    }
+                    return RedirectToAction(nameof(Create));
+                }
+
+                if (vm.AutoPrintReceipt)
+                {
+                    return RedirectToAction(nameof(Receipt), new { id, autoPrint = true });
+                }
+
                 return RedirectToAction(nameof(Details), new { id });
             }
             catch (Exception ex)
@@ -525,6 +561,9 @@ namespace NewsApp2.Controllers
         {
             try
             {
+                // Old behavior kept in comment for traceability: InvoiceDate relied on posted value and could fail due client-side format differences.
+                vm.InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
                 var payload = new SalesDraftPayloadVM
                 {
                     InvoiceDate = vm.InvoiceDate,
@@ -536,6 +575,7 @@ namespace NewsApp2.Controllers
                     DiscountType = string.Equals(vm.DiscountType, "Percent", StringComparison.OrdinalIgnoreCase) ? "Percent" : "Amount",
                     DiscountValue = vm.DiscountValue,
                     IsReturn = vm.IsReturn,
+                    AutoPrintReceipt = vm.AutoPrintReceipt,
                     Lines = vm.Lines?
                         .Where(l => l != null)
                         .Select(l => new SalesDraftLineVM
@@ -596,6 +636,31 @@ namespace NewsApp2.Controllers
         public IActionResult RestoreDraft(Guid id)
         {
             return RedirectToAction(nameof(Create), new { draftId = id });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Receipt(Guid id, bool autoPrint = true)
+        {
+            var invoice = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Include(i => i.Customer)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (invoice == null)
+                return View("NotFound");
+
+            var lines = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => l.SalesInvoiceId == id)
+                .Include(l => l.Item)
+                .OrderBy(l => l.LineOrder)
+                .ThenBy(l => l.Created)
+                .ThenBy(l => l.Id)
+                .ToListAsync();
+
+            ViewBag.Lines = lines;
+            ViewBag.AutoPrint = autoPrint;
+            return View(invoice);
         }
 
         [HttpPost]
@@ -956,6 +1021,7 @@ namespace NewsApp2.Controllers
                 DiscountType = payload.DiscountType,
                 DiscountValue = payload.DiscountValue,
                 IsReturn = payload.IsReturn,
+                AutoPrintReceipt = payload.AutoPrintReceipt,
                 Lines = payload.Lines?.Select(l => new SalesLineInputVM
                 {
                     ItemId = l.ItemId,

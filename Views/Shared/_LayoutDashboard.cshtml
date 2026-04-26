@@ -43,6 +43,8 @@
     <link href="~/css/template.css" rel="stylesheet" />
     <link href="~/css/dashboard.css" rel="stylesheet" />
     <link href="~/css/date-inputs.css" rel="stylesheet" />
+    <!-- ERP Theme UI Modernization injected safely -->
+    <link href="~/css/erp-theme.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet" />
     @if (isRtl)
     {
@@ -91,7 +93,7 @@
                                 <img src="~/img/User.png" alt="no img" />
                             </div>
                             <div class="nav-profile-text">
-                                <p class="mb-1 text-black">@User.Identity.Name</p>
+                                <p class="mb-1 text-black">@(User.Identity?.Name ?? "User")</p>
                             </div>
 
                             <!--------------------------------------------------------------------------------->
@@ -128,60 +130,119 @@
         <div class="container-fluid page-body-wrapper">
             <nav class="sidebar sidebar-offcanvas" id="sidebar">
                 <ul class="nav">
+                    <!-- لوحة التحكم الرئيسية -->
                     <li class="nav-item">
                         <a href="@Url.Action("Index", "StockBalances")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-box-seam menu-icon"></i></span>
+                            <span class="icon-bg"><i class="mdi mdi-view-dashboard menu-icon"></i></span>
                             <span class="menu-title">@L["InventoryDashboard"]</span>
                         </a>
                     </li>
+
                     <li class="nav-item">
-                        <a href="@Url.Action("SendEmail", "Mail")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-envelope-arrow-up menu-icon"></i></span>
-                            <span class="menu-title">@L["EmailSend"]</span>
-                        </a>
+                        <span class="nav-link disabled text-uppercase small fw-bold text-muted">إدارة المبيعات</span>
                     </li>
                     <li class="nav-item">
-                        <span class="nav-link disabled text-uppercase small fw-semibold">@L["Inventory"]</span>
-                    </li>
-                    <li class="nav-item">
-                        <a href="@Url.Action("Index", "Categories")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-tags menu-icon"></i></span>
-                            <span class="menu-title">@L["Categories"]</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="@Url.Action("Index", "Items")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-boxes menu-icon"></i></span>
-                            <span class="menu-title">@L["Items"]</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="@Url.Action("Index", "StockBalances")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-clipboard-data menu-icon"></i></span>
-                            <span class="menu-title">@L["StockOverview"]</span>
+                        <a href="@Url.Action("Create", "SalesInvoices")" class="nav-link ajax-link">
+                            <span class="icon-bg"><i class="mdi mdi-cash-register menu-icon"></i></span>
+                            <span class="menu-title">نقطة البيع (POS)</span>
                         </a>
                     </li>
                     @if (!User.IsInRole("Cashier"))
                     {
                         <li class="nav-item">
-                            <a href="@Url.Action("Movement", "StockBalances")" class="nav-link ajax-link">
-                                <span class="icon-bg"><i class="bi bi-graph-up menu-icon"></i></span>
-                                <span class="menu-title">@L["StockMovement"]</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="@Url.Action("DailyInventory", "StockBalances")" class="nav-link ajax-link">
-                                <span class="icon-bg"><i class="bi bi-calendar-check menu-icon"></i></span>
-                                <span class="menu-title">تقرير الجرد اليومي</span>
-                            </a>
-                        </li>
+                        <a href="@Url.Action("Index", "SalesInvoices")" class="nav-link ajax-link">
+                            <span class="icon-bg"><i class="mdi mdi-cart menu-icon"></i></span>
+                            <span class="menu-title">@L["Sales"]</span>
+                        </a>
+                    </li>
                     }
-                    @if (User.IsInRole("Prog") || User.IsInRole("Admin") || User.IsInRole("SalesManager"))
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="collapse" href="#customersMenu" aria-expanded="false" aria-controls="customersMenu">
+                            <span class="icon-bg"><i class="mdi mdi-account-group menu-icon"></i></span>
+                            <span class="menu-title">الأطراف والذمم</span>
+                            <i class="menu-arrow"></i>
+                        </a>
+                        <div class="collapse" id="customersMenu">
+                            <ul class="nav flex-column sub-menu">
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Index", "Customers")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-account-multiple"></i> @L["Customers"]
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Debts", "Customers")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-cash-multiple"></i> ديون العملاء
+                                    </a>
+                                </li>
+                                @if (!User.IsInRole("Cashier"))
+                                {
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("Index", "Suppliers")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-truck"></i> الموردون
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("Debts", "Suppliers")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-cash-100"></i> ديون الموردين
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </li>
+
+                    <!-- المخزون -->
+                    <li class="nav-item">
+                        <span class="nav-link disabled text-uppercase small fw-bold text-muted">@L["Inventory"]</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="collapse" href="#inventoryMenu" aria-expanded="false" aria-controls="inventoryMenu">
+                            <span class="icon-bg"><i class="mdi mdi-store menu-icon"></i></span>
+                            <span class="menu-title">سجل المخزون</span>     
+                            <i class="menu-arrow"></i>
+                        </a>
+                        <div class="collapse" id="inventoryMenu">
+                            <ul class="nav flex-column sub-menu">
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Index", "Categories")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-tag"></i> @L["Categories"]    
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Index", "Items")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-package-variant"></i> @L["Items"]
+                                    </a>
+                                </li>
+                                @if (!User.IsInRole("Cashier"))
+                                {
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("Movement", "StockBalances")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-chart-line"></i> @L["StockMovement"]
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("DailyInventory", "StockBalances")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-calendar-check"></i> تقرير الجرد اليومي
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </li>
+
+                    <!-- قسم المالية والإدارة -->
+                    @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager") || !User.IsInRole("Cashier"))
                     {
                         <li class="nav-item">
-                            <a href="@Url.Action("ProfitLoss", "FinancialReports")" class="nav-link ajax-link">
-                                <span class="icon-bg"><i class="bi bi-cash-coin menu-icon"></i></span>
-                                <span class="menu-title">@L["FinancialReport"]</span>
+                            <span class="nav-link disabled text-uppercase small fw-bold text-muted">المالية والإدارة</span>
+                        </li>
+                    }
+                    @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager"))
+                    {
+                        <li class="nav-item">
+                            <a href="@Url.Action("Index", "PurchaseInvoices")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-cart-plus menu-icon"></i></span>
+                                <span class="menu-title">@L["Purchases"]</span> 
                             </a>
                         </li>
                     }
@@ -189,37 +250,31 @@
                     {
                         <li class="nav-item">
                             <a href="@Url.Action("Index", "Expenses")" class="nav-link ajax-link">
-                                <span class="icon-bg"><i class="bi bi-wallet2 menu-icon"></i></span>
+                                <span class="icon-bg"><i class="mdi mdi-wallet menu-icon"></i></span>
                                 <span class="menu-title">المصروفات والمرتبات</span>
                             </a>
                         </li>
                     }
-                    @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager"))
+                    @if (User.IsInRole("Prog") || User.IsInRole("Admin") || User.IsInRole("SalesManager"))
                     {
                         <li class="nav-item">
-                            <a href="@Url.Action("Index", "PurchaseInvoices")" class="nav-link ajax-link">
-                                <span class="icon-bg"><i class="bi bi-cart-plus menu-icon"></i></span>
-                                <span class="menu-title">@L["Purchases"]</span>
+                            <a href="@Url.Action("ProfitLoss", "FinancialReports")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-cash menu-icon"></i></span>
+                                <span class="menu-title">@L["FinancialReport"]</span>
                             </a>
                         </li>
-                    }
-                    <li class="nav-item">
-                        <a href="@Url.Action("Create", "SalesInvoices")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-receipt-cutoff menu-icon"></i></span>
-                            <span class="menu-title">نقطة البيع</span>
-                        </a>
-                    </li>
-                    @if (!User.IsInRole("Cashier"))
-                    {
                         <li class="nav-item">
-                        <a href="@Url.Action("Index", "SalesInvoices")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="bi bi-cart-check menu-icon"></i></span>
-                            <span class="menu-title">@L["Sales"]</span>
-                        </a>
-                    </li>
-                    }
-                    @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager"))
-                    {
+                            <a href="@Url.Action("Journal", "FinancialReports")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-notebook menu-icon"></i></span>
+                                <span class="menu-title">دفتر القيود</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="@Url.Action("TrialBalance", "FinancialReports")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-scale-balance menu-icon"></i></span>
+                                <span class="menu-title">ميزان المراجعة</span>
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a href="@Url.Action("CashierPerformance", "PosShifts")" class="nav-link ajax-link">
                                 <span class="icon-bg"><i class="mdi mdi-chart-line menu-icon"></i></span>
@@ -227,40 +282,39 @@
                             </a>
                         </li>
                     }
+
+                    <!-- المراسلات والإعدادات -->
                     <li class="nav-item">
-                        <a href="@Url.Action("Index", "Customers")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="mdi mdi-account-group menu-icon"></i></span>
-                            <span class="menu-title">@L["Customers"]</span>
+                        <span class="nav-link disabled text-uppercase small fw-bold text-muted">النظام والمستخدمين</span>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="@Url.Action("SendEmail", "Mail")" class="nav-link ajax-link">
+                            <span class="icon-bg"><i class="mdi mdi-email menu-icon"></i></span>
+                            <span class="menu-title">@L["EmailSend"]</span>     
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a href="@Url.Action("Debts", "Customers")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="mdi mdi-cash-multiple menu-icon"></i></span>
-                            <span class="menu-title">ديون العملاء</span>
-                        </a>
-                    </li>
-                    @if (User.IsInRole("Prog") || User.IsInRole("Admin"))
+                    
+                    @if (User.IsInRole("Prog") || User.IsInRole("Admin"))       
                     {
                         <li class="nav-item">
-                            <a class="nav-link" data-toggle="collapse" href="#users" aria-expanded="false" aria-controls="auth">
-                                <span class="icon-bg"><i class="bi bi-people menu-icon"></i></span>
-                                <span class="menu-title">@L["Users"]</span>
+                            <a class="nav-link" data-bs-toggle="collapse" href="#users" aria-expanded="false" aria-controls="auth">
+                                <span class="icon-bg"><i class="mdi mdi-account-settings menu-icon"></i></span>
+                                <span class="menu-title">@L["Users"]</span>     
                                 <i class="menu-arrow"></i>
                             </a>
                             <div class="collapse" id="users">
                                 <ul class="nav flex-column sub-menu">
                                     <li class="nav-item">
                                         <a href="@Url.Action("Index", "Employees")" class="nav-link ajax-link">
-                                            <i class="bi bi-person"></i>
-                                            <span class="menu-title">@L["Employees"]</span>
+                                            <i class="mdi mdi-account-outline"></i> @L["Employees"]
                                         </a>
                                     </li>
                                     @if (User.IsInRole("Prog"))
                                     {
                                         <li class="nav-item">
                                             <a href="@Url.Action("Index", "Roles")" class="nav-link ajax-link">
-                                                <i class="bi bi-shield-lock"></i>
-                                                <span class="menu-title">@L["Roles"]</span>
+                                                <i class="mdi mdi-shield-half-full"></i> @L["Roles"]
                                             </a>
                                         </li>
                                     }
@@ -268,10 +322,10 @@
                             </div>
                         </li>
                     }
-                    <li class="nav-item ">
-                        <a class="nav-link" data-toggle="collapse" href="#settings" aria-expanded="false" aria-controls="auth">
-                            <span class="icon-bg"><i class="bi bi-gear menu-icon"></i></span>
-                            <span class="menu-title">@L["Settings"]</span>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="collapse" href="#settings" aria-expanded="false" aria-controls="auth">
+                            <span class="icon-bg"><i class="mdi mdi-settings menu-icon"></i></span>
+                            <span class="menu-title">@L["Settings"]</span>      
                             <i class="menu-arrow"></i>
                         </a>
                         <div class="collapse" id="settings">
@@ -281,42 +335,37 @@
                                     @if(User.IsInRole("Prog"))
                                     {
                                         <a href="@Url.Action("SiteState", "Admin")" class="nav-link ajax-link">
-                                            @L["SiteState"]
+                                            <i class="mdi mdi-web"></i> @L["SiteState"]
                                         </a>
-                                    }  
-                                    
+                                    }
+
                                 </li>
                                 <li class="nav-item">
                                     <a href="@Url.Action("SiteDetails", "Admin")" class="nav-link ajax-link">
-                                        @L["SiteInfoContact"]
+                                        <i class="mdi mdi-information"></i> @L["SiteInfoContact"]
                                     </a>
                                 </li>
                                 <li class="nav-item">
                                     <a href="@Url.Action("EmailSettings", "Mail")" class="nav-link ajax-link">
-                                        @L["EmailSettings"]
+                                        <i class="mdi mdi-settings"></i> @L["EmailSettings"]
                                     </a>
                                 </li>
                                 @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager"))
                                 {
                                     <li class="nav-item">
                                         <a href="@Url.Action("Index", "AuditLogs")" class="nav-link ajax-link">
-                                            @L["AuditLogs"]
+                                            <i class="mdi mdi-clipboard-text"></i> @L["AuditLogs"]
                                         </a>
                                     </li>
                                 }
-                                @* <li class="nav-item">
-                                    <a href="@Url.Action("GoToBlazor", "Admin")" class="nav-link ajax-link">
-                                        Blazor Page
-                                    </a>
-                                </li> *@
                             </ul>
                         </div>
                     </li>
                     <li class="nav-item sidebar-user-actions">
                         <div class="sidebar-user-menu">
-                            <a href="@Url.Action("Logout", "Account")" class="nav-link ajax-link">
-                                <i class="mdi mdi-logout menu-icon"></i>
-                                <span class="menu-title">@L["LogOut"]</span>
+                            <a href="@Url.Action("Logout", "Account")" class="nav-link ajax-link text-danger">
+                                <i class="mdi mdi-logout menu-icon text-danger"></i>
+                                <span class="menu-title px-2 fw-bold">@L["LogOut"]</span>
                             </a>
                         </div>
                     </li>
@@ -387,6 +436,118 @@
  
     @await RenderSectionAsync("Scripts", required: false)
 
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smart Active Menu Highlighting
+            const currentPath = window.location.pathname.toLowerCase();
+            const segments = currentPath.split('/').filter(x => x);
+            const baseRoute = segments.length > 0 ? '/' + segments[0] : '/';
+
+            const links = document.querySelectorAll('.sidebar .nav-item .nav-link');
+            let bestMatch = null;
+            let longestMatch = 0;
+
+            links.forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href || href === '#') return;
+                
+                const hrefLower = href.toLowerCase();
+                
+                // Exact Match
+                if (currentPath === hrefLower) {
+                    bestMatch = link;
+                    longestMatch = 1000;
+                } 
+                // Prefix Match (e.g. /SalesInvoices/Create -> /SalesInvoices matches)
+                else if (currentPath.startsWith(hrefLower) && hrefLower.length > longestMatch) {
+                    bestMatch = link;
+                    longestMatch = hrefLower.length;
+                }
+            });
+
+            if (bestMatch) {
+                // Add active to link
+                bestMatch.classList.add('active');
+                
+                // Open parent collapse
+                let parentCollapse = bestMatch.closest('.collapse');
+                if (parentCollapse) {
+                    parentCollapse.classList.add('show');
+                    // Set parent nav-item active to keep arrow rotated
+                    const parentNavItem = parentCollapse.closest('.nav-item');
+                    if (parentNavItem) {
+                        const parentLink = parentNavItem.querySelector('[data-bs-toggle="collapse"]');
+                        if (parentLink) {
+                            parentLink.setAttribute('aria-expanded', 'true');
+                            parentLink.classList.remove('collapsed');
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smart Menu Highlighting based on Controller
+            var currentPath = window.location.pathname.toLowerCase().split('?')[0];
+            var segments = currentPath.split('/').filter(Boolean);
+            var currentController = segments.length > 0 ? segments[0] : 'home';
+
+            var links = document.querySelectorAll('.sidebar .nav-item .nav-link');
+            var bestMatch = null;
+            var highestScore = -1;
+
+            links.forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (!href || href === '#' || href.includes('javascript:')) return;
+                
+                var hrefLower = href.toLowerCase().split('?')[0];
+                var score = -1;
+                
+                // Exact Match
+                if (currentPath === hrefLower || currentPath === hrefLower + '/index') {
+                    score = 100;
+                }
+                // Controller Match (e.g. /SalesInvoices/Create -> /SalesInvoices/Index)
+                else {
+                    var hrefSegments = hrefLower.split('/').filter(Boolean);
+                    var hrefController = hrefSegments.length > 0 ? hrefSegments[0] : 'home';
+                    if (currentController === hrefController) {
+                        score = 50;
+                    }
+                }
+
+                if (score > highestScore) {
+                    highestScore = score;
+                    bestMatch = link;
+                }
+            });
+
+            if (bestMatch && highestScore > 0) {
+                bestMatch.classList.add('active');
+                
+                var parentCollapse = bestMatch.closest('.collapse');
+                if (parentCollapse) {
+                    parentCollapse.classList.add('show');
+                    var toggleLink = document.querySelector('[href="#' + parentCollapse.id + '"]');
+                    if (toggleLink) {
+                        toggleLink.setAttribute('aria-expanded', 'true');
+                        toggleLink.classList.remove('collapsed');
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 

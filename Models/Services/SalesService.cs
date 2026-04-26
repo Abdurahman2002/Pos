@@ -8,6 +8,16 @@ namespace NewsApp2.Models.Services
         private const string StatusPendingApproval = "PendingApproval";
         private const string StatusPosted = "Posted";
         private const string StatusCancelled = "Cancelled";
+        private const string JournalSourceType = "SalesInvoice";
+
+        private const string AccountCashCode = "1101";
+        private const string AccountCashName = "الصندوق";
+        private const string AccountBankCode = "1102";
+        private const string AccountBankName = "البنك";
+        private const string AccountCustomerCode = "1201";
+        private const string AccountCustomerName = "ذمم العملاء";
+        private const string AccountSalesRevenueCode = "4101";
+        private const string AccountSalesRevenueName = "إيراد المبيعات";
 
         private readonly AppDbContext _context;
         private readonly ILogger<SalesService> _logger;
@@ -122,6 +132,8 @@ namespace NewsApp2.Models.Services
 
             invoice.TotalEur = RoundMoney(totalEur);
             invoice.TotalDinar = RoundMoney(totalDinar);
+
+            await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
 
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -244,6 +256,8 @@ namespace NewsApp2.Models.Services
             invoice.TotalEur = RoundMoney(totalEur);
             invoice.TotalDinar = RoundMoney(totalDinar);
 
+            await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
+
             _context.Set<AuditLog>().Add(new AuditLog
             {
                 Action = "CreateReturn",
@@ -312,6 +326,7 @@ namespace NewsApp2.Models.Services
             }
 
             invoice.Status = StatusCancelled;
+            await RemoveFinancialEntriesAsync(invoice.Id);
 
             _context.Set<AuditLog>().Add(new AuditLog
             {
@@ -510,6 +525,8 @@ namespace NewsApp2.Models.Services
             invoice.ApprovedAt = DateTime.UtcNow;
             invoice.ApprovedByUserName = approvedBy;
 
+            await ReplaceFinancialEntriesAsync(invoice, null, approvedBy);
+
             _context.Set<AuditLog>().Add(new AuditLog
             {
                 Action = "Approve",
@@ -574,6 +591,10 @@ namespace NewsApp2.Models.Services
 
             if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Only posted sales invoices can be edited.");
+
+            if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase)
+                && !customerId.HasValue)
+                throw new InvalidOperationException("Customer is required when editing a credit sales invoice.");
 
             var itemIds = lineList.Select(l => l.ItemId)
                 .Concat((invoice.Lines ?? new List<SalesLine>()).Select(l => l.ItemId))
@@ -692,6 +713,8 @@ namespace NewsApp2.Models.Services
             invoice.TotalEur = RoundMoney(totalEur);
             invoice.TotalDinar = RoundMoney(totalDinar);
 
+            await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
+
             _context.Set<AuditLog>().Add(new AuditLog
             {
                 Action = "Edit",
@@ -756,6 +779,87 @@ namespace NewsApp2.Models.Services
         private static decimal RoundMoney(decimal value)
         {
             return Math.Round(value, 2, MidpointRounding.ToEven);
+        }
+
+        private async Task ReplaceFinancialEntriesAsync(SalesInvoice invoice, string? userId, string? userName)
+        {
+            await RemoveFinancialEntriesAsync(invoice.Id);
+
+            var amount = RoundMoney(invoice.TotalDinar);
+            if (amount == 0m)
+                return;
+
+            var (debitCode, debitName, creditCode, creditName, debitAmount, creditAmount) =
+                ResolveSalesEntry(invoice.PaymentMethod, amount);
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = invoice.InvoiceDate,
+                SourceType = JournalSourceType,
+                SourceId = invoice.Id,
+                DocumentNo = invoice.Number,
+                AccountCode = debitCode,
+                AccountName = debitName,
+                Debit = debitAmount,
+                Credit = 0m,
+                Note = invoice.Note,
+                CreatedByUserId = userId,
+                CreatedByUserName = userName
+            });
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = invoice.InvoiceDate,
+                SourceType = JournalSourceType,
+                SourceId = invoice.Id,
+                DocumentNo = invoice.Number,
+                AccountCode = creditCode,
+                AccountName = creditName,
+                Debit = 0m,
+                Credit = creditAmount,
+                Note = invoice.Note,
+                CreatedByUserId = userId,
+                CreatedByUserName = userName
+            });
+        }
+
+        private async Task RemoveFinancialEntriesAsync(Guid invoiceId)
+        {
+            var existing = await _context.Set<FinJournalEntry>()
+                .Where(e => e.SourceType == JournalSourceType && e.SourceId == invoiceId)
+                .ToListAsync();
+
+            if (existing.Count > 0)
+                _context.Set<FinJournalEntry>().RemoveRange(existing);
+        }
+
+        private static (string DebitCode, string DebitName, string CreditCode, string CreditName, decimal DebitAmount, decimal CreditAmount)
+            ResolveSalesEntry(string? paymentMethod, decimal signedAmount)
+        {
+            var absoluteAmount = Math.Abs(signedAmount);
+            if (absoluteAmount == 0m)
+                return (AccountCashCode, AccountCashName, AccountSalesRevenueCode, AccountSalesRevenueName, 0m, 0m);
+
+            var (receivableCode, receivableName) = ResolveSalesDebitAccount(paymentMethod);
+
+            if (signedAmount > 0)
+            {
+                return (receivableCode, receivableName, AccountSalesRevenueCode, AccountSalesRevenueName, absoluteAmount, absoluteAmount);
+            }
+
+            return (AccountSalesRevenueCode, AccountSalesRevenueName, receivableCode, receivableName, absoluteAmount, absoluteAmount);
+        }
+
+        private static (string Code, string Name) ResolveSalesDebitAccount(string? paymentMethod)
+        {
+            if (string.Equals(paymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+                return (AccountCustomerCode, AccountCustomerName);
+
+            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return (AccountBankCode, AccountBankName);
+
+            return (AccountCashCode, AccountCashName);
         }
 
         private static string FormatQuantity(decimal value)

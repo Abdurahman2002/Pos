@@ -69,7 +69,7 @@
             <input type="hidden" name="CustomerId" value="@Model.CustomerId" />
             <div class="col-md-2">
                 <label class="form-label">التاريخ</label>
-                <input name="ReceiptDate" type="date" class="form-control" value="@Model.PaymentInput.ReceiptDate.ToString("yyyy-MM-dd")" required />
+                <input name="ReceiptDate" type="text" class="form-control" value="@Model.PaymentInput.ReceiptDate.ToString("dd/MM/yyyy")" placeholder="dd/MM/yyyy" required />
             </div>
             <div class="col-md-2">
                 <label class="form-label">المبلغ</label>
@@ -114,7 +114,7 @@
             @foreach (var row in Model.Rows)
             {
                 <tr>
-                    <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy HH:mm")</span></td>
+                    <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy")</span></td>
                     <td>@row.Reference</td>
                     <td>@row.Type</td>
                     <td class="text-end">@row.Debit.ToString("0.00")</td>

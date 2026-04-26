@@ -44,6 +44,8 @@ namespace NewsApp2.ViewModels.Sales
 
         public bool IsReturn { get; set; }
 
+        public bool AutoPrintReceipt { get; set; } = true;
+
         [MinLength(0)]
         public List<SalesDraftLineVM> Lines { get; set; } = new();
     }

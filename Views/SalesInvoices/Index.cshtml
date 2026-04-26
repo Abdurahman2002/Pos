@@ -59,7 +59,7 @@
             var shownCustomerName = string.Equals(customerName, "مبيعات يومية", StringComparison.Ordinal) ? "-" : (customerName ?? "-");
             <tr>
                 <td>@row.Number</td>
-                <td><span dir="ltr">@row.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
+                <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@row.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                 <td>@shownCustomerName</td>
                 <td>@localizedStatus</td>
                 <td>@paymentText</td>

@@ -17,6 +17,20 @@ namespace NewsApp2.Controllers
         private const string SalaryKind = "Salary";
         private const string AdvanceKind = "Advance";
         private const string AdvanceSettlementKind = "AdvanceSettlement";
+        private const string JournalSourceType = "ExpenseEntry";
+
+        private const string AccountCashCode = "1101";
+        private const string AccountCashName = "الصندوق";
+        private const string AccountBankCode = "1102";
+        private const string AccountBankName = "البنك";
+        private const string AccountGeneralExpenseCode = "5101";
+        private const string AccountGeneralExpenseName = "مصروفات عامة";
+        private const string AccountSalaryExpenseCode = "5102";
+        private const string AccountSalaryExpenseName = "مصروفات الرواتب";
+        private const string AccountEmployeeAdvanceCode = "1202";
+        private const string AccountEmployeeAdvanceName = "سلف الموظفين";
+        private const string AccountPayrollClearingCode = "2102";
+        private const string AccountPayrollClearingName = "تسويات رواتب";
 
         private static readonly string[] AllowedKinds = { "General", SalaryKind, AdvanceKind };
         private static readonly string[] AllowedPaymentMethods = { "Cash", "Card", "Transfer", "Internal" };
@@ -257,7 +271,11 @@ namespace NewsApp2.Controllers
             _context.Set<ExpenseEntry>().Add(entity);
             await _context.SaveChangesAsync();
 
+            AddFinancialEntriesForExpense(entity);
+
             await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
+
+            await _context.SaveChangesAsync();
 
             await trx.CommitAsync();
 
@@ -356,9 +374,14 @@ namespace NewsApp2.Controllers
             entity.ReferenceNo = vm.ReferenceNo;
             entity.Note = vm.Note;
 
+            await RemoveFinancialEntriesAsync(entity.Id);
+            AddFinancialEntriesForExpense(entity);
+
             await _context.SaveChangesAsync();
 
             await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
+
+            await _context.SaveChangesAsync();
 
             await trx.CommitAsync();
             return RedirectToAction(nameof(Index));
@@ -409,6 +432,15 @@ namespace NewsApp2.Controllers
                 return View("NotFound");
             }
 
+            var linkedSettlement = await GetLinkedSettlementAsync(entity.Id);
+
+            if (linkedSettlement != null)
+            {
+                await RemoveFinancialEntriesAsync(linkedSettlement.Id);
+                _context.Set<ExpenseEntry>().Remove(linkedSettlement);
+            }
+
+            await RemoveFinancialEntriesAsync(entity.Id);
             _context.Set<ExpenseEntry>().Remove(entity);
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
@@ -559,8 +591,8 @@ namespace NewsApp2.Controllers
             {
                 if (linkedSettlement != null)
                 {
+                    await RemoveFinancialEntriesAsync(linkedSettlement.Id);
                     _context.Set<ExpenseEntry>().Remove(linkedSettlement);
-                    await _context.SaveChangesAsync();
                 }
 
                 return;
@@ -585,6 +617,8 @@ namespace NewsApp2.Controllers
                     CreatedByUserName = User.Identity?.Name
                 };
                 _context.Set<ExpenseEntry>().Add(linkedSettlement);
+                await _context.SaveChangesAsync();
+                AddFinancialEntriesForExpense(linkedSettlement);
             }
             else
             {
@@ -592,9 +626,91 @@ namespace NewsApp2.Controllers
                 linkedSettlement.Amount = deductionAmount;
                 linkedSettlement.EmployeeId = salaryEntry.EmployeeId;
                 linkedSettlement.Note = settlementNote;
-            }
 
-            await _context.SaveChangesAsync();
+                await RemoveFinancialEntriesAsync(linkedSettlement.Id);
+                AddFinancialEntriesForExpense(linkedSettlement);
+            }
+        }
+
+        private async Task RemoveFinancialEntriesAsync(Guid expenseId)
+        {
+            var entries = await _context.Set<FinJournalEntry>()
+                .Where(e => e.SourceType == JournalSourceType && e.SourceId == expenseId)
+                .ToListAsync();
+
+            if (entries.Count > 0)
+                _context.Set<FinJournalEntry>().RemoveRange(entries);
+        }
+
+        private void AddFinancialEntriesForExpense(ExpenseEntry expense)
+        {
+            var amount = Round2(expense.Amount);
+            if (amount <= 0)
+                return;
+
+            var documentNo = !string.IsNullOrWhiteSpace(expense.ReferenceNo)
+                ? expense.ReferenceNo
+                : $"EX-{expense.ExpenseDate:yyyyMMdd}-{expense.Id.ToString("N")[..6].ToUpperInvariant()}";
+
+            var (debitCode, debitName) = ResolveExpenseDebitAccount(expense.ExpenseKind);
+            var (creditCode, creditName) = ResolveExpenseCreditAccount(expense.ExpenseKind, expense.PaymentMethod);
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = expense.ExpenseDate,
+                SourceType = JournalSourceType,
+                SourceId = expense.Id,
+                DocumentNo = documentNo,
+                AccountCode = debitCode,
+                AccountName = debitName,
+                Debit = amount,
+                Credit = 0m,
+                Note = expense.Note,
+                CreatedByUserId = expense.CreatedByUserId,
+                CreatedByUserName = expense.CreatedByUserName
+            });
+
+            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            {
+                EntryDate = expense.ExpenseDate,
+                SourceType = JournalSourceType,
+                SourceId = expense.Id,
+                DocumentNo = documentNo,
+                AccountCode = creditCode,
+                AccountName = creditName,
+                Debit = 0m,
+                Credit = amount,
+                Note = expense.Note,
+                CreatedByUserId = expense.CreatedByUserId,
+                CreatedByUserName = expense.CreatedByUserName
+            });
+        }
+
+        private static (string Code, string Name) ResolveExpenseDebitAccount(string? expenseKind)
+        {
+            if (string.Equals(expenseKind, SalaryKind, StringComparison.OrdinalIgnoreCase))
+                return (AccountSalaryExpenseCode, AccountSalaryExpenseName);
+
+            if (string.Equals(expenseKind, AdvanceKind, StringComparison.OrdinalIgnoreCase))
+                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
+
+            if (string.Equals(expenseKind, AdvanceSettlementKind, StringComparison.OrdinalIgnoreCase))
+                return (AccountPayrollClearingCode, AccountPayrollClearingName);
+
+            return (AccountGeneralExpenseCode, AccountGeneralExpenseName);
+        }
+
+        private static (string Code, string Name) ResolveExpenseCreditAccount(string? expenseKind, string? paymentMethod)
+        {
+            if (string.Equals(expenseKind, AdvanceSettlementKind, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(paymentMethod, "Internal", StringComparison.OrdinalIgnoreCase))
+                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
+
+            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return (AccountBankCode, AccountBankName);
+
+            return (AccountCashCode, AccountCashName);
         }
 
         private static string BuildSettlementRef(Guid salaryExpenseId)

@@ -1,0 +1,442 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css?family=Nunito:400,600,700;800&display=swap');
+
+:root {
+    --sidebar-width: 280px;
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --bg-color: #f3f4f6;
+    --sidebar-bg: #0f172a;
+    --sidebar-text: #94a3b8;
+    --topbar-bg: #ffffff;
+}
+
+body {
+    background-color: var(--bg-color);
+    overflow-x: hidden;
+    margin: 0;
+}
+
+[dir=""rtl""] body { font-family: 'Cairo', sans-serif; }
+[dir=""ltr""] body { font-family: 'Nunito', sans-serif; }
+
+/* ---------------- Layout wrappers ---------------- */
+.erp-wrapper {
+    display: flex;
+    width: 100%;
+}
+
+.erp-sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    z-index: 1040;
+    transition: transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+}
+[dir=""rtl""] .erp-sidebar { right: 0; border-left: 1px solid rgba(255,255,255,0.1); }
+[dir=""ltr""] .erp-sidebar { left: 0; border-right: 1px solid rgba(255,255,255,0.1); }
+
+.erp-main {
+    flex: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: margin 0.3s ease-in-out;
+}
+[dir=""rtl""] .erp-main { margin-right: var(--sidebar-width); }
+[dir=""ltr""] .erp-main { margin-left: var(--sidebar-width); }
+
+/* Responsive Sidebar off-canvas */
+@media (max-width: 991.98px) {
+    .erp-sidebar {
+        transform: translateX(100%);
+    }
+    [dir=""rtl""] .erp-sidebar { transform: translateX(100%); }
+    [dir=""ltr""] .erp-sidebar { transform: translateX(-100%); }
+
+    .erp-sidebar.active { transform: translateX(0); }
+    
+    [dir=""rtl""] .erp-main { margin-right: 0; }
+    [dir=""ltr""] .erp-main { margin-left: 0; }
+}
+
+/* ---------------- Sidebar Design ---------------- */
+.sidebar-header {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+.sidebar-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+.sidebar-brand-text {
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.25rem;
+    margin: 0 10px;
+    line-height: 1.2;
+}
+
+.sidebar-menu-wrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+.sidebar-menu-wrapper::-webkit-scrollbar { width: 5px; }
+.sidebar-menu-wrapper::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+
+.sidebar-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.nav-heading {
+    padding: 20px 25px 10px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.sidebar-nav a {
+    display: flex;
+    align-items: center;
+    padding: 12px 25px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+}
+.sidebar-nav a i {
+    font-size: 1.3rem;
+    width: 35px;
+    text-align: center;
+}
+[dir=""rtl""] .sidebar-nav a i { margin-left: 10px; }
+[dir=""ltr""] .sidebar-nav a i { margin-right: 10px; }
+
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[dir=""rtl""] .sidebar-nav a.active { border-right: 3px solid var(--primary-color); }
+[dir=""ltr""] .sidebar-nav a.active { border-left: 3px solid var(--primary-color); }
+
+.pos-btn-link {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff !important;
+    border-radius: 8px;
+    margin: 15px 20px;
+    padding: 12px !important;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+}
+.pos-btn-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4);
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* ---------------- Topbar Design ---------------- */
+.erp-topbar {
+    height: 70px;
+    background-color: var(--topbar-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 25px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    z-index: 1030;
+    position: sticky;
+    top: 0;
+}
+
+/* Ensure the navUser partial (which contains ul) lays out inline */
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.topbar-actions ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+}
+.topbar-actions .dropdown-toggle::after {
+    margin-right: 5px;
+    margin-left: 5px;
+}
+
+/* ---------------- Main Elements overrides ---------------- */
+.erp-content {
+    padding: 25px;
+}
+
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background-color: #fff;
+    margin-bottom: 20px;
+}
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 15px 20px;
+    font-weight: 700;
+    color: #1e293b;
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.btn { border-radius: 6px; font-weight: 600; }
+.form-control, .form-select {
+    border-radius: 6px; border: 1px solid #cbd5e1; padding: 10px 15px; background: #f8fafc;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    background: #fff;
+}
+
+/* ---- Modern Sidebar Submenus Fixes ---- */
+.sidebar .nav .nav-item .collapse.show {
+    background-color: var(--body-bg);
+    border-radius: 8px;
+    margin: 0.5rem 1rem;
+    padding: 0.5rem 0;
+    box-shadow: inset 0px 2px 4px rgba(0,0,0,0.05);
+}
+.sidebar .nav .nav-item .collapse .nav-item .nav-link {
+    padding: 0.5rem 1.5rem !important;
+    font-size: 0.9rem;
+    color: #555 !important;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+.sidebar .nav .nav-item .collapse .nav-item .nav-link:hover {
+    color: var(--primary-color) !important;
+    background-color: rgba(var(--primary-color-rgb), 0.1) !important;
+}
+.sidebar .nav .nav-item .collapse .nav-item .nav-link i {
+    font-size: 1rem !important;
+    color: inherit;
+    opacity: 0.8;
+}
+.sidebar .nav.sub-menu {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.sidebar .nav-link.disabled {
+    opacity: 1;
+    color: #6c757d !important;
+    letter-spacing: 1px;
+    padding-top: 1rem;
+    padding-bottom: 0.2rem;
+}
+
+/* ---- Backend DataTables & List Views Reskin ---- */
+
+/* Wrapping container */
+.table-responsive {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.03);
+    padding: 0;
+    border: 1px solid rgba(0,0,0,0.05);
+    max-height: 75vh;
+    overflow-y: auto;
+}
+
+/* Base table */
+.table {
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+.table > :not(caption) > * > * {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+/* Remove ugly dark borders */
+.table-bordered > :not(caption) > * > * {
+    border: none;
+    border-bottom: 1px solid #f1f3f5;
+}
+.table-bordered {
+    border: none;
+}
+
+/* Header style */
+.table thead th, .table .table-light th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #ffffff !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    border-bottom: 2px solid #e9ecef !important;
+    box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1);
+    /* For Firefox border collision fix on sticky elements */
+    background-clip: padding-box; 
+}
+
+/* Stripes & Hover Rows (Modern) */
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(var(--primary-color-rgb), 0.02) !important;
+}
+tbody tr {
+    transition: all 0.2s ease-in-out;
+}
+tbody tr:hover {
+    background-color: rgba(var(--primary-color-rgb), 0.05) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+/* Action Buttons inside tables */
+.table .btn-sm {
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin: 0 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+}
+.table .btn-sm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Page Headers (Index views) */
+.d-flex.justify-content-between.align-items-center.mb-3 {
+    background: #fff;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.03);
+    margin-bottom: 1.5rem !important;
+}
+.d-flex.justify-content-between.align-items-center.mb-3 h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #2b3445;
+}
+
+/* Forms & Inputs in headers */
+.d-flex.justify-content-between .form-control, 
+.d-flex.justify-content-between .form-select {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
+.d-flex.justify-content-between .btn {
+    border-radius: 8px;
+    font-weight: 700;
+    padding: 0.5rem 1.5rem;
+    display: d-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Sidebar animation jitter fix */
+.sidebar {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+}
+.sidebar .nav.sub-menu {
+    overflow: hidden;
+}
+.sidebar .nav .nav-item .nav-link {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sidebar-icon-only .sidebar .nav .nav-item .menu-title {
+    display: none;
+}
+
+
+/* Hide default template arrow from submenus so custom MDI icons look clean */
+.sidebar .nav.sub-menu .nav-item .nav-link::before {
+    display: none !important;
+    content: none !important;
+}
+
+
+/* Fix Collapse Jitter */
+.sidebar .collapse {
+    transition: height 0.25s ease-in-out !important;
+}
+.sidebar .collapse .nav.sub-menu {
+    margin-bottom: 0 !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+
+/* Sidebar Active State Enhancements */
+.sidebar .nav.sub-menu .nav-item .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: #fff !important;
+    font-weight: 600;
+    border-left: 3px solid #10b981; /* Green accent */
+    padding-left: 1.7rem; /* Adjust padding to fit border */
+    border-radius: 0 4px 4px 0;
+}
+[dir='rtl'] .sidebar .nav.sub-menu .nav-item .nav-link.active {
+    border-left: none;
+    border-right: 3px solid #10b981;
+    padding-left: 2rem;
+    padding-right: 1.7rem;
+    border-radius: 4px 0 0 4px;
+}
+.sidebar .nav.sub-menu .nav-item .nav-link:hover {
+    background-color: rgba(255,255,255,0.02);
+    color: #eee !important;
+}
+
+
+.sidebar .collapse .nav.sub-menu {
+    margin-top: 0 !important;
+}
+
+
+/* Complete reset for Collapse Jitter */
+.sidebar .collapse {
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow: hidden !important; 
+}
+.sidebar .collapse .nav.sub-menu {
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+.sidebar .nav.sub-menu .nav-item .nav-link {
+    /* Make sure links inside provide the spacing to avoid parent layout shifts */
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+}
+

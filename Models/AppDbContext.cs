@@ -25,6 +25,7 @@ namespace NewsApp2.Models
         public DbSet<Employee> Employees { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<Customer> Customers { get; set; }
+        public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<Item> Items { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -39,7 +40,9 @@ namespace NewsApp2.Models
         public DbSet<SalesInvoiceDraft> SalesInvoiceDrafts { get; set; }
         public DbSet<PosShift> PosShifts { get; set; }
         public DbSet<CustomerReceipt> CustomerReceipts { get; set; }
+        public DbSet<SupplierPayment> SupplierPayments { get; set; }
         public DbSet<ExpenseEntry> ExpenseEntries { get; set; }
+        public DbSet<FinJournalEntry> FinJournalEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -56,6 +59,7 @@ namespace NewsApp2.Models
             //---------------------------------------------------------------------------------
             modelBuilder.Entity<Category>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<Customer>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
+            modelBuilder.Entity<Supplier>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<Warehouse>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<Item>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<BarcodeMapping>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
@@ -69,10 +73,13 @@ namespace NewsApp2.Models
             modelBuilder.Entity<SalesInvoiceDraft>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<PosShift>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<CustomerReceipt>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
+            modelBuilder.Entity<SupplierPayment>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<ExpenseEntry>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
+            modelBuilder.Entity<FinJournalEntry>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             //---------------------------------------------------------------------------------
             modelBuilder.Entity<Category>().HasIndex(c => c.Name).IsUnique();
             modelBuilder.Entity<Customer>().HasIndex(c => c.Name).IsUnique();
+            modelBuilder.Entity<Supplier>().HasIndex(s => s.Name).IsUnique();
             modelBuilder.Entity<Item>().HasIndex(i => i.Name).IsUnique();
             modelBuilder.Entity<Item>().HasIndex(i => i.Barcode).IsUnique().HasFilter("[Barcode] IS NOT NULL");
             modelBuilder.Entity<Warehouse>().HasIndex(w => w.Name).IsUnique();
@@ -83,8 +90,15 @@ namespace NewsApp2.Models
             modelBuilder.Entity<SalesInvoiceDraft>().HasIndex(d => d.CreatedByUserId);
             modelBuilder.Entity<PosShift>().HasIndex(s => new { s.OpenedByUserId, s.Status });
             modelBuilder.Entity<CustomerReceipt>().HasIndex(r => new { r.CustomerId, r.ReceiptDate });
+            modelBuilder.Entity<SupplierPayment>().HasIndex(r => new { r.SupplierId, r.PaymentDate });
+            modelBuilder.Entity<SupplierPayment>().HasIndex(r => r.Number).IsUnique();
             modelBuilder.Entity<ExpenseEntry>().HasIndex(e => new { e.ExpenseDate, e.ExpenseKind });
             modelBuilder.Entity<ExpenseEntry>().HasIndex(e => new { e.EmployeeId, e.ExpenseDate });
+            modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.SourceType, e.SourceId });
+            modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.EntryDate, e.AccountCode });
+            modelBuilder.Entity<InventorySettings>().Property(s => s.MaxCashierDiscountPercent).HasPrecision(18, 2);
+            modelBuilder.Entity<PosShift>().Property(s => s.OpeningCashLyd).HasPrecision(18, 2);
+            modelBuilder.Entity<PosShift>().Property(s => s.ClosingCashLyd).HasPrecision(18, 2);
             modelBuilder.Entity<InvStockBalance>().Property(b => b.RowVersion).IsRowVersion();
             modelBuilder.Entity<InvStockBalance>().ToTable(tb =>
                 tb.HasCheckConstraint("CK_InvStockBalance_QtyOnHand_NonNegative", "[QuantityOnHand] >= 0"));
@@ -119,6 +133,12 @@ namespace NewsApp2.Models
                 .HasOne(l => l.Item)
                 .WithMany()
                 .HasForeignKey(l => l.ItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PurchaseInvoice>()
+                .HasOne(i => i.Supplier)
+                .WithMany(s => s.PurchaseInvoices)
+                .HasForeignKey(i => i.SupplierId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalesLine>()
@@ -162,6 +182,12 @@ namespace NewsApp2.Models
                 .WithMany()
                 .HasForeignKey(r => r.PosShiftId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<SupplierPayment>()
+                .HasOne(r => r.Supplier)
+                .WithMany(s => s.Payments)
+                .HasForeignKey(r => r.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<ExpenseEntry>()
                 .HasOne(e => e.Employee)

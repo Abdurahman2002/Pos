@@ -43,6 +43,7 @@ namespace NewsApp2.Models
         public DbSet<SupplierPayment> SupplierPayments { get; set; }
         public DbSet<ExpenseEntry> ExpenseEntries { get; set; }
         public DbSet<FinJournalEntry> FinJournalEntries { get; set; }
+        public DbSet<Bank> Banks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -76,6 +77,7 @@ namespace NewsApp2.Models
             modelBuilder.Entity<SupplierPayment>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<ExpenseEntry>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             modelBuilder.Entity<FinJournalEntry>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
+            modelBuilder.Entity<Bank>().Property(x => x.Id).HasDefaultValueSql("NEWID()");
             //---------------------------------------------------------------------------------
             modelBuilder.Entity<Category>().HasIndex(c => c.Name).IsUnique();
             modelBuilder.Entity<Customer>().HasIndex(c => c.Name).IsUnique();
@@ -96,6 +98,7 @@ namespace NewsApp2.Models
             modelBuilder.Entity<ExpenseEntry>().HasIndex(e => new { e.EmployeeId, e.ExpenseDate });
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.SourceType, e.SourceId });
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.EntryDate, e.AccountCode });
+            modelBuilder.Entity<Bank>().HasIndex(b => b.Name).IsUnique();
             modelBuilder.Entity<InventorySettings>().Property(s => s.MaxCashierDiscountPercent).HasPrecision(18, 2);
             modelBuilder.Entity<PosShift>().Property(s => s.OpeningCashLyd).HasPrecision(18, 2);
             modelBuilder.Entity<PosShift>().Property(s => s.ClosingCashLyd).HasPrecision(18, 2);
@@ -141,6 +144,12 @@ namespace NewsApp2.Models
                 .HasForeignKey(i => i.SupplierId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<PurchaseInvoice>()
+                .HasOne(i => i.Bank)
+                .WithMany()
+                .HasForeignKey(i => i.BankId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<SalesLine>()
                 .HasOne(l => l.SalesInvoice)
                 .WithMany(h => h.Lines)
@@ -157,6 +166,12 @@ namespace NewsApp2.Models
                 .HasOne(i => i.Customer)
                 .WithMany(c => c.SalesInvoices)
                 .HasForeignKey(i => i.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SalesInvoice>()
+                .HasOne(i => i.Bank)
+                .WithMany()
+                .HasForeignKey(i => i.BankId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SalesInvoice>()

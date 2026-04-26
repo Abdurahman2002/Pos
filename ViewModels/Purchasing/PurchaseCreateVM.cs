@@ -39,6 +39,7 @@ namespace NewsApp2.ViewModels.Purchasing
 
         [StringLength(20)]
         public string PaymentMethod { get; set; } = "Cash";
+        public Guid? BankId { get; set; }
 
         [DataType(DataType.Date)]
         public DateOnly? DueDate { get; set; }

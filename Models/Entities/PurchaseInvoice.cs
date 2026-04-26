@@ -31,6 +31,7 @@ namespace NewsApp2.Models.Entities
 
         [StringLength(20)]
         public string PaymentMethod { get; set; } = "Cash";
+        public Guid? BankId { get; set; }
 
         public DateOnly? DueDate { get; set; }
 
@@ -44,6 +45,7 @@ namespace NewsApp2.Models.Entities
         public string? CreatedByUserName { get; set; }
 
         public Supplier? Supplier { get; set; }
+        public Bank? Bank { get; set; }
         public ICollection<PurchaseLine>? Lines { get; set; }
     }
 }

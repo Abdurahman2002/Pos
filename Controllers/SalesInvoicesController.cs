@@ -242,6 +242,7 @@ namespace NewsApp2.Controllers
 
             await LoadItemsAsync();
             await LoadCustomersAsync(customerId);
+            await LoadBanksAsync();
             ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
 
             var vm = draftId.HasValue
@@ -366,6 +367,12 @@ namespace NewsApp2.Controllers
             if (vm.IsOnAccount)
                 vm.PaymentMethod = PaymentCredit;
 
+            var isTransferPayment = string.Equals(vm.PaymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase);
+            if (isTransferPayment && (!vm.BankId.HasValue || vm.BankId == Guid.Empty))
+                ModelState.AddModelError(nameof(vm.BankId), "حدد المصرف عند الدفع بالتحويل.");
+            if (!isTransferPayment)
+                vm.BankId = null;
+
             if (simplePosMode)
             {
                 vm.DiscountType = "Percent";
@@ -442,6 +449,7 @@ namespace NewsApp2.Controllers
             {
                 await LoadItemsAsync();
                 await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
                 return View(vm);
             }
 
@@ -469,6 +477,7 @@ namespace NewsApp2.Controllers
                     : $"{notePrefix} {vm.Note} | {paymentNote} | {discountNote}",
                 CustomerId = vm.CustomerId,
                 PaymentMethod = vm.PaymentMethod,
+                BankId = vm.BankId,
                 PosShiftId = activeShiftId,
                 CreatedByUserId = _userManager.GetUserId(User),
                 CreatedByUserName = User?.Identity?.Name
@@ -512,6 +521,7 @@ namespace NewsApp2.Controllers
                     UserMessageSanitizer.Sanitize(ex.Message, "تعذر حفظ فاتورة البيع."));
                 await LoadItemsAsync();
                 await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
                 ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
                 return View(vm);
             }
@@ -778,6 +788,7 @@ namespace NewsApp2.Controllers
                     Status = i.Status,
                     IsReturn = (i.Note != null && i.Note.Contains("[POS-RETURN]")) || i.TotalDinar < 0,
                     PaymentMethod = ToArabicPaymentMethod(i.PaymentMethod),
+                    BankName = i.Bank != null ? i.Bank.Name : null,
                     CustomerName = i.Customer == null || i.Customer.Name == DailySalesCustomerName ? "-" : i.Customer.Name
                 })
                 .ToListAsync();
@@ -837,6 +848,15 @@ namespace NewsApp2.Controllers
                 .ToListAsync();
 
             ViewData["Customers"] = new SelectList(customers, "Id", "Name", selectedCustomerId);
+        }
+
+        private async Task LoadBanksAsync(Guid? selectedBankId = null)
+        {
+            var banks = await _context.Set<Bank>()
+                .AsNoTracking()
+                .OrderBy(b => b.Name)
+                .ToListAsync();
+            ViewData["Banks"] = new SelectList(banks, "Id", "Name", selectedBankId);
         }
 
         private bool CanApprovePendingInvoices()

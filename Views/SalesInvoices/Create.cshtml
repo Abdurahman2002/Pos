@@ -46,7 +46,10 @@
     data-simple-pos-mode="@(simplePosMode ? "true" : "false")"
     data-max-cashier-discount-percent="@maxCashierDiscountPercentText"
     data-sound-user-key="@soundUserKey"
-    data-item-default-prices='@itemDefaultPricesJson'>
+    data-item-default-prices='@itemDefaultPricesJson'
+    data-create-customer-url="@Url.Action("CreateCustomerInline", "SalesInvoices")"
+    data-msg-customer-name-required="اسم العميل مطلوب."
+    data-msg-unable-create-customer="تعذر إضافة العميل.">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <input asp-for="DraftId" type="hidden" />
 
@@ -58,7 +61,7 @@
                     <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
                         <input asp-for="IsReturn" class="form-check-input mt-0 fs-5" id="is-return-toggle" style="cursor: pointer;" />
                         <label class="form-check-label fw-bold text-danger m-0" for="is-return-toggle" style="cursor: pointer;">
-                            <i class="mdi mdi-keyboard-return"></i> إسترجاع
+                            <i class="mdi mdi-keyboard-return"></i> مرتجع بيع
                         </label>
                     </div>
                     <div class="vr mx-1 bg-secondary opacity-25"></div>
@@ -104,7 +107,7 @@
                     <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
                         <input asp-for="IsReturn" class="form-check-input mt-0 fs-5" id="is-return-toggle-pos" style="cursor: pointer;" />
                         <label class="form-check-label fw-bold text-danger m-0" for="is-return-toggle-pos" style="cursor: pointer;">
-                            <i class="mdi mdi-keyboard-return"></i> إسترجاع
+                            <i class="mdi mdi-keyboard-return"></i> مرتجع بيع
                         </label>
                     </div>
                     <div class="vr mx-1 bg-secondary opacity-25"></div>
@@ -309,6 +312,14 @@
                         <span asp-validation-for="PaymentMethod" class="text-danger small d-block mt-1"></span>
                     </div>
 
+                    <div class="mb-3 d-none" id="bank-section">
+                        <label asp-for="BankId" class="form-label form-label-sm mb-1 fw-bold text-muted small">المصرف (للتحويل)</label>
+                        <select asp-for="BankId" asp-items="@(ViewData["Banks"] as SelectList)" class="form-select form-select-sm">
+                            <option value="">اختر المصرف</option>
+                        </select>
+                        <span asp-validation-for="BankId" class="text-danger small"></span>
+                    </div>
+
                     @if (simplePosMode)
                     {
                         <div class="mb-3">
@@ -335,6 +346,7 @@
                     <div class="mb-3 d-none" id="customer-section">
                         <div class="d-flex align-items-center justify-content-between mb-1">
                             <label asp-for="CustomerId" class="form-label form-label-sm mb-0 fw-bold text-muted small">العميل (للبيع الآجل)</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#quick-customer-modal">+ إضافة عميل</button>
                         </div>
                         <select asp-for="CustomerId" asp-items="@(ViewData["Customers"] as SelectList)" class="form-select form-select-sm">
                             <option value="">اختر العميل</option>
@@ -350,6 +362,32 @@
         </div>
     </div>
 </form>
+
+<div class="modal fade" id="quick-customer-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة عميل سريع</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="quick-customer-error" class="alert alert-danger d-none"></div>
+                <div class="mb-2">
+                    <label class="form-label">اسم العميل</label>
+                    <input id="quick-customer-name" class="form-control" />
+                </div>
+                <div>
+                    <label class="form-label">الهاتف</label>
+                    <input id="quick-customer-phone" class="form-control" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="quick-customer-save">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @if (!simplePosMode)
 {
@@ -379,7 +417,7 @@
                                         @draft.Title
                                         @if (draft.IsReturn)
                                         {
-                                            <span class="badge bg-danger ms-2">ترجيع</span>
+                                            <span class="badge bg-danger ms-2">مرتجع بيع</span>
                                         }
                                     </div>
                                     <div class="small text-muted mt-1"><i class="mdi mdi-calendar"></i> <span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></div>
@@ -481,6 +519,31 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/lines-table.js"></script>
     <script src="https://unpkg.com/@@zxing/library@latest"></script>
+    <script>
+        (function forceTransferBankVisibility() {
+            function refresh() {
+                var selected = document.querySelector('input[name="PaymentMethod"]:checked');
+                var bankSection = document.getElementById('bank-section');
+                var bankInput = document.getElementById('BankId');
+                if (!bankSection || !bankInput) return;
+
+                var isTransfer = !!selected && String(selected.value).toLowerCase() === 'transfer';
+                bankSection.classList.toggle('d-none', !isTransfer);
+                bankInput.required = isTransfer;
+                if (!isTransfer) bankInput.value = '';
+            }
+
+            document.addEventListener('change', function (event) {
+                if (event.target && event.target.name === 'PaymentMethod') refresh();
+            });
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', refresh);
+            } else {
+                refresh();
+            }
+        })();
+    </script>
     <script>
         (function () {
             var autoPrintInvoiceId = '@(autoPrintInvoiceId?.ToString() ?? string.Empty)';

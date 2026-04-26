@@ -1,0 +1,47 @@
+@model IEnumerable<NewsApp2.Models.Entities.Bank>
+@{
+    ViewData["Title"] = "المصارف";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">المصارف</h1>
+    <a asp-action="Create" class="btn btn-primary">إضافة مصرف</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>ملاحظة</th>
+                    <th style="width:220px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="3" class="text-center text-muted py-4">لا توجد مصارف.</td></tr>
+            }
+            else
+            {
+                foreach (var row in Model)
+                {
+                    <tr>
+                        <td>@row.Name</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.Note) ? "-" : row.Note)</td>
+                        <td class="text-end">
+                            <a asp-action="Edit" asp-route-id="@row.Id" class="btn btn-sm btn-outline-primary">تعديل</a>
+                            <form asp-action="Delete" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@row.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف المصرف؟');">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

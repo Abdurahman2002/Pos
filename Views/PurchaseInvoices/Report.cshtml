@@ -21,8 +21,8 @@
     </div>
 </form>
 
-<div class="mb-3">
-    <strong>إجمالي المشتريات:</strong> @Model.SumDinar.ToString("0.00") دينار
+<div class="alert alert-secondary mb-3">
+    إجمالي المشتريات: <strong>@Model.SumDinar.ToString("0.00")</strong> دينار
 </div>
 
 <div class="table-responsive">
@@ -32,6 +32,8 @@
                 <th>@L["Number"]</th>
                 <th>@L["Date"]</th>
                 <th>الحالة</th>
+                <th>طريقة الدفع</th>
+                <th>المصرف</th>
                 <th>الإجمالي</th>
             </tr>
         </thead>
@@ -43,6 +45,8 @@
                 <td>@row.Number</td>
                 <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@row.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                 <td>@localizedStatus</td>
+                <td>@row.PaymentMethod</td>
+                <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
                 <td>@row.TotalDinar.ToString("0.00")</td>
             </tr>
         }

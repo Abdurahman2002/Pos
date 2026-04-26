@@ -255,6 +255,25 @@
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     
     <script>
+        (function () {
+            function initSelect(el) {
+                if (!el || el.tomselect || el.dataset.noTs !== undefined) return;
+                new TomSelect(el, {
+                    create: false,
+                    allowEmptyOption: true,
+                    sortField: { field: "text", direction: "asc" },
+                    dropdownParent: 'body',
+                    placeholder: el.dataset.placeholder || '',
+                    hidePlaceholder: true
+                });
+            }
+
+            document.querySelectorAll('select.form-select').forEach(initSelect);
+            document.addEventListener('ts:refresh', function () {
+                document.querySelectorAll('select.form-select').forEach(initSelect);
+            });
+        })();
+
         // Live Clock Script
         function updateClock() {
             const now = new Date();

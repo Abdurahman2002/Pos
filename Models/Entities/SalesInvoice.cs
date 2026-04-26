@@ -31,6 +31,7 @@ namespace NewsApp2.Models.Entities
 
         [StringLength(20)]
         public string PaymentMethod { get; set; } = "Cash";
+        public Guid? BankId { get; set; }
 
         public Guid? PosShiftId { get; set; }
 
@@ -51,6 +52,7 @@ namespace NewsApp2.Models.Entities
         public string? CreatedByUserName { get; set; }
 
         public Customer? Customer { get; set; }
+        public Bank? Bank { get; set; }
         public PosShift? PosShift { get; set; }
 
         public ICollection<SalesLine>? Lines { get; set; }

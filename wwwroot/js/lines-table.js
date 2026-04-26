@@ -177,6 +177,8 @@
 
         var customerSelect = form.querySelector('#CustomerId');
         var customerSection = form.querySelector('#customer-section');
+        var bankSection = form.querySelector('#bank-section');
+        var bankSelect = form.querySelector('#BankId');
         var customerRequiredHint = form.querySelector('#customer-required-hint');
         var paymentMethodInputs = form.querySelectorAll('input[name="PaymentMethod"]');
         var quickCustomerModalEl = document.getElementById('quick-customer-modal');
@@ -393,14 +395,22 @@
 
             var selectedPayment = form.querySelector('input[name="PaymentMethod"]:checked');
             var isCredit = !!selectedPayment && selectedPayment.value === 'Credit';
+            var isTransfer = !!selectedPayment && selectedPayment.value === 'Transfer';
             customerSelect.required = isCredit;
+            if (bankSelect) bankSelect.required = isTransfer;
 
             if (customerSection) {
                 customerSection.classList.toggle('d-none', !isCredit);
             }
+            if (bankSection) {
+                bankSection.classList.toggle('d-none', !isTransfer);
+            }
 
             if (!isCredit) {
                 setSelectValue(customerSelect, '');
+            }
+            if (!isTransfer && bankSelect) {
+                setSelectValue(bankSelect, '');
             }
 
             if (customerRequiredHint) {

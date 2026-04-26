@@ -10,6 +10,7 @@ namespace NewsApp2.ViewModels.Sales
         public decimal TotalDinar { get; set; }
         public string Status { get; set; } = string.Empty;
         public string PaymentMethod { get; set; } = string.Empty;
+        public string? BankName { get; set; }
         public bool IsReturn { get; set; }
     }
 

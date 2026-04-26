@@ -32,12 +32,9 @@
 </form>
 
 <div class="row g-3 mb-3">
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي البيع</div><div class="fw-bold">@Model.SumDinar.ToString("0.00")</div></div></div></div>
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">مرتجعات</div><div class="fw-bold text-danger">@Model.ReturnsLyd.ToString("0.00")</div></div></div></div>
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">الصافي</div><div class="fw-bold text-success">@Model.NetSalesLyd.ToString("0.00")</div></div></div></div>
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">نقدي</div><div class="fw-bold">@Model.CashSalesLyd.ToString("0.00")</div></div></div></div>
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">بطاقة/تحويل</div><div class="fw-bold">@((Model.CardSalesLyd + Model.TransferSalesLyd).ToString("0.00"))</div></div></div></div>
-    <div class="col-md-2"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">آجل</div><div class="fw-bold">@Model.CreditSalesLyd.ToString("0.00")</div></div></div></div>
+    <div class="col-md-4"><div class="alert alert-secondary mb-0">إجمالي البيع: <strong>@Model.SumDinar.ToString("0.00")</strong></div></div>
+    <div class="col-md-4"><div class="alert alert-danger mb-0">مرتجعات: <strong>@Model.ReturnsLyd.ToString("0.00")</strong></div></div>
+    <div class="col-md-4"><div class="alert alert-success mb-0">صافي المبيعات: <strong>@Model.NetSalesLyd.ToString("0.00")</strong></div></div>
 </div>
 
 <div class="table-responsive">
@@ -49,6 +46,7 @@
                 <th>العميل</th>
                 <th>الحالة</th>
                 <th>طريقة الدفع</th>
+                <th>المصرف</th>
                 <th>النوع</th>
                 <th>الإجمالي</th>
             </tr>
@@ -63,6 +61,7 @@
                 <td>@row.CustomerName</td>
                 <td>@localizedStatus</td>
                 <td>@row.PaymentMethod</td>
+                <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
                 <td>
                     <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">
                         @(row.IsReturn ? "مرتجع" : "بيع")

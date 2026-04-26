@@ -21,6 +21,7 @@ namespace NewsApp2.Controllers
     {
         private const string PaymentCash = "Cash";
         private const string PaymentCredit = "Credit";
+        private const string PaymentTransfer = "Transfer";
 
         private readonly AppDbContext _context;
         private readonly PurchaseService _purchaseService;
@@ -243,6 +244,11 @@ namespace NewsApp2.Controllers
             vm.CurrencyCode = "LYD";
             vm.EurToDinarRateSnapshot = 1m;
             vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+            var isTransferPayment = string.Equals(vm.PaymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase);
+            if (isTransferPayment && (!vm.BankId.HasValue || vm.BankId == Guid.Empty))
+                ModelState.AddModelError(nameof(vm.BankId), "حدد المصرف عند الشراء بالتحويل.");
+            if (!isTransferPayment)
+                vm.BankId = null;
 
             if (string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
             {
@@ -285,6 +291,7 @@ namespace NewsApp2.Controllers
                 EurToDinarRateSnapshot = vm.EurToDinarRateSnapshot!.Value,
                 SupplierId = vm.SupplierId,
                 PaymentMethod = vm.PaymentMethod,
+                BankId = vm.BankId,
                 DueDate = vm.DueDate,
                 Note = vm.Note,
                 CreatedByUserId = _userManager.GetUserId(User),
@@ -310,6 +317,44 @@ namespace NewsApp2.Controllers
                 await LoadItemsAsync();
                 return View(vm);
             }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "InventoryCreatePolicy")]
+        public async Task<IActionResult> CreateSupplierInline([FromBody] CreateSupplierInlineRequest request)
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+            var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new { success = false, error = "اسم المورد مطلوب." });
+
+            if (name.Length > 200)
+                return BadRequest(new { success = false, error = "اسم المورد طويل جدا." });
+
+            var exists = await _context.Set<Supplier>()
+                .AsNoTracking()
+                .AnyAsync(c => c.Name == name);
+
+            if (exists)
+                return Conflict(new { success = false, error = "المورد موجود بالفعل." });
+
+            var supplier = new Supplier
+            {
+                Name = name,
+                Phone = phone
+            };
+
+            _context.Set<Supplier>().Add(supplier);
+            await _context.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                supplierId = supplier.Id,
+                supplierName = supplier.Name
+            });
         }
 
         [HttpPost]
@@ -348,7 +393,9 @@ namespace NewsApp2.Controllers
                     Number = i.Number,
                     InvoiceDate = i.InvoiceDate,
                     TotalDinar = i.TotalDinar,
-                    Status = i.Status
+                    Status = i.Status,
+                    PaymentMethod = ToArabicPaymentMethod(i.PaymentMethod),
+                    BankName = i.Bank != null ? i.Bank.Name : null
                 })
                 .ToListAsync();
 
@@ -378,6 +425,12 @@ namespace NewsApp2.Controllers
                 .ToListAsync();
 
             ViewData["Suppliers"] = new SelectList(suppliers, "Id", "Name");
+
+            var banks = await _context.Set<Bank>()
+                .AsNoTracking()
+                .OrderBy(b => b.Name)
+                .ToListAsync();
+            ViewData["Banks"] = new SelectList(banks, "Id", "Name");
 
             var recentPrices = await _context.Set<PurchaseLine>()
                 .AsNoTracking()
@@ -443,7 +496,25 @@ namespace NewsApp2.Controllers
             if (string.Equals(paymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
                 return PaymentCredit;
 
+            if (string.Equals(paymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase))
+                return PaymentTransfer;
+
             return PaymentCash;
+        }
+
+        private static string ToArabicPaymentMethod(string? paymentMethod)
+        {
+            if (string.Equals(paymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
+                return "آجل";
+            if (string.Equals(paymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase))
+                return "تحويل";
+            return "نقدي";
+        }
+
+        public sealed class CreateSupplierInlineRequest
+        {
+            public string? Name { get; set; }
+            public string? Phone { get; set; }
         }
     }
 }

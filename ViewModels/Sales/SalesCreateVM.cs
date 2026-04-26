@@ -36,6 +36,7 @@ namespace NewsApp2.ViewModels.Sales
 
         [StringLength(20)]
         public string PaymentMethod { get; set; } = "Cash";
+        public Guid? BankId { get; set; }
 
         public bool IsOnAccount { get; set; }
 

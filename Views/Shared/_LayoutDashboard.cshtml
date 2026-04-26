@@ -245,6 +245,12 @@
                                 <span class="menu-title">@L["Purchases"]</span> 
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="@Url.Action("Index", "Banks")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-bank menu-icon"></i></span>
+                                <span class="menu-title">المصارف</span>
+                            </a>
+                        </li>
                     }
                     @if (!User.IsInRole("Cashier"))
                     {

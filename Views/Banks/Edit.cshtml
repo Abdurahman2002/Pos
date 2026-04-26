@@ -1,0 +1,26 @@
+@model NewsApp2.Models.Entities.Bank
+@{
+    ViewData["Title"] = "تعديل مصرف";
+}
+
+<h1 class="h3 mb-3">تعديل مصرف</h1>
+
+<form asp-action="Edit" method="post" class="card shadow-sm">
+    <div class="card-body">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label">اسم المصرف</label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Note" class="form-label">ملاحظة</label>
+            <textarea asp-for="Note" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="Note" class="text-danger"></span>
+        </div>
+        <button type="submit" class="btn btn-primary">تحديث</button>
+        <a asp-action="Index" class="btn btn-secondary">رجوع</a>
+    </div>
+</form>

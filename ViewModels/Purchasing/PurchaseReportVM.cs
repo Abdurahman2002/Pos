@@ -8,6 +8,8 @@ namespace NewsApp2.ViewModels.Purchasing
         public decimal TotalEur { get; set; }
         public decimal TotalDinar { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string? BankName { get; set; }
     }
 
     public class PurchaseReportVM

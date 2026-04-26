@@ -222,6 +222,9 @@
     data-msg-scan-or-type-first="امسح أو اكتب الباركود أولا."
     data-msg-unknown-with-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود أو إنشاء صنف جديد."
     data-msg-unknown-without-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود."
+    data-create-supplier-url="@Url.Action("CreateSupplierInline", "PurchaseInvoices")"
+    data-msg-supplier-name-required="اسم المورد مطلوب."
+    data-msg-unable-create-supplier="تعذر إضافة المورد."
     data-item-default-prices='@Html.Raw(itemDefaultPricesJson)'
     data-item-sale-prices='@Html.Raw(itemSalePricesJson)'>
     <div asp-validation-summary="ModelOnly" class="text-danger fw-bold mb-3"></div>
@@ -368,13 +371,25 @@
                         <label asp-for="PaymentMethod" class="form-label fw-bold text-dark fs-6">طريقة الدفع</label>
                         <select asp-for="PaymentMethod" class="form-select form-select-lg shadow-sm" id="payment-method">
                             <option value="Cash">نقدي</option>
+                            <option value="Transfer">تحويل</option>
                             <option value="Credit">آجل</option>
                         </select>
+                    <div class="mb-4 d-none" id="bank-wrapper">
+                        <label asp-for="BankId" class="form-label fw-bold text-dark fs-6">المصرف</label>
+                        <select asp-for="BankId" asp-items="@(ViewData["Banks"] as SelectList)" class="form-select form-select-lg shadow-sm" id="bank-id">
+                            <option value="">اختر المصرف...</option>
+                        </select>
+                        <span asp-validation-for="BankId" class="text-danger fw-bold mt-1 d-block"></span>
+                    </div>
+
                         <span asp-validation-for="PaymentMethod" class="text-danger fw-bold mt-1 d-block"></span>
                     </div>
 
                     <div class="mb-4" id="supplier-wrapper">
-                        <label asp-for="SupplierId" class="form-label fw-bold text-dark fs-6">المورد</label>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label asp-for="SupplierId" class="form-label fw-bold text-dark fs-6 mb-0">المورد</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#quick-supplier-modal">+ إضافة مورد</button>
+                        </div>
                         <select asp-for="SupplierId" asp-items="@(ViewData["Suppliers"] as SelectList)" class="form-select form-select-lg shadow-sm" id="supplier-id">
                             <option value="">اختر المورد...</option>
                         </select>
@@ -456,6 +471,32 @@
     </div>
 </div>
 
+<div class="modal fade" id="quick-supplier-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة مورد سريع</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="quick-supplier-error" class="alert alert-danger d-none"></div>
+                <div class="mb-2">
+                    <label class="form-label">اسم المورد</label>
+                    <input id="quick-supplier-name" class="form-control" />
+                </div>
+                <div>
+                    <label class="form-label">الهاتف</label>
+                    <input id="quick-supplier-phone" class="form-control" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="quick-supplier-save">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/lines-table.js"></script>
@@ -524,25 +565,98 @@
         (function initPurchaseCreditUi() {
             const paymentMethod = document.getElementById('payment-method');
             const supplierWrapper = document.getElementById('supplier-wrapper');
+            const bankWrapper = document.getElementById('bank-wrapper');
             const dueDateWrapper = document.getElementById('due-date-wrapper');
             const dueDateInput = document.getElementById('DueDate');
             const supplierInput = document.getElementById('supplier-id');
-            if (!paymentMethod || !supplierWrapper || !dueDateWrapper || !dueDateInput || !supplierInput) return;
+            const bankInput = document.getElementById('bank-id');
+            if (!paymentMethod || !supplierWrapper || !dueDateWrapper || !dueDateInput || !supplierInput || !bankWrapper || !bankInput) return;
 
             const refresh = () => {
                 const isCredit = (paymentMethod.value || '').toLowerCase() === 'credit';
+                const isTransfer = (paymentMethod.value || '').toLowerCase() === 'transfer';
                 supplierWrapper.classList.toggle('d-none', !isCredit);
+                bankWrapper.classList.toggle('d-none', !isTransfer);
                 dueDateWrapper.classList.toggle('d-none', !isCredit);
                 dueDateInput.required = isCredit;
                 supplierInput.required = isCredit;
+                bankInput.required = isTransfer;
                 if (!isCredit) {
                     supplierInput.value = '';
                     dueDateInput.value = '';
+                }
+                if (!isTransfer) {
+                    bankInput.value = '';
                 }
             };
 
             paymentMethod.addEventListener('change', refresh);
             refresh();
+        })();
+
+        (function initQuickSupplierCreate() {
+            const form = document.querySelector('.invoice-create-form');
+            const createUrl = form ? (form.dataset.createSupplierUrl || '') : '';
+            const supplierSelect = document.getElementById('supplier-id');
+            const modalEl = document.getElementById('quick-supplier-modal');
+            const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+            const nameInput = document.getElementById('quick-supplier-name');
+            const phoneInput = document.getElementById('quick-supplier-phone');
+            const saveBtn = document.getElementById('quick-supplier-save');
+            const errorBox = document.getElementById('quick-supplier-error');
+            const msgNameRequired = form ? (form.dataset.msgSupplierNameRequired || 'اسم المورد مطلوب.') : 'اسم المورد مطلوب.';
+            const msgCreateFailed = form ? (form.dataset.msgUnableCreateSupplier || 'تعذر إضافة المورد.') : 'تعذر إضافة المورد.';
+            if (!form || !createUrl || !supplierSelect || !modal || !nameInput || !saveBtn) return;
+
+            const tokenInput = form.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
+
+            const setError = (msg) => {
+                if (!errorBox) return;
+                errorBox.textContent = msg || '';
+                errorBox.classList.toggle('d-none', !msg);
+            };
+
+            saveBtn.addEventListener('click', async function () {
+                const name = (nameInput.value || '').trim();
+                const phone = phoneInput ? (phoneInput.value || '').trim() : '';
+                setError('');
+                if (!name) {
+                    setError(msgNameRequired);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(createUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': token
+                        },
+                        body: JSON.stringify({ name, phone })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        setError((data && data.error) || msgCreateFailed);
+                        return;
+                    }
+
+                    const option = document.createElement('option');
+                    option.value = data.supplierId;
+                    option.text = data.supplierName;
+                    supplierSelect.appendChild(option);
+                    supplierSelect.value = data.supplierId;
+                    supplierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    document.dispatchEvent(new Event('ts:refresh'));
+
+                    nameInput.value = '';
+                    if (phoneInput) phoneInput.value = '';
+                    setError('');
+                    modal.hide();
+                } catch {
+                    setError(msgCreateFailed);
+                }
+            });
         })();
     </script>
 }

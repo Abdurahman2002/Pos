@@ -57,7 +57,7 @@ namespace NewsApp2.Controllers
                 .Where(l => l.SalesInvoice != null
                             && l.SalesInvoice.Status == "Posted"
                             && l.SalesInvoice.InvoiceDate <= toDate
-                            && l.Qty > 0)
+                            && l.Qty != 0)
                 .Select(l => new
                 {
                     l.ItemId,
@@ -78,85 +78,30 @@ namespace NewsApp2.Controllers
 
             foreach (var itemId in itemIds)
             {
-                var itemPurchases = purchases
-                    .Where(x => x.ItemId == itemId)
-                    .OrderBy(x => x.InvoiceDate)
-                    .ThenBy(x => x.Created)
-                    .ToList();
-
-                var itemSales = sales
-                    .Where(x => x.ItemId == itemId)
-                    .OrderBy(x => x.InvoiceDate)
-                    .ThenBy(x => x.Created)
-                    .ToList();
+                var itemPurchases = purchases.Where(x => x.ItemId == itemId).ToList();
+                var itemSales = sales.Where(x => x.ItemId == itemId).ToList();
 
                 var itemName = itemSales.Select(x => x.ItemName).FirstOrDefault()
                                ?? itemPurchases.Select(x => x.ItemName).FirstOrDefault()
                                ?? "Unknown Item";
 
-                var layers = new Queue<FifoLayer>();
+                var purchasedQtyToDate = itemPurchases.Sum(x => x.Qty);
+                var purchasedValueToDate = itemPurchases.Sum(x => x.Qty * x.UnitCostDinar);
+                var avgUnitCost = purchasedQtyToDate > 0 ? purchasedValueToDate / purchasedQtyToDate : 0m;
 
-                decimal soldQtyInPeriod = 0m;
-                decimal revenueDinarInPeriod = 0m;
-                decimal cogsDinarInPeriod = 0m;
+                var soldQtyToDate = itemSales.Sum(x => x.Qty);
+                var soldQtyInPeriod = itemSales
+                    .Where(x => x.InvoiceDate >= fromDate && x.InvoiceDate <= toDate)
+                    .Sum(x => x.Qty);
+                var revenueDinarInPeriod = itemSales
+                    .Where(x => x.InvoiceDate >= fromDate && x.InvoiceDate <= toDate)
+                    .Sum(x => x.RevenueDinar);
+                var cogsDinarInPeriod = soldQtyInPeriod * avgUnitCost;
 
-                var purchaseIndex = 0;
-                var saleIndex = 0;
+                var remainingQty = Math.Max(0m, purchasedQtyToDate - soldQtyToDate);
+                var remainingValueDinar = remainingQty * avgUnitCost;
 
-                while (purchaseIndex < itemPurchases.Count || saleIndex < itemSales.Count)
-                {
-                    var hasPurchase = purchaseIndex < itemPurchases.Count;
-                    var hasSale = saleIndex < itemSales.Count;
-
-                    var nextPurchaseDate = hasPurchase ? itemPurchases[purchaseIndex].InvoiceDate : DateOnly.MaxValue;
-                    var nextSaleDate = hasSale ? itemSales[saleIndex].InvoiceDate : DateOnly.MaxValue;
-
-                    var takePurchase = hasPurchase && (!hasSale || nextPurchaseDate < nextSaleDate ||
-                        (nextPurchaseDate == nextSaleDate && itemPurchases[purchaseIndex].Created <= itemSales[saleIndex].Created));
-
-                    if (takePurchase)
-                    {
-                        var p = itemPurchases[purchaseIndex++];
-                        layers.Enqueue(new FifoLayer
-                        {
-                            RemainingQty = p.Qty,
-                            UnitCostDinar = p.UnitCostDinar
-                        });
-                    }
-                    else
-                    {
-                        var s = itemSales[saleIndex++];
-                        var inPeriod = s.InvoiceDate >= fromDate && s.InvoiceDate <= toDate;
-
-                        var qtyToConsume = s.Qty;
-                        decimal eventCogsDinar = 0m;
-
-                        while (qtyToConsume > 0 && layers.Count > 0)
-                        {
-                            var layer = layers.Peek();
-                            var consumed = Math.Min(qtyToConsume, layer.RemainingQty);
-                            eventCogsDinar += consumed * layer.UnitCostDinar;
-
-                            layer.RemainingQty -= consumed;
-                            qtyToConsume -= consumed;
-
-                            if (layer.RemainingQty <= 0)
-                                layers.Dequeue();
-                        }
-
-                        if (inPeriod)
-                        {
-                            soldQtyInPeriod += s.Qty;
-                            revenueDinarInPeriod += s.RevenueDinar;
-                            cogsDinarInPeriod += eventCogsDinar;
-                        }
-                    }
-                }
-
-                var remainingQty = layers.Sum(x => x.RemainingQty);
-                var remainingValueDinar = layers.Sum(x => x.RemainingQty * x.UnitCostDinar);
-
-                var hasRelevantData = soldQtyInPeriod > 0 || remainingQty > 0;
+                var hasRelevantData = soldQtyInPeriod != 0 || revenueDinarInPeriod != 0 || remainingQty > 0;
                 if (!hasRelevantData)
                     continue;
 
@@ -613,10 +558,5 @@ namespace NewsApp2.Controllers
         private static decimal Round2(decimal value)
             => Math.Round(value, 2, MidpointRounding.ToEven);
 
-        private sealed class FifoLayer
-        {
-            public decimal RemainingQty { get; set; }
-            public decimal UnitCostDinar { get; set; }
-        }
     }
 }

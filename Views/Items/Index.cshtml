@@ -7,7 +7,7 @@
         <select name="categoryId" class="form-select me-2" asp-items="@(ViewData["Categories"] as SelectList)">
             <option value="">@L["All categories"]</option>
         </select>
-        <input type="text" name="search" value="@ViewBag.Search" class="form-control me-2" placeholder="@L["Search by name"]" />
+        <input type="text" name="search" value="@ViewBag.Search" class="form-control me-2" placeholder="@L["Search by name or barcode"]" />
         <button class="btn btn-outline-primary" type="submit">@L["Search"]</button>
     </form>
     <a class="btn btn-primary" asp-action="Create">@L["Create New"]</a>
@@ -29,6 +29,10 @@
         {
             <tr>
                 <td>
+                    @if (!string.IsNullOrWhiteSpace(item.Barcode))
+                    {
+                        <span class="text-muted me-1 small">[<span dir="ltr">@item.Barcode</span>]</span>
+                    }
                     @item.Name
                 </td>
                 <td class="d-none d-md-table-cell">@item.Category?.Name</td>

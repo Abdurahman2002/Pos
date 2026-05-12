@@ -1,0 +1,136 @@
+@model NewsApp2.ViewModels.Sales.SalesDailyInvoicesVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "تقرير فواتير اليوم";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 no-print">
+    <h1 class="h3 mb-0">تقرير فواتير اليوم</h1>
+    <div class="d-flex gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary">رجوع</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة التقرير</button>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3 no-print">
+    <div class="col-sm-4 col-md-3">
+        <label class="form-label">التاريخ</label>
+        <input type="date" name="date" value="@Model.ReportDate.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-sm-3 col-md-2 align-self-end">
+        <button type="submit" class="btn btn-outline-primary w-100">عرض</button>
+    </div>
+</form>
+
+<div class="alert alert-light border mb-3">
+    <div class="fw-bold">تاريخ التقرير: <span dir="ltr">@Model.ReportDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></div>
+    <div class="small text-muted">تقرير يومي بسيط للطباعة والمشاركة مع الإدارة.</div>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">عدد الفواتير</div>
+            <div class="fs-5 fw-bold">@Model.TotalInvoicesCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">فواتير بيع</div>
+            <div class="fs-5 fw-bold text-success">@Model.SalesInvoicesCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">فواتير مرتجع</div>
+            <div class="fs-5 fw-bold text-warning">@Model.ReturnInvoicesCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">إجمالي البيع</div>
+            <div class="fs-6 fw-bold text-success">@Model.TotalSalesLyd.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">إجمالي المرتجع</div>
+            <div class="fs-6 fw-bold text-danger">@Model.TotalReturnsLyd.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="border rounded p-2 h-100 bg-white">
+            <div class="small text-muted">الصافي</div>
+            <div class="fs-6 fw-bold text-primary">@Model.NetSalesLyd.ToString("N2")</div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Rows.Any())
+{
+    <div class="alert alert-info">لا توجد فواتير في هذا التاريخ.</div>
+}
+else
+{
+    <div class="table-responsive print-area">
+        <table class="table table-striped table-bordered align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>رقم الفاتورة</th>
+                    <th>الوقت</th>
+                    <th>العميل</th>
+                    <th>النوع</th>
+                    <th>طريقة الدفع</th>
+                    <th>المصرف</th>
+                    <th>الحالة</th>
+                    <th class="text-end">الإجمالي (د.ل)</th>
+                    <th class="no-print">التفاصيل</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;
+                    <tr>
+                        <td class="fw-bold">@row.Number</td>
+                        <td dir="ltr">@row.CreatedAt.ToString("HH:mm")</td>
+                        <td>@row.CustomerName</td>
+                        <td>
+                            <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">
+                                @(row.IsReturn ? "مرتجع" : "بيع")
+                            </span>
+                        </td>
+                        <td>@row.PaymentMethod</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
+                        <td>@localizedStatus</td>
+                        <td class="text-end @(row.IsReturn ? "text-danger" : "")">@row.TotalDinar.ToString("N2")</td>
+                        <td class="no-print">
+                            <a asp-action="Details" asp-route-id="@row.InvoiceId" class="btn btn-sm btn-outline-primary">فتح</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        body {
+            background: #fff !important;
+        }
+
+        .container-fluid, .content-wrapper {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .table {
+            font-size: 12px;
+        }
+    }
+</style>

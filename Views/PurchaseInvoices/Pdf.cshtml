@@ -1,0 +1,256 @@
+@model NewsApp2.Models.Entities.PurchaseInvoice
+@using NewsApp2.Models.Entities
+@{
+    Layout = null;
+    var lines = ViewBag.Lines as IEnumerable<PurchaseLine> ?? Enumerable.Empty<PurchaseLine>();
+    var shopName = ViewBag.ShopName as string;
+    var shopLogo = ViewBag.ShopLogo as string;
+    var paymentMethodAr = string.Equals(Model.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase) ? "آجل"
+                        : string.Equals(Model.PaymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase) ? "تحويل"
+                        : "نقدي";
+    var statusAr = string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) ? "مرحلة"
+                 : string.Equals(Model.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ? "ملغاة"
+                 : Model.Status;
+    int rowNum = 0;
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>فاتورة شراء - @Model.Number</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            font-size: 13px;
+            margin: 0;
+            padding: 20px;
+            color: #111;
+            direction: rtl;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+        .header-logo img {
+            max-height: 60px;
+            max-width: 120px;
+            object-fit: contain;
+        }
+        .header-title {
+            text-align: center;
+            flex: 1;
+        }
+        .header-title h1 {
+            font-size: 20px;
+            margin: 0 0 4px 0;
+        }
+        .header-title .shop-name {
+            font-size: 15px;
+            font-weight: bold;
+            color: #444;
+        }
+        .header-num {
+            text-align: left;
+            font-size: 13px;
+            color: #555;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px 20px;
+            margin-bottom: 16px;
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px 14px;
+        }
+        .info-item { display: flex; gap: 6px; }
+        .info-label { font-weight: bold; white-space: nowrap; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+        }
+        thead th {
+            background: #2c3e50;
+            color: #fff;
+            padding: 7px 8px;
+            text-align: center;
+            font-size: 12px;
+        }
+        tbody tr:nth-child(even) { background: #f5f5f5; }
+        tbody td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        tbody td.name-col { text-align: right; }
+        .totals-row {
+            display: flex;
+            justify-content: flex-start;
+            gap: 30px;
+            margin-bottom: 14px;
+        }
+        .total-box {
+            background: #2c3e50;
+            color: #fff;
+            border-radius: 4px;
+            padding: 8px 20px;
+            text-align: center;
+        }
+        .total-box .t-label { font-size: 11px; opacity: 0.85; }
+        .total-box .t-value { font-size: 17px; font-weight: bold; }
+        .note-box {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            color: #555;
+            margin-bottom: 14px;
+        }
+        .note-box span { font-weight: bold; color: #333; }
+        .actions {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .actions button {
+            background: #2c3e50;
+            color: #fff;
+            border: none;
+            padding: 8px 30px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 4px;
+        }
+        .actions a {
+            background: #6c757d;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 4px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            border-top: 1px solid #ddd;
+            padding-top: 6px;
+        }
+        @@media print {
+            .actions { display: none; }
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-logo">
+            @if (!string.IsNullOrWhiteSpace(shopLogo))
+            {
+                <img src="@shopLogo" alt="شعار المتجر" />
+            }
+        </div>
+        <div class="header-title">
+            @if (!string.IsNullOrWhiteSpace(shopName))
+            {
+                <div class="shop-name">@shopName</div>
+            }
+            <h1>فاتورة شراء</h1>
+        </div>
+        <div class="header-num">
+            <div>رقم: <strong>@Model.Number</strong></div>
+            <div>التاريخ: <strong>@Model.InvoiceDate.ToString("dd/MM/yyyy")</strong></div>
+        </div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-item"><span class="info-label">المورد:</span> <span>@(Model.Supplier?.Name ?? "-")</span></div>
+        <div class="info-item"><span class="info-label">طريقة الدفع:</span> <span>@paymentMethodAr</span></div>
+        <div class="info-item"><span class="info-label">الحالة:</span> <span>@statusAr</span></div>
+        @if (Model.DueDate.HasValue)
+        {
+            <div class="info-item"><span class="info-label">تاريخ الاستحقاق:</span> <span>@Model.DueDate.Value.ToString("dd/MM/yyyy")</span></div>
+        }
+        @if (Model.EurToDinarRateSnapshot > 0 && !string.Equals(Model.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="info-item"><span class="info-label">سعر الصرف:</span> <span>1 @Model.CurrencyCode = @Model.EurToDinarRateSnapshot.ToString("0.000") دينار</span></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.CreatedByUserName))
+        {
+            <div class="info-item"><span class="info-label">أنشأ بواسطة:</span> <span>@Model.CreatedByUserName</span></div>
+        }
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width:36px">#</th>
+                <th>الكود / الباركود</th>
+                <th class="name-col" style="text-align:right">اسم الصنف</th>
+                <th>الكمية</th>
+                <th>سعر الشراء (@Model.CurrencyCode)</th>
+                <th>التكلفة (د.ل)</th>
+                <th>سعر البيع (د.ل)</th>
+                <th>إجمالي السطر (د.ل)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var line in lines)
+            {
+                rowNum++;
+                <tr>
+                    <td>@rowNum</td>
+                    <td>@(line.Item?.Barcode ?? "-")</td>
+                    <td class="name-col">@(line.Item?.Name ?? "-")</td>
+                    <td>@line.Qty.ToString("0.##")</td>
+                    <td>@line.UnitPriceEur.ToString("0.000")</td>
+                    <td>@line.UnitCostLyd.ToString("0.00")</td>
+                    <td>@(line.Item?.DefaultSalePriceLyd.HasValue == true ? line.Item.DefaultSalePriceLyd!.Value.ToString("0.00") : "-")</td>
+                    <td>@line.LineTotalDinar.ToString("0.00")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="totals-row">
+        @if (!string.Equals(Model.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase) && Model.TotalEur > 0)
+        {
+            <div class="total-box">
+                <div class="t-label">الإجمالي (@Model.CurrencyCode)</div>
+                <div class="t-value">@Model.TotalEur.ToString("0.000")</div>
+            </div>
+        }
+        <div class="total-box">
+            <div class="t-label">الإجمالي (دينار ليبي)</div>
+            <div class="t-value">@Model.TotalDinar.ToString("0.00") د.ل</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Note))
+    {
+        <div class="note-box"><span>ملاحظة: </span>@Model.Note</div>
+    }
+
+    <div class="actions">
+        <button onclick="window.print()">طباعة / حفظ PDF</button>
+        <a href="javascript:history.back()">رجوع</a>
+    </div>
+
+    <div class="footer-note">
+        تم إنشاء هذا المستند بواسطة النظام &mdash; @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+    </div>
+
+</body>
+</html>

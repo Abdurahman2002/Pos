@@ -11,6 +11,9 @@ namespace NewsApp2.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal QuantityOnHand { get; set; }
 
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal AverageCostLyd { get; set; }
+
         [Timestamp]
         public byte[]? RowVersion { get; set; }
 

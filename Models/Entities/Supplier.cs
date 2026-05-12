@@ -16,5 +16,7 @@ namespace NewsApp2.Models.Entities
 
         public ICollection<PurchaseInvoice>? PurchaseInvoices { get; set; }
         public ICollection<SupplierPayment>? Payments { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }

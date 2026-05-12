@@ -113,9 +113,13 @@ namespace NewsApp2.Models.Services
                     CurrencyCode = invoice.CurrencyCode,
                     ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
                 };
+                // compute COGS from current moving average
+                var unitCost = stock!.AverageCostLyd;
+                salesLine.UnitCostLyd = unitCost;
+                salesLine.LineCostDinar = RoundMoney(unitCost * line.Qty);
                 _context.Set<SalesLine>().Add(salesLine);
 
-                stock!.QuantityOnHand -= line.Qty;
+                stock.QuantityOnHand -= line.Qty;
 
                 var ledger = new InvStockLedger
                 {
@@ -125,7 +129,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = -line.Qty,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note
+                    Note = invoice.Note,
+                    UnitCostLyd = unitCost
                 };
                 _context.Set<InvStockLedger>().Add(ledger);
             }
@@ -226,7 +231,8 @@ namespace NewsApp2.Models.Services
                 totalEur += lineTotalEur;
                 totalDinar += lineTotalDinar;
 
-                _context.Set<SalesLine>().Add(new SalesLine
+                var unitCost = stock.AverageCostLyd;
+                var salesLine = new SalesLine
                 {
                     SalesInvoiceId = invoice.Id,
                     ItemId = line.ItemId,
@@ -236,8 +242,11 @@ namespace NewsApp2.Models.Services
                     LineTotalEur = lineTotalEur,
                     LineTotalDinar = lineTotalDinar,
                     CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
-                });
+                    ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot,
+                    UnitCostLyd = unitCost,
+                    LineCostDinar = RoundMoney(unitCost * qty)
+                };
+                _context.Set<SalesLine>().Add(salesLine);
 
                 stock.QuantityOnHand += line.Qty;
 
@@ -249,7 +258,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = line.Qty,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note
+                    Note = invoice.Note,
+                    UnitCostLyd = unitCost
                 });
             }
 
@@ -290,6 +300,34 @@ namespace NewsApp2.Models.Services
             if (!lines.Any())
                 throw new InvalidOperationException("Invoice has no lines.");
 
+            // For return invoices (negative qty lines), cancelling restores negative qty to stock.
+            // Validate that no line would push stock below zero before entering the transaction.
+            var negativeLines = lines.Where(l => l.Qty < 0).ToList();
+            if (negativeLines.Any())
+            {
+                var negItemIds = negativeLines.Select(l => l.ItemId).Distinct().ToList();
+                var stockForNeg = await _context.Set<InvStockBalance>()
+                    .AsNoTracking()
+                    .Where(s => negItemIds.Contains(s.ItemId))
+                    .ToDictionaryAsync(s => s.ItemId, s => s.QuantityOnHand);
+
+                foreach (var negLine in negativeLines)
+                {
+                    var available = stockForNeg.TryGetValue(negLine.ItemId, out var qty) ? qty : 0m;
+                    var wouldBeRemoved = Math.Abs(negLine.Qty);
+                    if (available < wouldBeRemoved)
+                    {
+                        var itemName = await _context.Set<Item>()
+                            .AsNoTracking()
+                            .Where(i => i.Id == negLine.ItemId)
+                            .Select(i => i.Name)
+                            .FirstOrDefaultAsync() ?? negLine.ItemId.ToString();
+                        throw new InvalidOperationException(
+                            $"تعذر إلغاء المرتجع: الكمية المتاحة لـ {itemName} غير كافية. متاح: {FormatQuantity(available)}, مطلوب: {FormatQuantity(wouldBeRemoved)}.");
+                    }
+                }
+            }
+
             using var tx = await _context.Database.BeginTransactionAsync();
 
             _logger.LogInformation("Cancelling sales invoice {Number} ({Id}) by {User}.", invoice.Number, invoice.Id, cancelledBy);
@@ -321,7 +359,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = line.Qty,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Cancelled by {cancelledBy ?? "unknown"}"
+                    Note = $"Cancelled by {cancelledBy ?? "unknown"}",
+                    UnitCostLyd = line.UnitCostLyd
                 });
             }
 
@@ -500,6 +539,11 @@ namespace NewsApp2.Models.Services
                 line.LineTotalDinar = lineTotalDinar;
                 line.ExchangeRateSnapshot = rate;
 
+                // record COGS from current average
+                var unitCost = stock!.AverageCostLyd;
+                line.UnitCostLyd = unitCost;
+                line.LineCostDinar = RoundMoney(unitCost * line.Qty);
+
                 totalEur += lineTotalEur;
                 totalDinar += lineTotalDinar;
 
@@ -513,7 +557,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = -line.Qty,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note
+                    Note = invoice.Note,
+                    UnitCostLyd = unitCost
                 });
             }
 
@@ -673,7 +718,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = deltaStock,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Edited by {editedBy ?? "unknown"}"
+                    Note = $"Edited by {editedBy ?? "unknown"}",
+                    UnitCostLyd = stock.AverageCostLyd
                 });
             }
 
@@ -691,7 +737,8 @@ namespace NewsApp2.Models.Services
                 totalEur += lineTotalEur;
                 totalDinar += lineTotalDinar;
 
-                _context.Set<SalesLine>().Add(new SalesLine
+                var unitCost = stockByItem[line.ItemId].AverageCostLyd;
+                var salesLine = new SalesLine
                 {
                     SalesInvoiceId = invoice.Id,
                     ItemId = line.ItemId,
@@ -701,8 +748,11 @@ namespace NewsApp2.Models.Services
                     LineTotalEur = lineTotalEur,
                     LineTotalDinar = lineTotalDinar,
                     CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = rate
-                });
+                    ExchangeRateSnapshot = rate,
+                    UnitCostLyd = unitCost,
+                    LineCostDinar = RoundMoney(unitCost * line.Qty)
+                };
+                _context.Set<SalesLine>().Add(salesLine);
             }
 
             invoice.InvoiceDate = invoiceDate;

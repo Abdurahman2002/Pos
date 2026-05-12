@@ -99,6 +99,9 @@ namespace NewsApp2.Models
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.SourceType, e.SourceId });
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.EntryDate, e.AccountCode });
             modelBuilder.Entity<Bank>().HasIndex(b => b.Name).IsUnique();
+            // InvStockLedger performance indexes for item history and reference lookups
+            modelBuilder.Entity<InvStockLedger>().HasIndex(l => l.ItemId);
+            modelBuilder.Entity<InvStockLedger>().HasIndex(l => new { l.ReferenceType, l.ReferenceId });
             modelBuilder.Entity<InventorySettings>().Property(s => s.MaxCashierDiscountPercent).HasPrecision(18, 2);
             modelBuilder.Entity<PosShift>().Property(s => s.OpeningCashLyd).HasPrecision(18, 2);
             modelBuilder.Entity<PosShift>().Property(s => s.ClosingCashLyd).HasPrecision(18, 2);
@@ -108,6 +111,8 @@ namespace NewsApp2.Models
 
             modelBuilder.Entity<Item>().HasQueryFilter(i => !i.IsDeleted);
             modelBuilder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
+            modelBuilder.Entity<Customer>().HasQueryFilter(c => !c.IsDeleted);
+            modelBuilder.Entity<Supplier>().HasQueryFilter(s => !s.IsDeleted);
             modelBuilder.Entity<InvStockBalance>().HasQueryFilter(b => !b.Item!.IsDeleted);
             modelBuilder.Entity<InvStockLedger>().HasQueryFilter(l => !l.Item!.IsDeleted);
             modelBuilder.Entity<PurchaseLine>().HasQueryFilter(l => !l.Item!.IsDeleted);
@@ -208,6 +213,13 @@ namespace NewsApp2.Models
                 .HasOne(e => e.Employee)
                 .WithMany()
                 .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Explicit cascade config to prevent accidental hard-delete data loss
+            modelBuilder.Entity<BarcodeMapping>()
+                .HasOne(m => m.Item)
+                .WithMany()
+                .HasForeignKey(m => m.ItemId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Seed();

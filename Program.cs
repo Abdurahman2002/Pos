@@ -54,7 +54,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.ExpireTimeSpan = TimeSpan.FromMinutes(360);
+    options.ExpireTimeSpan = TimeSpan.FromDays(2);
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Error/403";
@@ -109,7 +109,7 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy("SettingsPolicy", policy =>
     {
-        policy.RequireClaim("SiteState", "EditUser"); // �����
+        policy.RequireClaim("SiteState", "true");
     });
 
 
@@ -176,6 +176,7 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<PurchaseService>();
 builder.Services.AddScoped<SalesService>();
 builder.Services.AddScoped<BarcodeScanService>();
+builder.Services.AddScoped<InventoryService>();
 
 //-----------------------------------------
 var app = builder.Build();

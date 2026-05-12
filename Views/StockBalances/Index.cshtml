@@ -89,7 +89,18 @@
             var badge = statusKey == "Out" ? "bg-dark" : statusKey == "Low" ? "bg-danger" : "bg-success";
             <tr>
                 <td class="d-none d-md-table-cell">@row.Item?.Category?.Name</td>
-                <td>@row.Item?.Name</td>
+                <td>
+                    @if (row.ItemId != Guid.Empty)
+                    {
+                        <a asp-action="ItemCard" asp-route-id="@row.ItemId" class="text-decoration-none fw-semibold">
+                            @row.Item?.Name
+                        </a>
+                    }
+                    else
+                    {
+                        @row.Item?.Name
+                    }
+                </td>
                 <td class="text-end">@row.QuantityOnHand.ToString("0")</td>
                 <td class="d-none d-lg-table-cell text-end">@(reorder > 0 ? reorder.ToString("0") : "-")</td>
                 <td><span class="badge @badge">@status</span></td>

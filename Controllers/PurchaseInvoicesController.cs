@@ -39,7 +39,7 @@ namespace NewsApp2.Controllers
         {
             var query = _context.Set<PurchaseInvoice>()
                 .AsNoTracking()
-                .Where(i => i.Status == null || (i.Status != "Cancelled" && i.Status != "Canceled"));
+                .Where(i => i.Status != "Cancelled");
 
             if (from.HasValue)
                 query = query.Where(i => i.InvoiceDate >= from.Value);
@@ -64,6 +64,7 @@ namespace NewsApp2.Controllers
             var lines = await _context.Set<PurchaseLine>()
                 .AsNoTracking()
                 .Where(l => l.PurchaseInvoiceId == id)
+                .IgnoreQueryFilters()
                 .Include(l => l.Item)
                 .OrderBy(l => l.LineOrder)
                 .ThenBy(l => l.Created)
@@ -71,6 +72,38 @@ namespace NewsApp2.Controllers
                 .ToListAsync();
 
             ViewBag.Lines = lines;
+            return View(invoice);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Pdf(Guid id)
+        {
+            var invoice = await _context.Set<PurchaseInvoice>()
+                .AsNoTracking()
+                .Include(i => i.Supplier)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (invoice == null)
+                return View("NotFound");
+
+            var lines = await _context.Set<PurchaseLine>()
+                .AsNoTracking()
+                .Where(l => l.PurchaseInvoiceId == id)
+                .IgnoreQueryFilters()
+                .Include(l => l.Item)
+                .OrderBy(l => l.LineOrder)
+                .ThenBy(l => l.Created)
+                .ThenBy(l => l.Id)
+                .ToListAsync();
+
+            var siteInfo = await _context.Set<SiteInfo>()
+                .AsNoTracking()
+                .OrderByDescending(s => s.Created)
+                .FirstOrDefaultAsync();
+
+            ViewBag.Lines = lines;
+            ViewBag.ShopName = siteInfo?.Name;
+            ViewBag.ShopLogo = siteInfo?.LogoUrl;
             return View(invoice);
         }
 
@@ -380,7 +413,7 @@ namespace NewsApp2.Controllers
         {
             var query = _context.Set<PurchaseInvoice>()
                 .AsNoTracking()
-                .Where(i => i.Status == null || (i.Status != "Cancelled" && i.Status != "Canceled"));
+                .Where(i => i.Status != "Cancelled");
             if (from.HasValue)
                 query = query.Where(i => i.InvoiceDate >= from.Value);
             if (to.HasValue)

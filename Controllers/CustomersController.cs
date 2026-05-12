@@ -154,6 +154,10 @@ namespace NewsApp2.Controllers
             if (customer.Id == DailySalesCustomerSeedId || string.Equals(customer.Name, DailySalesCustomerName, StringComparison.Ordinal))
                 return View("NotFound");
 
+            var usage = await GetCustomerUsageAsync(customer.Id);
+            ViewBag.DeleteBlockedReason = usage.BlockedReason;
+            ViewBag.CanDelete = string.IsNullOrWhiteSpace(usage.BlockedReason);
+
             return View(customer);
         }
 
@@ -169,17 +173,39 @@ namespace NewsApp2.Controllers
             if (customer.Id == DailySalesCustomerSeedId || string.Equals(customer.Name, DailySalesCustomerName, StringComparison.Ordinal))
                 return View("NotFound");
 
+            var usage = await GetCustomerUsageAsync(customer.Id);
+            if (!string.IsNullOrWhiteSpace(usage.BlockedReason))
+            {
+                ViewBag.DeleteBlockedReason = usage.BlockedReason;
+                ViewBag.CanDelete = false;
+                return View("Delete", customer);
+            }
+
             try
             {
-                _customers.Repository.Delete(customer);
+                customer.IsDeleted = true;
+                customer.DeletedAt = DateTime.UtcNow;
                 await _customers.SaveAsync();
                 return RedirectToAction(nameof(Index));
             }
             catch
             {
-                ViewBag.Message = "لا يمكن حذف العميل لوجود فواتير مرتبطة به.";
+                ViewBag.Message = "تعذر تعطيل العميل (حدث خطأ).";
                 return View("Delete", customer);
             }
+        }
+
+        private async Task<(string? BlockedReason, int SalesInvoices, int Receipts)> GetCustomerUsageAsync(Guid customerId)
+        {
+            var sales = await _context.Set<SalesInvoice>().IgnoreQueryFilters().CountAsync(i => i.CustomerId == customerId);
+            var receipts = await _context.Set<CustomerReceipt>().IgnoreQueryFilters().CountAsync(r => r.CustomerId == customerId);
+
+            var blockers = new List<string>();
+            if (sales > 0) blockers.Add($"{sales} invoice(s)");
+            if (receipts > 0) blockers.Add($"{receipts} receipt(s)");
+
+            var reason = blockers.Count > 0 ? $"لا يمكن حذف العميل لأنه مرتبط ببيانات تشغيلية موجودة: {string.Join(", ", blockers)}." : null;
+            return (reason, sales, receipts);
         }
 
         [HttpGet]

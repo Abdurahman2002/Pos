@@ -42,7 +42,7 @@ namespace NewsApp2.Controllers
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
             var query = _context.Set<SalesInvoice>()
                 .AsNoTracking()
-                .Where(i => i.Status == null || (i.Status != "Cancelled" && i.Status != "Canceled"));
+                .Where(i => i.Status != "Cancelled");
 
             if (from.HasValue)
                 query = query.Where(i => i.InvoiceDate >= from.Value);
@@ -77,6 +77,7 @@ namespace NewsApp2.Controllers
             var lines = await _context.Set<SalesLine>()
                 .AsNoTracking()
                 .Where(l => l.SalesInvoiceId == id)
+                .IgnoreQueryFilters()
                 .Include(l => l.Item)
                 .OrderBy(l => l.LineOrder)
                 .ThenBy(l => l.Created)
@@ -662,6 +663,7 @@ namespace NewsApp2.Controllers
             var lines = await _context.Set<SalesLine>()
                 .AsNoTracking()
                 .Where(l => l.SalesInvoiceId == id)
+                .IgnoreQueryFilters()
                 .Include(l => l.Item)
                 .OrderBy(l => l.LineOrder)
                 .ThenBy(l => l.Created)
@@ -822,6 +824,40 @@ namespace NewsApp2.Controllers
                 new { Value = "Transfer", Text = "تحويل" },
                 new { Value = "Credit", Text = "آجل" }
             }, "Value", "Text", string.IsNullOrWhiteSpace(normalizedPayment) ? "All" : normalizedPayment);
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> TodayReport(DateOnly? date)
+        {
+            var reportDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var rows = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Where(i => i.InvoiceDate == reportDate)
+                .Where(i => i.Status != "Cancelled")
+                .OrderByDescending(i => i.Created)
+                .Select(i => new SalesDailyInvoiceRowVM
+                {
+                    InvoiceId = i.Id,
+                    Number = i.Number,
+                    InvoiceDate = i.InvoiceDate,
+                    CreatedAt = i.Created,
+                    CustomerName = i.Customer == null || i.Customer.Name == DailySalesCustomerName ? "-" : i.Customer.Name,
+                    Status = i.Status,
+                    PaymentMethod = ToArabicPaymentMethod(i.PaymentMethod),
+                    BankName = i.Bank != null ? i.Bank.Name : null,
+                    IsReturn = (i.Note != null && i.Note.Contains("[POS-RETURN]")) || i.TotalDinar < 0,
+                    TotalDinar = i.TotalDinar
+                })
+                .ToListAsync();
+
+            var vm = new SalesDailyInvoicesVM
+            {
+                ReportDate = reportDate,
+                Rows = rows
+            };
 
             return View(vm);
         }

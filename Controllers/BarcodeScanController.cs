@@ -87,6 +87,7 @@ namespace NewsApp2.Controllers
 
             var normalized = request.Code.Trim();
             var existing = await _context.Set<BarcodeMapping>()
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == parsedType.ToString());
 
             if (existing != null)
@@ -97,6 +98,15 @@ namespace NewsApp2.Controllers
                 }
 
                 return Json(new { success = true });
+            }
+
+            // Also check primary barcodes stored directly on Item
+            var usedAsPrimary = await _context.Set<Item>()
+                .IgnoreQueryFilters()
+                .AnyAsync(i => i.Barcode == normalized && i.Id != request.ItemId);
+            if (usedAsPrimary)
+            {
+                return Json(new { success = false, error = "الباركود مستخدم كباركود أساسي لصنف آخر." });
             }
 
             var mapping = new BarcodeMapping

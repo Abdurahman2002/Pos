@@ -42,12 +42,14 @@ else
                 <table class="table table-hover table-striped table-bordered align-middle mb-0">
                     <thead class="table-light text-secondary small text-uppercase">
                         <tr>
-                            <th style="width: 250px;">الصنف</th>
+                            <th style="width: 200px;">الصنف</th>
                             <th>التصنيف</th>
                             <th class="text-end">الرصيد الافتتاحي</th>
                             <th class="text-end text-success">الوارد / المشتريات</th>
                             <th class="text-end text-danger">المباع</th>
+                            <th class="text-end">قيمة المبيعات (د.ل)</th>
                             <th class="text-end text-warning">المرتجعات</th>
+                            <th class="text-end fw-bold text-dark">قيمة الرصيد الختامي (د.ل)</th>
                             <th class="text-end fw-bold text-dark">الرصيد הختامي</th>
                         </tr>
                     </thead>
@@ -76,7 +78,9 @@ else
                                 <td class="text-end fw-bold">@row.OpeningBalance.ToString("0.##")</td>
                                 <td class="text-end text-success fw-bold">@row.Received.ToString("0.##")</td>
                                 <td class="text-end text-danger fw-bold">@row.Sold.ToString("0.##")</td>
+                                <td class="text-end text-danger fw-bold">@row.SoldValueLyd.ToString("N2")</td>
                                 <td class="text-end text-warning fw-bold">@row.Returns.ToString("0.##")</td>
+                                <td class="text-end fw-bold">@row.ClosingValueLyd.ToString("N2")</td>
                                 <td class="text-end fw-bold fs-6 text-dark border-start">@row.ClosingBalance.ToString("0.##")</td>
                             </tr>
                         }
@@ -87,7 +91,9 @@ else
                             <td class="text-end fw-bold">@Model.TotalOpening.ToString("0.##")</td>
                             <td class="text-end text-success fw-bold">@Model.TotalReceived.ToString("0.##")</td>
                             <td class="text-end text-danger fw-bold">@Model.TotalSold.ToString("0.##")</td>
+                            <td class="text-end text-danger fw-bold">@Model.TotalSoldValue.ToString("N2")</td>
                             <td class="text-end text-warning fw-bold">@Model.TotalReturns.ToString("0.##")</td>
+                            <td class="text-end fw-bold">@Model.TotalClosingValue.ToString("N2")</td>
                             <td class="text-end fw-bold fs-6 border-start">@Model.TotalClosing.ToString("0.##")</td>
                         </tr>
                     </tfoot>

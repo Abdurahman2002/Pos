@@ -122,22 +122,35 @@ namespace NewsApp2.Models.Services
                     CurrencyCode = invoice.CurrencyCode,
                     ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
                 };
+                // compute and store unit cost in LYD for this purchase line
+                purchaseLine.UnitCostLyd = line.Qty > 0 ? RoundMoney(lineTotalDinar / line.Qty) : 0m;
                 _context.Set<PurchaseLine>().Add(purchaseLine);
 
                 var stock = await _context.Set<InvStockBalance>()
                     .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
 
+                var incomingUnitCost = purchaseLine.UnitCostLyd;
                 if (stock == null)
                 {
                     stock = new InvStockBalance
                     {
                         ItemId = line.ItemId,
-                        QuantityOnHand = line.Qty
+                        QuantityOnHand = line.Qty,
+                        AverageCostLyd = incomingUnitCost
                     };
                     _context.Set<InvStockBalance>().Add(stock);
                 }
                 else
                 {
+                    // recalc moving average
+                    var oldQty = stock.QuantityOnHand;
+                    var oldAvg = stock.AverageCostLyd;
+                    var newQty = oldQty + line.Qty;
+                    if (newQty > 0)
+                    {
+                        var newAvg = ((oldQty * oldAvg) + (line.Qty * incomingUnitCost)) / newQty;
+                        stock.AverageCostLyd = RoundMoney(newAvg);
+                    }
                     stock.QuantityOnHand += line.Qty;
                 }
 
@@ -151,6 +164,7 @@ namespace NewsApp2.Models.Services
                     BalanceAfter = stock.QuantityOnHand,
                     Note = invoice.Note
                 };
+                ledger.UnitCostLyd = incomingUnitCost;
                 _context.Set<InvStockLedger>().Add(ledger);
             }
 
@@ -193,6 +207,7 @@ namespace NewsApp2.Models.Services
         {
             var invoice = await _context.Set<PurchaseInvoice>()
                 .Include(i => i.Lines)
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(i => i.Id == invoiceId);
 
             if (invoice == null)
@@ -228,7 +243,22 @@ namespace NewsApp2.Models.Services
                         $"Cannot cancel purchase for {itemName}. Required {FormatQuantity(line.Qty)}, available {FormatQuantity(available)}.");
                 }
 
-                stock.QuantityOnHand -= line.Qty;
+                // adjust stock quantity and value using stored unit cost
+                var removedQty = line.Qty;
+                var removedValue = line.UnitCostLyd * removedQty;
+                var currentQty = stock.QuantityOnHand;
+                var currentValue = currentQty * stock.AverageCostLyd;
+                var newQty = currentQty - removedQty;
+                if (newQty > 0)
+                {
+                    var newAvg = (currentValue - removedValue) / newQty;
+                    stock.AverageCostLyd = RoundMoney(newAvg);
+                }
+                else
+                {
+                    stock.AverageCostLyd = 0m;
+                }
+                stock.QuantityOnHand = newQty;
 
                 _context.Set<InvStockLedger>().Add(new InvStockLedger
                 {
@@ -238,7 +268,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = -line.Qty,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Cancelled by {cancelledBy ?? "unknown"}"
+                    Note = $"Cancelled by {cancelledBy ?? "unknown"}",
+                    UnitCostLyd = line.UnitCostLyd
                 });
             }
 
@@ -401,8 +432,37 @@ namespace NewsApp2.Models.Services
                     continue;
 
                 var stock = stockByItem[itemId];
-                stock.QuantityOnHand += delta;
+                // compute old and new total values (Dinar) for the lines of this item
+                var oldLines = (invoice.Lines ?? new List<PurchaseLine>()).Where(l => l.ItemId == itemId).ToList();
+                var oldValue = oldLines.Sum(l => l.LineTotalDinar);
+                var newLines = lineList.Where(l => l.ItemId == itemId).ToList();
+                decimal newValue = 0m;
+                foreach (var nl in newLines)
+                {
+                    var lTotalEur = RoundMoney(nl.Qty * nl.UnitPriceEur);
+                    var lTotalDinar = RoundMoney(lTotalEur * rate);
+                    newValue += lTotalDinar;
+                }
 
+                var deltaValue = newValue - oldValue; // positive for net added value, negative for net removed value
+
+                var currentQty = stock.QuantityOnHand;
+                var currentValue = currentQty * stock.AverageCostLyd;
+                var newStockQty = currentQty + delta;
+                if (newStockQty > 0)
+                {
+                    var newAvg = (currentValue + deltaValue) / newStockQty;
+                    stock.AverageCostLyd = RoundMoney(newAvg);
+                }
+                else
+                {
+                    stock.AverageCostLyd = 0m;
+                }
+
+                stock.QuantityOnHand = newStockQty;
+
+                // record a ledger with an approximate unit cost for this net change
+                var unitCostForLedger = delta != 0 ? RoundMoney(deltaValue / delta) : 0m;
                 _context.Set<InvStockLedger>().Add(new InvStockLedger
                 {
                     ItemId = itemId,
@@ -411,7 +471,8 @@ namespace NewsApp2.Models.Services
                     ReferenceId = invoice.Id,
                     QuantityChange = delta,
                     BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Edited by {editedBy ?? "unknown"}"
+                    Note = $"Edited by {editedBy ?? "unknown"}",
+                    UnitCostLyd = unitCostForLedger
                 });
             }
 
@@ -429,6 +490,7 @@ namespace NewsApp2.Models.Services
                 totalEur += lineTotalEur;
                 totalDinar += lineTotalDinar;
 
+                var unitCostLyd = line.Qty > 0 ? RoundMoney(lineTotalDinar / line.Qty) : 0m;
                 _context.Set<PurchaseLine>().Add(new PurchaseLine
                 {
                     PurchaseInvoiceId = invoice.Id,
@@ -438,6 +500,7 @@ namespace NewsApp2.Models.Services
                     UnitPriceEur = line.UnitPriceEur,
                     LineTotalEur = lineTotalEur,
                     LineTotalDinar = lineTotalDinar,
+                    UnitCostLyd = unitCostLyd,
                     CurrencyCode = invoice.CurrencyCode,
                     ExchangeRateSnapshot = rate
                 });

@@ -11,6 +11,7 @@
         <form method="get" asp-action="PrintLabel" class="card">
             <div class="card-body">
                 <input type="hidden" name="id" value="@Model.ItemId" />
+                @Html.AntiForgeryToken()
 
                 <div class="mb-3">
                     <label class="form-label">@L["Item"]</label>
@@ -44,8 +45,7 @@
                     <input id="copies" name="copies" class="form-control" type="number" step="1" min="1" max="200" value="@Model.Copies" />
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100">@L["Refresh Preview"]</button>
-                <button type="button" class="btn btn-success w-100 mt-2" id="print-label-btn">@L["Print"]</button>
+                <button type="button" class="btn btn-success w-100" id="print-label-btn">@L["Print"]</button>
             </div>
         </form>
     </div>
@@ -53,7 +53,7 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-body">
-                <div class="small text-muted mb-2">@L["Preview uses a common thermal-label size (50mm x 30mm)."]</div>
+                <div class="small text-muted mb-2">@L["Preview uses the 38mm x 25mm label size."]</div>
                 <div id="labels-wrapper" class="d-flex flex-wrap gap-2"></div>
             </div>
         </div>
@@ -62,68 +62,95 @@
 
 <p class="mt-3">
     <a asp-action="Details" asp-route-id="@Model.ItemId" class="btn btn-secondary">@L["Back To Item"]</a>
+    <a asp-action="Create" asp-controller="Items" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> إضافة صنف جديد
+    </a>
 </p>
 
 <style>
+    @@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;900&display=swap');
+
+    @@page {
+        size: 38mm 25mm;
+        margin: 0;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Cairo', Tahoma, Arial, sans-serif;
+    }
+
     .item-label {
-        width: 189px;
-        height: 113px;
-        border: 1px dashed #999;
+        width: 38mm;
+        height: 25mm;
+        border: 1px dashed #ccc;
         background: #fff;
-        padding: 5px 6px;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        overflow: hidden;
-    }
-
-    .item-label-shop {
-        display: flex;
         align-items: center;
-        gap: 6px;
-        min-height: 18px;
-    }
-
-    .item-label-shop img {
-        width: 18px;
-        height: 18px;
-        object-fit: contain;
+        justify-content: center;
+        padding: 1mm 1.5mm;
+        gap: 0.3mm;
+        overflow: hidden;
     }
 
     .item-label-shop-name {
-        font-size: 10px;
-        font-weight: 700;
+        font-size: 7px;
+        font-weight: 600;
         line-height: 1;
+        text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        width: 100%;
+        unicode-bidi: isolate;
     }
 
     .item-label-name {
         font-size: 11px;
-        font-weight: 700;
-        line-height: 1.2;
-        height: 26px;
-        overflow: hidden;
-    }
-
-    .item-label-price {
-        font-size: 11px;
-        font-weight: 700;
-        text-align: right;
-        line-height: 1;
-    }
-
-    .item-label-code {
-        font-size: 9px;
+        font-weight: 900;
+        line-height: 1.15;
         text-align: center;
-        margin-top: 1px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        width: 100%;
+        unicode-bidi: isolate;
+    }
+
+    .barcode-svg {
+        width: 100%;
+        height: 9mm;
+        display: block;
+        flex-shrink: 0;
+    }
+
+    .item-label-code {
+        font-size: 7px;
+        font-family: 'Courier New', 'Lucida Console', monospace;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-align: center;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .item-label-price {
+        font-size: 9px;
+        font-weight: 900;
+        text-align: center;
+        line-height: 1;
+        white-space: nowrap;
     }
 
     @@media print {
+        @@page {
+            size: 38mm 25mm;
+            margin: 0;
+        }
+
         body * {
             visibility: hidden;
         }
@@ -137,19 +164,26 @@
             position: absolute;
             left: 0;
             top: 0;
-            gap: 0;
+            margin: 0;
+            padding: 0;
         }
 
         .item-label {
-            border: 0;
+            border: none;
             margin: 0;
-            page-break-inside: avoid;
+            page-break-after: always;
+            break-after: page;
+        }
+
+        .item-label:last-child {
+            page-break-after: avoid;
+            break-after: avoid;
         }
     }
 </style>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         (function () {
             var labelsWrapper = document.getElementById('labels-wrapper');
@@ -162,6 +196,25 @@
                 return;
             }
 
+            var savePriceEndpoint = '@Url.Action("SaveItemPrice", "Items")';
+            var itemId = '@Model.ItemId';
+
+            function saveCurrentPrice() {
+                var price = (priceInput.value || '').trim();
+                var token = getAntiForgeryToken();
+                var payload = new URLSearchParams();
+                payload.append('itemId', itemId);
+                payload.append('price', price);
+                return fetch(savePriceEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'RequestVerificationToken': token
+                    },
+                    body: payload.toString()
+                }).catch(function () { });
+            }
+
             function htmlEncode(value) {
                 return (value || '')
                     .replace(/&/g, '&amp;')
@@ -171,54 +224,48 @@
                     .replace(/'/g, '&#39;');
             }
 
+            function getAntiForgeryToken() {
+                var tokenField = document.querySelector('input[name="__RequestVerificationToken"]');
+                return tokenField ? tokenField.value : '';
+            }
+
             function renderLabels() {
                 var code = (codeInput.value || '').trim();
                 var copies = parseInt(copiesInput.value || '1', 10);
                 var price = (priceInput.value || '').trim();
 
-                if (!Number.isFinite(copies) || copies < 1) {
-                    copies = 1;
-                    copiesInput.value = '1';
-                }
-
-                if (copies > 200) {
-                    copies = 200;
-                    copiesInput.value = '200';
-                }
+                if (!Number.isFinite(copies) || copies < 1) { copies = 1; copiesInput.value = '1'; }
+                if (copies > 200) { copies = 200; copiesInput.value = '200'; }
 
                 labelsWrapper.innerHTML = '';
-                if (!code) {
-                    return;
-                }
+                if (!code) return;
 
                 var shopLogo = '@(Model.ShopLogoUrl ?? string.Empty)';
-                var shopName = htmlEncode('@(Model.ShopName ?? L["Shop"].Value)');
-                var itemName = htmlEncode('@Model.ItemName');
-                var priceText = price ? ('@L["Price"]: ' + htmlEncode(price)) : '';
+                var shopName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ShopName ?? L["Shop"].Value));
+                var itemName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ItemName));
+                var priceLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L["Price"].Value));
+                var priceText = price ? (priceLabel + ': ' + htmlEncode(price)) : '';
 
                 for (var i = 0; i < copies; i++) {
                     var label = document.createElement('div');
                     label.className = 'item-label';
                     label.innerHTML =
-                        '<div class="item-label-shop">' +
-                            (shopLogo ? ('<img src="' + shopLogo + '" alt="logo" />') : '') +
-                            '<div class="item-label-shop-name">' + shopName + '</div>' +
-                        '</div>' +
-                        '<div class="item-label-name">' + itemName + '</div>' +
+                        '<div class="item-label-shop-name" dir="auto">' + shopName + '</div>' +
+                        '<div class="item-label-name" dir="auto">' + itemName + '</div>' +
                         '<svg class="barcode-svg"></svg>' +
                         '<div class="item-label-code">' + htmlEncode(code) + '</div>' +
-                        '<div class="item-label-price">' + priceText + '</div>';
+                        (priceText ? '<div class="item-label-price">' + priceText + '</div>' : '');
 
                     labelsWrapper.appendChild(label);
 
                     var svg = label.querySelector('.barcode-svg');
                     JsBarcode(svg, code, {
                         format: 'CODE128',
-                        lineColor: '#111',
-                        width: 1.4,
-                        height: 28,
+                        lineColor: '#000',
+                        width: 1.8,
+                        height: 38,
                         displayValue: false,
-                        margin: 0
+                        margin: 3
                     });
                 }
             }
@@ -227,9 +274,49 @@
             copiesInput.addEventListener('input', renderLabels);
             priceInput.addEventListener('input', renderLabels);
 
+            function buildPrintHtml() {
+                var labelsHtml = labelsWrapper.innerHTML;
+                return '<!DOCTYPE html><html dir="rtl" lang="ar">'
+                    + '<head><meta charset="utf-8">'
+                    + '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;900&display=swap" rel="stylesheet">'
+                    + '<style>'
+                    + '@@page { size: 38mm 25mm; margin: 0; }'
+                    + 'html, body { margin: 0; padding: 0; width: 38mm; background: #fff; font-family: \'Cairo\', Tahoma, Arial, sans-serif; }'
+                    + '.item-label { width: 38mm; height: 25mm; background: #fff; box-sizing: border-box;'
+                    + '  display: flex; flex-direction: column; align-items: center; justify-content: center;'
+                    + '  padding: 1mm 1.5mm; gap: 0.3mm; overflow: hidden; }'
+                    + '.item-label:not(:last-child) { page-break-after: always; break-after: page; }'
+                    + '.item-label-shop-name { font-size: 7px; font-weight: 600; line-height: 1; text-align: center;'
+                    + '  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; unicode-bidi: isolate; }'
+                    + '.item-label-name { font-size: 11px; font-weight: 900; line-height: 1.15; text-align: center;'
+                    + '  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; unicode-bidi: isolate; }'
+                    + '.barcode-svg { width: 100%; height: 9mm; display: block; flex-shrink: 0; }'
+                    + '.item-label-code { font-size: 7px; font-family: \'Courier New\', monospace;'
+                    + '  font-weight: 700; letter-spacing: 1.5px; text-align: center; line-height: 1; white-space: nowrap; }'
+                    + '.item-label-price { font-size: 9px; font-weight: 900; text-align: center; line-height: 1; white-space: nowrap; }'
+                    + '</style></head>'
+                    + '<body>' + labelsHtml + '</body></html>';
+            }
+
             if (printBtn) {
                 printBtn.addEventListener('click', function () {
-                    window.print();
+                    if (!labelsWrapper.children.length) renderLabels();
+                    if (!labelsWrapper.children.length) {
+                        alert('الرجاء اختيار باركود أولاً.');
+                        return;
+                    }
+
+                    saveCurrentPrice();
+
+                    var win = window.open('', '_blank', 'width=700,height=500');
+                    if (!win) {
+                        alert('يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم حاول مرة أخرى.');
+                        return;
+                    }
+                    win.document.write(buildPrintHtml());
+                    win.document.close();
+                    win.focus();
+                    setTimeout(function () { win.print(); win.close(); }, 800);
                 });
             }
 

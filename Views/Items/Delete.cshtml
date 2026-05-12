@@ -6,6 +6,13 @@
 <div class="alert alert-warning">
     @L["Are you sure you want to delete this item?"]
 </div>
+
+@if (ViewBag.DeleteBlockedReason != null)
+{
+    <div class="alert alert-danger">
+        @ViewBag.DeleteBlockedReason
+    </div>
+}
 <dl class="row">
     <dt class="col-sm-2">@L["Name"]</dt>
     <dd class="col-sm-10">@Model.Name</dd>
@@ -14,7 +21,7 @@
 </dl>
 <form asp-action="Delete" method="post">
     <input type="hidden" asp-for="Id" />
-    <button type="submit" class="btn btn-danger">@L["Delete"]</button>
+    <button type="submit" class="btn btn-danger" @(ViewBag.CanDelete == false ? "disabled" : "")>@L["Delete"]</button>
     <a asp-action="Index" class="btn btn-secondary">@L["Cancel"]</a>
 </form>
 

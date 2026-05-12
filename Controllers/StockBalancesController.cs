@@ -6,6 +6,7 @@ using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
 using NewsApp2.Models.Interfaces;
+using NewsApp2.Models.Services;
 using NewsApp2.ViewModels.Inventory;
 
 namespace NewsApp2.Controllers
@@ -19,17 +20,20 @@ namespace NewsApp2.Controllers
         private readonly IUnitOfWork<Category> _categories;
         private readonly IUnitOfWork<Item> _items;
         private readonly AppDbContext _context;
+        private readonly InventoryService _inventoryService;
 
         public StockBalancesController(
             IUnitOfWork<InvStockBalance> balances,
             IUnitOfWork<Category> categories,
             IUnitOfWork<Item> items,
-            AppDbContext context)
+            AppDbContext context,
+            InventoryService inventoryService)
         {
             _balances = balances;
             _categories = categories;
             _items = items;
             _context = context;
+            _inventoryService = inventoryService;
         }
 
         [HttpGet]
@@ -186,6 +190,7 @@ namespace NewsApp2.Controllers
                     l.ReferenceType,
                     l.ReferenceId,
                     l.QuantityChange,
+                    l.UnitCostLyd,
                     l.Created
                 })
                 .ToListAsync();
@@ -206,6 +211,15 @@ namespace NewsApp2.Controllers
             var resultList = new List<NewsApp2.ViewModels.Inventory.DailyInventoryRowVM>();
             var items = await itemsQuery.ToListAsync();
 
+            // preload stock balances and sales lines for value calculations
+            var stockByItem = await _context.Set<InvStockBalance>().AsNoTracking().ToDictionaryAsync(s => s.ItemId, s => s);
+            var itemIds = items.Select(i => i.Id).ToList();
+            var salesLines = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => itemIds.Contains(l.ItemId))
+                .Select(l => new { l.ItemId, l.SalesInvoiceId, l.LineCostDinar, l.Qty })
+                .ToListAsync();
+
             foreach(var item in items)
             {
                 var opening = openingBalances.GetValueOrDefault(item.Id, 0m);
@@ -221,8 +235,19 @@ namespace NewsApp2.Controllers
                 
                 var closing = opening + purchases + sales + returns + other;
 
+                var closingValue = allLedgers
+                    .Where(l => l.ItemId == item.Id && ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap) <= targetDate)
+                    .Sum(l => l.QuantityChange * l.UnitCostLyd);
+
                 if (opening == 0 && closing == 0 && received == 0 && sold == 0 && returns == 0)
                     continue;
+
+                // compute sold value for the date (sum COGS for sales lines on this business date)
+                var soldValue = salesLines
+                    .Where(sl => sl.ItemId == item.Id
+                        && ResolveBusinessDate("SalesInvoice", sl.SalesInvoiceId, DateTime.UtcNow, businessDateMap) == targetDate
+                        && sl.Qty > 0)
+                    .Sum(sl => sl.LineCostDinar);
 
                 resultList.Add(new NewsApp2.ViewModels.Inventory.DailyInventoryRowVM
                 {
@@ -234,7 +259,9 @@ namespace NewsApp2.Controllers
                     Received = received,
                     Sold = sold,
                     Returns = returns,
-                    ClosingBalance = closing
+                    ClosingBalance = closing,
+                    SoldValueLyd = soldValue,
+                    ClosingValueLyd = closingValue
                 });
             }
 
@@ -245,6 +272,42 @@ namespace NewsApp2.Controllers
             };
 
             return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ItemCard(Guid? id, DateOnly? from, DateOnly? to)
+        {
+            if (User.IsInRole("Cashier"))
+                return Forbid();
+
+            var selectedItemId = id ?? Guid.Empty;
+            if (selectedItemId == Guid.Empty)
+            {
+                var items = await _items.Repository.GetAll()
+                    .AsNoTracking()
+                    .OrderBy(i => i.Name)
+                    .ToListAsync();
+
+                ViewBag.Items = new SelectList(items, "Id", "Name");
+                ViewBag.OpeningQty = 0m;
+                ViewBag.ClosingQty = 0m;
+                ViewBag.ClosingValue = 0m;
+                ViewData["ItemId"] = Guid.Empty;
+                return View(new List<ItemCardRowVM>());
+            }
+
+            DateTime? fromDt = from.HasValue ? from.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null;
+            DateTime? toDt = to.HasValue ? to.Value.ToDateTime(TimeOnly.MaxValue) : (DateTime?)null;
+
+            var (rows, openingQty, closingQty, closingValue) = await _inventoryService.GetItemCardAsync(selectedItemId, fromDt, toDt);
+
+            ViewBag.OpeningQty = openingQty;
+            ViewBag.ClosingQty = closingQty;
+            ViewBag.ClosingValue = closingValue;
+
+            ViewData["ItemId"] = selectedItemId;
+
+            return View(rows);
         }
 
         private static string BuildBusinessDateKey(string referenceType, Guid referenceId)

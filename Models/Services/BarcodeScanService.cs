@@ -20,20 +20,30 @@ namespace NewsApp2.Models.Services
                 return BarcodeResolveResult.CreateFailure("Barcode is empty.");
             }
 
-            var lookupType = BarcodeCodeType.Raw;
-            var lookupCode = normalized;
-
-            var mapping = await _context.Set<BarcodeMapping>()
+            // Try Raw type first (most common — internal + manually entered barcodes)
+            var rawMapping = await _context.Set<BarcodeMapping>()
                 .AsNoTracking()
                 .Include(m => m.Item)
-                .FirstOrDefaultAsync(m => m.Code == lookupCode && m.CodeType == lookupType.ToString());
+                .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Raw.ToString());
 
-            if (mapping == null)
+            if (rawMapping != null)
             {
-                return BarcodeResolveResult.CreateRequiresMapping(normalized, lookupType, new BarcodeParseResult { Raw = normalized });
+                return BarcodeResolveResult.CreateSuccess(rawMapping, new BarcodeParseResult { Raw = normalized });
             }
 
-            return BarcodeResolveResult.CreateSuccess(mapping, new BarcodeParseResult { Raw = normalized });
+            // Fallback: try GTIN type (GS1/retail barcodes mapped via scan-and-map flow)
+            var gtinMapping = await _context.Set<BarcodeMapping>()
+                .AsNoTracking()
+                .Include(m => m.Item)
+                .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Gtin.ToString());
+
+            if (gtinMapping != null)
+            {
+                return BarcodeResolveResult.CreateSuccess(gtinMapping, new BarcodeParseResult { Raw = normalized, Gtin = normalized });
+            }
+
+            // Not found in any mapping — prompt user to map it
+            return BarcodeResolveResult.CreateRequiresMapping(normalized, BarcodeCodeType.Raw, new BarcodeParseResult { Raw = normalized });
         }
 
         private static string NormalizeCode(string raw)

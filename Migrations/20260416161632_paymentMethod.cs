@@ -66,10 +66,6 @@ BEGIN
     VALUES ('7e2efb6c-0cb2-430f-92af-6e0ad720f105', '2026-01-01T00:00:00.0000000', NULL, N'مبيعات يومية', N'عميل افتراضي لمبيعات الكاش اليومية', NULL);
 END
 
-UPDATE [dbo].[InventorySettings]
-SET [MaxCashierDiscountPercent] = 10.0
-WHERE [Id] = 'd8ec402f-4f11-4f5e-97ed-c9dc2a58a232';
-
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
@@ -98,6 +94,12 @@ BEGIN
         FOREIGN KEY ([PosShiftId]) REFERENCES [dbo].[PosShifts]([Id])
         ON DELETE SET NULL;
 END
+");
+
+            migrationBuilder.Sql(@"
+UPDATE [dbo].[InventorySettings]
+SET [MaxCashierDiscountPercent] = 10.0
+WHERE [Id] = 'd8ec402f-4f11-4f5e-97ed-c9dc2a58a232';
 ");
         }
 

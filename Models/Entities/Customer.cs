@@ -15,5 +15,7 @@ namespace NewsApp2.Models.Entities
         public string? Note { get; set; }
 
         public ICollection<SalesInvoice>? SalesInvoices { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }

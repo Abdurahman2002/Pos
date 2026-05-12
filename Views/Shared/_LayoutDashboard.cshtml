@@ -142,20 +142,44 @@
                         <span class="nav-link disabled text-uppercase small fw-bold text-muted">إدارة المبيعات</span>
                     </li>
                     <li class="nav-item">
-                        <a href="@Url.Action("Create", "SalesInvoices")" class="nav-link ajax-link">
+                        <a class="nav-link" data-bs-toggle="collapse" href="#salesMenu" aria-expanded="false" aria-controls="salesMenu">
                             <span class="icon-bg"><i class="mdi mdi-cash-register menu-icon"></i></span>
-                            <span class="menu-title">نقطة البيع (POS)</span>
+                            <span class="menu-title">إدارة البيع</span>
+                            <i class="menu-arrow"></i>
                         </a>
+                        <div class="collapse" id="salesMenu">
+                            <ul class="nav flex-column sub-menu">
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Create", "SalesInvoices")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-point-of-sale"></i> نقطة البيع (POS)
+                                    </a>
+                                </li>
+                                @if (!User.IsInRole("Cashier"))
+                                {
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("Index", "SalesInvoices")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-file-document-multiple"></i> فواتير البيع
+                                        </a>
+                                    </li>
+                                }
+                                <li class="nav-item">
+                                    <a href="@Url.Action("TodayReport", "SalesInvoices")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-calendar-today"></i> تقرير فواتير اليوم
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Report", "SalesInvoices")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-chart-bar"></i> تقرير المبيعات
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Drafts", "SalesInvoices")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-content-save-edit"></i> الفواتير المعلقة
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </li>
-                    @if (!User.IsInRole("Cashier"))
-                    {
-                        <li class="nav-item">
-                        <a href="@Url.Action("Index", "SalesInvoices")" class="nav-link ajax-link">
-                            <span class="icon-bg"><i class="mdi mdi-cart menu-icon"></i></span>
-                            <span class="menu-title">@L["Sales"]</span>
-                        </a>
-                    </li>
-                    }
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="collapse" href="#customersMenu" aria-expanded="false" aria-controls="customersMenu">
                             <span class="icon-bg"><i class="mdi mdi-account-group menu-icon"></i></span>
@@ -223,6 +247,11 @@
                                     <li class="nav-item">
                                         <a href="@Url.Action("DailyInventory", "StockBalances")" class="nav-link ajax-link">
                                             <i class="mdi mdi-calendar-check"></i> تقرير الجرد اليومي
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="@Url.Action("ItemCard", "StockBalances")" class="nav-link ajax-link">
+                                            <i class="mdi mdi-clipboard-text-outline"></i> بطاقة الصنف
                                         </a>
                                     </li>
                                 }

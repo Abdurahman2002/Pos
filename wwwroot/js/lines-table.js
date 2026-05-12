@@ -756,7 +756,7 @@
             calculateTotals();
             playTone('success');
             showLastAdded(itemName, qtyAdded);
-            clearAndRefocusBarcodeInput();
+            setTimeout(function () { clearAndRefocusBarcodeInput(); }, 50);
         }
 
         async function resolveBarcode(code) {

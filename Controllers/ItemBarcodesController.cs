@@ -80,6 +80,16 @@ namespace NewsApp2.Controllers
                 return Json(new { success = false, error = "الباركود يتبع صنفا آخر بالفعل." });
             }
 
+            // Also check if any other item uses this as its primary barcode
+            var usedByAnotherItemPrimary = await _context.Set<Item>()
+                .IgnoreQueryFilters()
+                .AnyAsync(i => i.Barcode == code && i.Id != id);
+            if (usedByAnotherItemPrimary)
+            {
+                Response.StatusCode = StatusCodes.Status400BadRequest;
+                return Json(new { success = false, error = "الباركود مستخدم كباركود أساسي لصنف آخر." });
+            }
+
             var existsOnSameItem = await _context.Set<BarcodeMapping>()
                 .AnyAsync(m => m.Code == code && m.CodeType == rawType && m.ItemId == id);
             if (existsOnSameItem)

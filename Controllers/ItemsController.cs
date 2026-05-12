@@ -20,15 +20,18 @@ namespace NewsApp2.Controllers
         private readonly IUnitOfWork<Item> _items;
         private readonly IUnitOfWork<Category> _categories;
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
         public ItemsController(
             IUnitOfWork<Item> items,
             IUnitOfWork<Category> categories,
-            AppDbContext context)
+            AppDbContext context,
+            IConfiguration configuration)
         {
             _items = items;
             _categories = categories;
             _context = context;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -40,7 +43,7 @@ namespace NewsApp2.Controllers
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();
-                query = query.Where(i => i.Name.Contains(term));
+                query = query.Where(i => i.Name.Contains(term) || (i.Barcode != null && i.Barcode.Contains(term)));
             }
 
             if (categoryId.HasValue && categoryId != Guid.Empty)
@@ -157,7 +160,7 @@ namespace NewsApp2.Controllers
             if (Url.IsLocalUrl(returnUrl))
                 return Redirect(returnUrl);
 
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(PrintLabel), new { id = item.Id });
         }
 
         [HttpGet]
@@ -198,7 +201,7 @@ namespace NewsApp2.Controllers
                 CategoryName = item.Category?.Name,
                 SelectedCode = selectedCode,
                 AvailableCodes = codes.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-                Price = price,
+                Price = price ?? item.DefaultSalePriceLyd,
                 Copies = Math.Clamp(copies, 1, 200),
                 ShopName = siteInfo?.Name,
                 ShopLogoUrl = siteInfo?.LogoUrl
@@ -284,6 +287,7 @@ namespace NewsApp2.Controllers
                 existingItem.CategoryId = item.CategoryId;
                 existingItem.ReorderLevel = item.ReorderLevel;
                 existingItem.Barcode = item.Barcode;
+                existingItem.DefaultSalePriceLyd = item.DefaultSalePriceLyd;
 
                 _items.Repository.Update(existingItem);
                 await _items.SaveAsync();
@@ -314,6 +318,10 @@ namespace NewsApp2.Controllers
             if (item == null)
                 return View("NotFound");
 
+            var usage = await GetItemUsageAsync(item.Id);
+            ViewBag.DeleteBlockedReason = usage.BlockedReason;
+            ViewBag.CanDelete = string.IsNullOrWhiteSpace(usage.BlockedReason);
+
             return View(item);
         }
 
@@ -324,6 +332,15 @@ namespace NewsApp2.Controllers
             var item = await _context.Set<Item>().FirstOrDefaultAsync(i => i.Id == id);
             if (item == null)
                 return View("NotFound");
+
+            var usage = await GetItemUsageAsync(item.Id);
+            if (!string.IsNullOrWhiteSpace(usage.BlockedReason))
+            {
+                item.Category = await _context.Set<Category>().IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == item.CategoryId);
+                ViewBag.DeleteBlockedReason = usage.BlockedReason;
+                ViewBag.CanDelete = false;
+                return View("Delete", item);
+            }
 
             try
             {
@@ -392,8 +409,122 @@ namespace NewsApp2.Controllers
             await _context.SaveChangesAsync();
         }
 
-        private async Task<string> GenerateInternalBarcodeAsync(Guid categoryId)
+        private async Task<(string? BlockedReason, int PurchaseLines, int SalesLines, int StockBalances, int StockLedgers, int BarcodeMappings)> GetItemUsageAsync(Guid itemId)
         {
+            var purchaseLines = await _context.Set<PurchaseLine>().IgnoreQueryFilters().CountAsync(l => l.ItemId == itemId);
+            var salesLines = await _context.Set<SalesLine>().IgnoreQueryFilters().CountAsync(l => l.ItemId == itemId);
+            var stockBalances = await _context.Set<InvStockBalance>().IgnoreQueryFilters().CountAsync(l => l.ItemId == itemId);
+            var stockLedgers = await _context.Set<InvStockLedger>().IgnoreQueryFilters().CountAsync(l => l.ItemId == itemId);
+            var barcodeMappings = await _context.Set<BarcodeMapping>().IgnoreQueryFilters().CountAsync(m => m.ItemId == itemId);
+
+            var blockers = new List<string>();
+            if (purchaseLines > 0) blockers.Add($"{purchaseLines} purchase line(s)");
+            if (salesLines > 0) blockers.Add($"{salesLines} sales line(s)");
+            if (stockBalances > 0) blockers.Add($"{stockBalances} stock balance record(s)");
+            if (stockLedgers > 0) blockers.Add($"{stockLedgers} stock ledger entry(ies)");
+            if (barcodeMappings > 0) blockers.Add($"{barcodeMappings} barcode mapping(s)");
+
+            var reason = blockers.Count > 0
+                ? $"لا يمكن حذف الصنف لأنه مرتبط ببيانات تشغيلية موجودة: {string.Join(", ", blockers)}. يمكن فقط تعطيله منطقيًا بدون حذف فعلي."
+                : null;
+
+            return (reason, purchaseLines, salesLines, stockBalances, stockLedgers, barcodeMappings);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveItemPrice(Guid itemId, decimal? price)
+        {
+            if (itemId == Guid.Empty)
+                return BadRequest(new { message = "معرّف الصنف غير صالح." });
+
+            var item = await _context.Set<Item>().FirstOrDefaultAsync(i => i.Id == itemId);
+            if (item == null)
+                return NotFound(new { message = "الصنف غير موجود." });
+
+            if (price.HasValue && price.Value >= 0)
+            {
+                item.DefaultSalePriceLyd = price.Value > 0 ? price.Value : (decimal?)null;
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "تم حفظ السعر." });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        public async Task<IActionResult> PrintLabelRaw(Guid itemId, string code, string? price, int copies = 1)
+        {
+            if (itemId == Guid.Empty)
+                return BadRequest(new { message = "معرّف الصنف غير صالح." });
+
+            if (string.IsNullOrWhiteSpace(code))
+                return BadRequest(new { message = "الباركود مطلوب." });
+
+            copies = Math.Clamp(copies, 1, 200);
+
+            var item = await _context.Set<Item>()
+                .Where(i => i.Id == itemId)
+                .Select(i => new { i.Name })
+                .FirstOrDefaultAsync();
+
+            if (item == null)
+                return NotFound(new { message = "الصنف غير موجود." });
+
+            // Save sell price to item if provided
+            if (decimal.TryParse(price, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedPrice) && parsedPrice > 0)
+            {
+                var itemToUpdate = await _context.Set<Item>().FindAsync(itemId);
+                if (itemToUpdate != null)
+                {
+                    itemToUpdate.DefaultSalePriceLyd = parsedPrice;
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            var siteInfo = await _context.Set<SiteInfo>()
+                .AsNoTracking()
+                .OrderByDescending(s => s.Created)
+                .Select(s => new { s.Name })
+                .FirstOrDefaultAsync();
+
+            var printing = _configuration.GetSection("Printing");
+            var printerName = printing["LabelPrinterName"] ?? string.Empty;
+            var widthMm    = printing.GetValue<int>("LabelWidthMm",  38);
+            var heightMm   = printing.GetValue<int>("LabelHeightMm", 25);
+            var gapMm      = printing.GetValue<int>("LabelGapMm",     2);
+            var speed      = printing.GetValue<int>("LabelSpeed",      4);
+            var density    = printing.GetValue<int>("LabelDensity",   10);
+
+            var shopName  = siteInfo?.Name ?? string.Empty;
+            var priceText = string.IsNullOrWhiteSpace(price) ? string.Empty : price.Trim();
+
+            byte[] labelBytes;
+            try
+            {
+                var builder = new NewsApp2.Classes.Helpers.TsplLabelBuilder(
+                    dpi: 203,
+                    labelWidthMm:  widthMm,
+                    labelHeightMm: heightMm,
+                    labelGapMm:    gapMm,
+                    speed:         speed,
+                    density:       density);
+
+                labelBytes = builder.BuildLabel(item.Name, code, priceText, shopName, null, priceLabel: "السعر", copies: copies);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"فشل بناء الطباعة: {ex.Message}" });
+            }
+
+            if (!NewsApp2.Classes.Helpers.RawPrinterHelper.SendBytesToPrinter(printerName, labelBytes, out var printError))
+                return StatusCode(500, new { message = $"فشل إرسال مهمة الطباعة: {printError}" });
+
+            return Ok(new { message = "تم إرسال مهمة الطباعة بنجاح." });
+        }
+
+        private async Task<string> GenerateInternalBarcodeAsync(Guid categoryId)        {
             var categoryName = await _categories.Repository.GetAll()
                 .Where(c => c.Id == categoryId)
                 .Select(c => c.Name)
@@ -401,8 +532,8 @@ namespace NewsApp2.Controllers
 
             var normalized = categoryName.ToLowerInvariant();
             var prefix = normalized.Contains("شنط") || normalized.Contains("bag")
-                ? "BAG"
-                : "ACC";
+                ? "20"
+                : "30";
 
             var dayStamp = DateTime.UtcNow.ToString("yyMMdd");
 

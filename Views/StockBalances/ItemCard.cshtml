@@ -1,0 +1,130 @@
+@model List<NewsApp2.ViewModels.Inventory.ItemCardRowVM>
+@{
+    ViewData["Title"] = "بطاقة الصنف";
+    var itemId = ViewData["ItemId"] as Guid? ?? Guid.Empty;
+    var openingQty = ViewBag.OpeningQty as decimal? ?? 0m;
+    var closingQty = ViewBag.ClosingQty as decimal? ?? 0m;
+    var closingValue = ViewBag.ClosingValue as decimal? ?? 0m;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 text-gray-800"><i class="mdi mdi-card-text-outline text-primary me-2"></i> بطاقة الصنف</h2>
+    <div>
+        <a class="btn btn-outline-secondary" href="/StockBalances/Index"><i class="mdi mdi-arrow-left me-1"></i> رجوع</a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 search-form-card">
+    <div class="card-body">
+        <form asp-action="ItemCard" method="get" class="row g-3 align-items-end">
+            <input type="hidden" name="id" value="@itemId" />
+            @if (itemId == Guid.Empty)
+            {
+                <div class="col-md-6">
+                    <label class="form-label small text-muted">الصنف</label>
+                    <select name="id" class="form-select" asp-items="@(ViewBag.Items as SelectList)">
+                        <option value="">اختر الصنف...</option>
+                    </select>
+                </div>
+            }
+            <div class="col-md-3">
+                <label class="form-label small text-muted">من تاريخ</label>
+                <input type="text" name="from" class="form-control" placeholder="dd/MM/yyyy" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted">الى تاريخ</label>
+                <input type="text" name="to" class="form-control" placeholder="dd/MM/yyyy" />
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">عرض</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (itemId == Guid.Empty)
+{
+    <div class="alert alert-info">اختر صنفًا لعرض بطاقة الصنف.</div>
+}
+else if (!Model.Any())
+{
+    <div class="alert alert-info">لا توجد حركات لهذا الصنف ضمن النطاق.</div>
+}
+else
+{
+    <div class="card shadow-sm print-area">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle mb-0 small">
+                    <thead class="table-light text-uppercase text-secondary">
+                        <tr>
+                            <th style="width:160px;">التاريخ</th>
+                            <th>نوع الحركة</th>
+                            <th>المرجع</th>
+                            <th class="text-end">وارد</th>
+                            <th class="text-end">منصرف</th>
+                            <th class="text-end">سعر الوحدة (د.ل)</th>
+                            <th class="text-end">قيمة السطر (د.ل)</th>
+                            <th class="text-end">الرصيد الجاري</th>
+                            <th class="text-end">متوسط التكلفة</th>
+                            <th class="text-end">قيمة الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach(var r in Model)
+                        {
+                            var rowClass = r.TransactionType == "Purchase" ? "table-success" : r.TransactionType == "Sale" ? "table-danger" : "";
+                            var referenceUrl = r.ReferenceType.Contains("Purchase", StringComparison.OrdinalIgnoreCase)
+                                ? Url.Action("Details", "PurchaseInvoices", new { id = r.ReferenceId })
+                                : r.ReferenceType.Contains("Sales", StringComparison.OrdinalIgnoreCase)
+                                    ? Url.Action("Details", "SalesInvoices", new { id = r.ReferenceId })
+                                    : null;
+                            <tr class="@rowClass">
+                                <td>@r.Date.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@r.TransactionType</td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(referenceUrl))
+                                    {
+                                        <a href="@referenceUrl">@r.Reference</a>
+                                    }
+                                    else
+                                    {
+                                        @r.Reference
+                                    }
+                                </td>
+                                <td class="text-end">@r.QtyIn.ToString("0.##")</td>
+                                <td class="text-end">@r.QtyOut.ToString("0.##")</td>
+                                <td class="text-end">@r.UnitCost.ToString("N2")</td>
+                                <td class="text-end">@r.LineValue.ToString("N2")</td>
+                                <td class="text-end">@r.RunningQty.ToString("0.##")</td>
+                                <td class="text-end">@r.RunningAvgCost.ToString("N2")</td>
+                                <td class="text-end">@r.RunningValue.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark small">
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">الإجمالي / الرصيد</td>
+                            <td class="text-end fw-bold">@Model.Sum(x => x.QtyIn).ToString("0.##")</td>
+                            <td class="text-end fw-bold">@Model.Sum(x => x.QtyOut).ToString("0.##")</td>
+                            <td></td>
+                            <td class="text-end fw-bold">@Model.Sum(x => x.LineValue).ToString("N2")</td>
+                            <td class="text-end fw-bold">@closingQty.ToString("0.##")</td>
+                            <td></td>
+                            <td class="text-end fw-bold">@closingValue.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    @@media print {
+        body * { visibility: hidden; }
+        .print-area, .print-area * { visibility: visible; }
+        .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+        .search-form-card, .navbar, .sidebar { display: none !important; }
+    }
+</style>

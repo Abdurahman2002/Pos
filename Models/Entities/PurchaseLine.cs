@@ -25,6 +25,9 @@ namespace NewsApp2.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal LineTotalDinar { get; set; }
 
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal UnitCostLyd { get; set; }
+
         [Required]
         [StringLength(3)]
         public string CurrencyCode { get; set; } = "EUR";

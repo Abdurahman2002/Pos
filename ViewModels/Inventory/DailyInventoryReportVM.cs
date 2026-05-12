@@ -23,6 +23,12 @@ namespace NewsApp2.ViewModels.Inventory
 
         [DisplayFormat(DataFormatString = "{0:N2}")]
         public decimal ClosingBalance { get; set; }
+
+        [DisplayFormat(DataFormatString = "{0:N2}")]
+        public decimal SoldValueLyd { get; set; }
+
+        [DisplayFormat(DataFormatString = "{0:N2}")]
+        public decimal ClosingValueLyd { get; set; }
     }
 
     public class DailyInventoryReportVM
@@ -37,5 +43,7 @@ namespace NewsApp2.ViewModels.Inventory
         public decimal TotalSold => Rows.Sum(x => x.Sold);
         public decimal TotalReturns => Rows.Sum(x => x.Returns);
         public decimal TotalClosing => Rows.Sum(x => x.ClosingBalance);
+        public decimal TotalSoldValue => Rows.Sum(x => x.SoldValueLyd);
+        public decimal TotalClosingValue => Rows.Sum(x => x.ClosingValueLyd);
     }
 }

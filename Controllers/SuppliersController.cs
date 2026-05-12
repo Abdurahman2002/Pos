@@ -132,6 +132,10 @@ namespace NewsApp2.Controllers
             if (supplier == null)
                 return View("NotFound");
 
+            var usage = await GetSupplierUsageAsync(supplier.Id);
+            ViewBag.DeleteBlockedReason = usage.BlockedReason;
+            ViewBag.CanDelete = string.IsNullOrWhiteSpace(usage.BlockedReason);
+
             return View(supplier);
         }
 
@@ -144,16 +148,32 @@ namespace NewsApp2.Controllers
             if (supplier == null)
                 return View("NotFound");
 
-            var hasInvoices = await _context.Set<PurchaseInvoice>().AnyAsync(i => i.SupplierId == id);
-            if (hasInvoices)
+            var usage = await GetSupplierUsageAsync(supplier.Id);
+            if (!string.IsNullOrWhiteSpace(usage.BlockedReason))
             {
-                ViewBag.Message = "لا يمكن حذف المورد لوجود فواتير مرتبطة به.";
+                ViewBag.DeleteBlockedReason = usage.BlockedReason;
+                ViewBag.CanDelete = false;
                 return View("Delete", supplier);
             }
 
-            _context.Set<Supplier>().Remove(supplier);
+            supplier.IsDeleted = true;
+            supplier.DeletedAt = DateTime.UtcNow;
+            _context.Set<Supplier>().Update(supplier);
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<(string? BlockedReason, int PurchaseInvoices, int Payments)> GetSupplierUsageAsync(Guid supplierId)
+        {
+            var purchases = await _context.Set<PurchaseInvoice>().IgnoreQueryFilters().CountAsync(i => i.SupplierId == supplierId);
+            var payments = await _context.Set<SupplierPayment>().IgnoreQueryFilters().CountAsync(p => p.SupplierId == supplierId);
+
+            var blockers = new List<string>();
+            if (purchases > 0) blockers.Add($"{purchases} purchase invoice(s)");
+            if (payments > 0) blockers.Add($"{payments} payment(s)");
+
+            var reason = blockers.Count > 0 ? $"لا يمكن حذف المورد لأنه مرتبط ببيانات تشغيلية موجودة: {string.Join(", ", blockers)}." : null;
+            return (reason, purchases, payments);
         }
 
         [HttpGet]

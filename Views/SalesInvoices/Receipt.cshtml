@@ -4,6 +4,9 @@
     Layout = null;
     var lines = ViewBag.Lines as IEnumerable<SalesLine> ?? Enumerable.Empty<SalesLine>();
     var autoPrint = ViewBag.AutoPrint is bool shouldPrint && shouldPrint;
+    var shopName = ViewBag.ShopName as string ?? "ايلورا";
+    var shopLogo = ViewBag.ShopLogo as string;
+    var shopActivity = ViewBag.ShopActivity as string;
     var paymentText = (Model.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
     {
         "card" => "بطاقة",
@@ -14,127 +17,238 @@
     var customerName = string.Equals(Model.Customer?.Name, NewsApp2.Controllers.SalesInvoicesController.DailySalesCustomerName, StringComparison.Ordinal)
         ? "-"
         : (Model.Customer?.Name ?? "-");
+
+    var lineTotalSum = lines.Sum(l => l.LineTotalDinar);
+    var hasDiscount = Model.TotalDinar < lineTotalSum;
+    var discountAmount = lineTotalSum - Model.TotalDinar;
+    var logoUrl = !string.IsNullOrWhiteSpace(shopLogo)
+        ? Url.Content("~/upload/" + shopLogo)
+        : null;
 }
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>إيصال بيع @Model.Number</title>
+    <title>فاتورة - @Model.Number</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            margin: 0;
-            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             background: #fff;
-            color: #111;
+            color: #000;
+            font-size: 10px;
+            line-height: 1.2;
         }
-
         .receipt {
-            width: 80mm;
+            width: 72mm;
             margin: 0 auto;
-            padding: 10px 8px;
-            box-sizing: border-box;
+            padding: 0;
         }
-
-        .center {
-            text-align: center;
-        }
-
-        .muted {
-            color: #555;
-            font-size: 12px;
-        }
-
-        .title {
-            font-weight: 700;
-            font-size: 16px;
-            margin-bottom: 4px;
-        }
-
-        .divider {
-            border-top: 1px dashed #444;
-            margin: 8px 0;
-        }
-
-        table {
+        .receipt-inner {
             width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
+            padding: 2mm 2.5mm;
         }
-
-        th,
-        td {
-            padding: 3px 0;
-            vertical-align: top;
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2mm;
         }
-
-        th {
-            font-weight: 700;
+        .header img {
+            max-height: 26px;
+            max-width: 42mm;
+            object-fit: contain;
+            margin-bottom: 0.5mm;
         }
-
-        .ltr {
+        .shop-name {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 0.3mm;
+        }
+        .shop-activity {
+            font-size: 8px;
+            margin-bottom: 0.5mm;
+        }
+        .invoice-title {
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 0.5mm;
+        }
+        .info-lines {
+            margin: 2mm 0 1.5mm;
+            font-size: 9px;
+            line-height: 1.45;
+        }
+        .info-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 2mm;
+            margin-bottom: 0.6mm;
+            white-space: nowrap;
+        }
+        .info-label {
+            font-weight: bold;
+            flex: 0 0 auto;
+        }
+        .info-value {
+            text-align: left;
             direction: ltr;
             unicode-bidi: isolate;
-            display: inline-block;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
-
+        
+        .divider {
+            border-top: 1px solid #000;
+            margin: 1.5mm 0;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 9px;
+            margin: 1.5mm 0 1mm;
+        }
+        .items-table th {
+            border: 1px solid #000;
+            padding: 0.8mm 0.5mm;
+            background: #fff;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .items-table th:first-child {
+            text-align: right;
+        }
+        .items-table td {
+            border: 1px solid #000;
+            padding: 0.8mm 0.5mm;
+            text-align: center;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            vertical-align: middle;
+        }
+        .items-table td:first-child {
+            text-align: right;
+            font-weight: 500;
+            overflow-wrap: anywhere;
+        }
+        .items-table th:first-child,
+        .items-table td:first-child {
+            width: 44%;
+        }
+        .items-table th:nth-child(2),
+        .items-table td:nth-child(2) {
+            width: 16%;
+        }
+        .items-table th:nth-child(3),
+        .items-table td:nth-child(3) {
+            width: 20%;
+        }
+        .items-table th:nth-child(4),
+        .items-table td:nth-child(4) {
+            width: 20%;
+        }
+        
+        .totals {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5mm 0 0.5mm;
+            font-size: 10px;
+        }
         .totals td {
-            padding: 2px 0;
+            border: 1px solid #000;
+            padding: 1mm 0.6mm;
         }
-
-        .grand-total {
-            font-size: 15px;
-            font-weight: 700;
+        .totals .label {
+            font-weight: bold;
+            width: 65%;
+            text-align: right;
         }
-
+        .totals .value {
+            text-align: left;
+            direction: ltr;
+            unicode-bidi: isolate;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+        .totals tr.grand-total {
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .totals tr.discount-row {
+            color: #c00;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 2mm;
+            padding-top: 1.5mm;
+            border-top: 1px solid #000;
+            font-size: 8px;
+        }
+        .thank-you {
+            font-weight: bold;
+            margin-bottom: 0.5mm;
+        }
+        .footer-text {
+            margin: 0.5mm 0;
+        }
+        
+        .no-print {
+            display: block;
+        }
+        
         @@media print {
             @@page {
-                size: 80mm auto;
+                size: 72mm auto;
                 margin: 0;
             }
-
-            body {
-                margin: 0;
-            }
-
-            .no-print {
-                display: none !important;
-            }
+            body { margin: 0; background: #fff; }
+            .receipt { width: 72mm; padding: 0; }
+            .receipt-inner { padding: 2mm 2.5mm; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
 <body>
     <div class="receipt">
-        <div class="center">
-            <div class="title">إيصال مبيعات</div>
-            <div class="muted">فاتورة رقم: <span class="ltr">@Model.Number</span></div>
-            <div class="muted">التاريخ: <span class="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></div>
+        <div class="receipt-inner">
+
+        <div class="header">
+            @if (logoUrl != null)
+            {
+                <img src="@logoUrl" alt="الشعار" />
+            }
+            <div class="shop-name">@shopName</div>
+            @if (!string.IsNullOrWhiteSpace(shopActivity))
+            {
+                <div class="shop-activity">@shopActivity</div>
+            }
+            <div class="invoice-title">فاتورة مبيعات</div>
+        </div>
+
+        <div class="info-lines">
+            <div class="info-line"><span class="info-label">رقم الفاتورة:</span><span class="info-value">@Model.Number</span></div>
+            <div class="info-line"><span class="info-label">التاريخ:</span><span class="info-value">@Model.InvoiceDate.ToString("dd/MM/yyyy") @DateTime.Now.ToString("HH:mm")</span></div>
+            <div class="info-line"><span class="info-label">العميل:</span><span class="info-value">@customerName</span></div>
+            <div class="info-line"><span class="info-label">الدفع:</span><span class="info-value">@paymentText</span></div>
         </div>
 
         <div class="divider"></div>
 
-        <table>
-            <tr>
-                <td>العميل</td>
-                <td class="center">:</td>
-                <td>@customerName</td>
-            </tr>
-            <tr>
-                <td>الدفع</td>
-                <td class="center">:</td>
-                <td>@paymentText</td>
-            </tr>
-        </table>
-
-        <div class="divider"></div>
-
-        <table>
+        <table class="items-table">
             <thead>
                 <tr>
                     <th>الصنف</th>
-                    <th class="center">ك</th>
-                    <th class="center">سعر</th>
-                    <th class="center">إجمالي</th>
+                    <th>الكمية</th>
+                    <th>السعر</th>
+                    <th>الإجمالي</th>
                 </tr>
             </thead>
             <tbody>
@@ -142,9 +256,9 @@
                 {
                     <tr>
                         <td>@line.Item?.Name</td>
-                        <td class="center"><span class="ltr">@line.Qty.ToString("0")</span></td>
-                        <td class="center"><span class="ltr">@line.UnitPriceEur.ToString("0.00")</span></td>
-                        <td class="center"><span class="ltr">@line.LineTotalDinar.ToString("0.00")</span></td>
+                        <td>@line.Qty.ToString("0.##")</td>
+                        <td>@line.UnitPriceEur.ToString("0.00")</td>
+                        <td>@line.LineTotalDinar.ToString("0.00")</td>
                     </tr>
                 }
             </tbody>
@@ -153,39 +267,53 @@
         <div class="divider"></div>
 
         <table class="totals">
-            <tr>
-                <td>الإجمالي</td>
-                <td class="center">:</td>
-                <td class="center"><span class="ltr">@Model.TotalDinar.ToString("0.00") د.ل</span></td>
-            </tr>
-            <tr>
-                <td colspan="3" class="center grand-total">شكرا لزيارتكم</td>
+            @if (hasDiscount)
+            {
+                <tr>
+                    <td class="label">المجموع الفرعي</td>
+                    <td class="value">@lineTotalSum.ToString("0.00") د.ل</td>
+                </tr>
+                <tr class="discount-row">
+                    <td class="label">الخصم</td>
+                    <td class="value">- @discountAmount.ToString("0.00") د.ل</td>
+                </tr>
+            }
+            <tr class="grand-total">
+                <td class="label">الإجمالي</td>
+                <td class="value">@Model.TotalDinar.ToString("0.00") د.ل</td>
             </tr>
         </table>
 
-        <div class="divider"></div>
+        @if (!string.IsNullOrWhiteSpace(Model.Note))
+        {
+            <div class="divider"></div>
+            <div style="font-size: 9px; text-align: right; padding: 1mm; color: #000;">
+                <strong>ملاحظة: </strong>@Model.Note
+            </div>
+        }
 
-        <div class="center no-print" style="margin-top:8px;">
-            <button type="button" onclick="window.print()" style="padding: 5px 15px; cursor: pointer;">طباعة</button>  
-            <button type="button" onclick="window.location.href='@Url.Action("Create", "SalesInvoices")'" style="padding: 5px 15px; cursor: pointer;">عودة للبيع</button>  
+        <div class="footer">
+            <div class="thank-you">شكراً لتسوقكم</div>
+            <div class="footer-text">معالج: @(Model.CreatedByUserName ?? "-")</div>
+            <div class="footer-text">@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</div>
+        </div>
+
+        <div class="no-print" style="text-align: center; margin-top: 8px; display: flex; gap: 8px; justify-content: center;">
+            <button onclick="window.print()" style="padding: 6px 14px; background: #000; color: #fff; border: none; cursor: pointer; font-size: 11px; font-weight: bold;">طباعة</button>
+            <button onclick="window.location.href='@Url.Action("Create", "SalesInvoices")'" style="padding: 6px 14px; background: #666; color: #fff; border: none; cursor: pointer; font-size: 11px; font-weight: bold;">عودة</button>
+        </div>
+
         </div>
     </div>
 
     @if (autoPrint)
     {
         <script>
-            var isIframe = window.location.search.indexOf('isIframe=true') > -1;
-
-            // الطباعة التلقائية عند فتح الصفحة
-            window.addEventListener('load', function () {
-                window.print();
+            window.addEventListener('load', function () { 
+                window.print(); 
             });
-
-            // العودة التلقائية للشاشة السابقة (نقطة البيع) بمجرد إغلاق نافذة الطباعة
             window.addEventListener('afterprint', function () {
-                if (!isIframe) {
-                    window.location.href = '@Url.Action("Create", "SalesInvoices")';
-                }
+                window.location.href = '@Url.Action("Create", "SalesInvoices")';
             });
         </script>
     }

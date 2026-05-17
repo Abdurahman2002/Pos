@@ -85,7 +85,7 @@ namespace NewsApp2.Classes.Helpers
             using var shopBmp  = BuildTextBitmap(shopName,    7.5f, bold: true,  TextAlign.Center, contentW);
             using var nameBmp  = BuildTextBitmap(productName, 10f,  bold: true,  TextAlign.Center, contentW);
             using var codeBmp  = BuildTextBitmap(cleanCode,   7.5f, bold: false, TextAlign.Center, contentW);
-            using var priceBmp = BuildTextBitmap(priceLine,   9f,   bold: true,  TextAlign.Center, contentW);
+            using var priceBmp = BuildTextBitmap(priceLine,   10f,   bold: true,  TextAlign.Center, contentW);
 
             int shopH  = shopBmp?.Height  ?? 0;
             int nameH  = nameBmp?.Height  ?? 0;
@@ -318,7 +318,8 @@ namespace NewsApp2.Classes.Helpers
             if (string.IsNullOrWhiteSpace(sanitizedLabel))
                 return sanitizedPrice;
 
-            return $"{sanitizedLabel}: {sanitizedPrice}";
+            // Format price line with clear separation for better readability
+            return $"{sanitizedLabel}\u200B: {sanitizedPrice}";
         }
 
         private static string SanitizeText(string? value)

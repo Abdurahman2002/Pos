@@ -670,8 +670,16 @@ namespace NewsApp2.Controllers
                 .ThenBy(l => l.Id)
                 .ToListAsync();
 
+            var siteInfo = await _context.Set<SiteInfo>()
+                .AsNoTracking()
+                .OrderByDescending(s => s.Created)
+                .FirstOrDefaultAsync();
+
             ViewBag.Lines = lines;
             ViewBag.AutoPrint = autoPrint;
+            ViewBag.ShopName = siteInfo?.Name;
+            ViewBag.ShopLogo = siteInfo?.LogoUrl;
+            ViewBag.ShopActivity = siteInfo?.Activity;
             return View(invoice);
         }
 

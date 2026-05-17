@@ -27,7 +27,7 @@ namespace NewsApp2.Classes.Helpers
         private const int DefaultSpeed = 4;
         private const int DefaultDensity = 10;
         private const int RasterThreshold = 160;
-        private const string DefaultFontName = "Tahoma";
+        private const string DefaultFontName = "Arial";
 
         private readonly int _dpi;
         private readonly int _labelWidthMm;
@@ -82,10 +82,10 @@ namespace NewsApp2.Classes.Helpers
             var       priceLine  = BuildPriceLine(priceLabel, price);
 
             // ── render text bitmaps (all centred) ──────────────────────────────
-            using var shopBmp  = BuildTextBitmap(shopName,    7.5f, bold: true,  TextAlign.Center, contentW);
-            using var nameBmp  = BuildTextBitmap(productName, 10f,  bold: true,  TextAlign.Center, contentW);
-            using var codeBmp  = BuildTextBitmap(cleanCode,   7.5f, bold: false, TextAlign.Center, contentW);
-            using var priceBmp = BuildTextBitmap(priceLine,   10f,   bold: true,  TextAlign.Center, contentW);
+            using var shopBmp  = BuildTextBitmap(shopName,    8f,   bold: true,  TextAlign.Center, contentW);
+            using var nameBmp  = BuildTextBitmap(productName, 11f,  bold: true,  TextAlign.Center, contentW);
+            using var codeBmp  = BuildTextBitmap(cleanCode,   10f,  bold: false, TextAlign.Center, contentW);
+            using var priceBmp = BuildTextBitmap(priceLine,   12f,  bold: false, TextAlign.Center, contentW);
 
             int shopH  = shopBmp?.Height  ?? 0;
             int nameH  = nameBmp?.Height  ?? 0;
@@ -272,7 +272,7 @@ namespace NewsApp2.Classes.Helpers
         }
 
         private static DrawingFontFamily ResolveFontFamily()
-            => TryResolveFont(DefaultFontName) ?? TryResolveFont("Segoe UI") ?? DrawingFontFamily.GenericSansSerif;
+            => TryResolveFont("Arial") ?? TryResolveFont("Segoe UI") ?? TryResolveFont("Tahoma") ?? DrawingFontFamily.GenericSansSerif;
 
         private static DrawingFontFamily? TryResolveFont(string name)
         {

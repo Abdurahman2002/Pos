@@ -32,12 +32,6 @@
         }
     }
 
-        function focusBarcodeInput() {
-            if (!barcodeInput) return;
-            barcodeInput.focus();
-            barcodeInput.select();
-        }
-
     function initInvoiceForm(form) {
         if (!form || form.dataset.invoiceLinesBound === '1') return;
         var tableBody = form.querySelector('#lines-table tbody');
@@ -57,6 +51,17 @@
         var submitPosBtn = form.querySelector('#submit-pos-btn');
         var holdInvoiceBtn = form.querySelector('#hold-invoice-btn');
         var restoreInvoiceBtn = form.querySelector('#restore-invoice-btn');
+        var draftIdInput = form.querySelector('input[name="DraftId"]');
+        var autoSaveTimer = null;
+        var autoSaveDirty = false;
+        var autoSaveInFlight = false;
+        var autoSaveDelayMs = 45000;
+        var localDraftKey = (form.dataset.localDraftKey || '').trim();
+        var localDraftTtlMinutes = parseInt(form.dataset.localDraftTtlMinutes || '720', 10);
+        if (!Number.isFinite(localDraftTtlMinutes) || localDraftTtlMinutes <= 0) {
+            localDraftTtlMinutes = 720;
+        }
+        var localDraftEnabled = !!localDraftKey;
 
         var barcodeInput = form.querySelector('#barcode-input');
         var barcodeAddBtn = form.querySelector('#barcode-add-btn');
@@ -71,6 +76,12 @@
         var barcodeCreateLink = form.querySelector('#barcode-create-item-link');
         var barcodeMapItemSelect = form.querySelector('#barcode-map-item-select');
         var barcodeMapExistingBtn = form.querySelector('#barcode-map-existing-btn');
+
+        function focusBarcodeInput() {
+            if (!barcodeInput) return;
+            barcodeInput.focus();
+            barcodeInput.select();
+        }
 
         var cameraModalEl = form.querySelector('#barcode-camera-modal') || document.getElementById('barcode-camera-modal');
         var barcodeVideo = form.querySelector('#barcode-video') || document.getElementById('barcode-video');
@@ -91,6 +102,8 @@
         var barcodeLastAddedTimer = null;
         var audioContext = null;
         var scanHistory = [];
+        var barcodeQueue = [];
+        var barcodeResolving = false;
         var soundUserKey = ((form.dataset.soundUserKey || 'anonymous') + '').trim().toLowerCase();
         var soundStorageKey = 'pos.sound.enabled.' + soundUserKey;
         var soundEnabled = true;
@@ -180,6 +193,11 @@
         var bankSection = form.querySelector('#bank-section');
         var bankSelect = form.querySelector('#BankId');
         var customerRequiredHint = form.querySelector('#customer-required-hint');
+        var invoiceDateInput = form.querySelector('#InvoiceDate');
+        var paymentMethodSelect = form.querySelector('#payment-method');
+        var supplierSelect = form.querySelector('#supplier-id');
+        var dueDateInput = form.querySelector('#DueDate');
+        var noteInput = form.querySelector('#Note');
         var paymentMethodInputs = form.querySelectorAll('input[name="PaymentMethod"]');
         var quickCustomerModalEl = document.getElementById('quick-customer-modal');
         var quickCustomerModal = quickCustomerModalEl ? new bootstrap.Modal(quickCustomerModalEl) : null;
@@ -611,10 +629,224 @@
             window.location.href = newUrl || window.location.pathname;
         }
 
-        async function saveHoldState() {
-            if (!holdUrl) {
-                showWarning(msgHoldServiceUnavailable);
+        function hasDraftableContent() {
+            var rows = tableBody.querySelectorAll('tr');
+            for (var i = 0; i < rows.length; i++) {
+                var itemSelect = rows[i].querySelector('.item-select');
+                var qtyInput = rows[i].querySelector('.qty-input');
+                var priceInput = rows[i].querySelector('.price-input');
+                var sellPriceInput = rows[i].querySelector('.sell-price-input');
+
+                if (itemSelect && itemSelect.value) return true;
+                if (qtyInput && qtyInput.value) return true;
+                if (priceInput && priceInput.value) return true;
+                if (sellPriceInput && sellPriceInput.value) return true;
+            }
+
+            return !!(draftIdInput && draftIdInput.value);
+        }
+
+        function hasLocalDraftContent() {
+            if (hasDraftableContent()) return true;
+            if (supplierSelect && supplierSelect.value) return true;
+            if (customerSelect && customerSelect.value) return true;
+            if (bankSelect && bankSelect.value) return true;
+            if (dueDateInput && dueDateInput.value) return true;
+            if (noteInput && noteInput.value && noteInput.value.trim()) return true;
+            return false;
+        }
+
+        function isFormEmptyForRestore() {
+            if (hasLocalDraftContent()) return false;
+            return true;
+        }
+
+        function buildLocalDraftPayload() {
+            var rows = tableBody.querySelectorAll('tr');
+            var lines = [];
+            rows.forEach(function (row) {
+                var itemSelect = row.querySelector('.item-select');
+                var qtyInput = row.querySelector('.qty-input');
+                var priceInput = row.querySelector('.price-input');
+                var sellPriceInput = row.querySelector('.sell-price-input');
+                lines.push({
+                    itemId: itemSelect ? itemSelect.value : '',
+                    qty: qtyInput ? qtyInput.value : '',
+                    unitPriceEur: priceInput ? priceInput.value : '',
+                    sellPriceLyd: sellPriceInput ? sellPriceInput.value : ''
+                });
+            });
+
+            return {
+                savedAt: Date.now(),
+                invoiceDate: invoiceDateInput ? invoiceDateInput.value : '',
+                paymentMethod: paymentMethodSelect ? paymentMethodSelect.value : '',
+                supplierId: supplierSelect ? supplierSelect.value : '',
+                customerId: customerSelect ? customerSelect.value : '',
+                bankId: bankSelect ? bankSelect.value : '',
+                dueDate: dueDateInput ? dueDateInput.value : '',
+                note: noteInput ? noteInput.value : '',
+                lines: lines
+            };
+        }
+
+        function saveLocalDraft() {
+            if (!localDraftEnabled) return false;
+            try {
+                var payload = buildLocalDraftPayload();
+                window.localStorage.setItem(localDraftKey, JSON.stringify(payload));
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function restoreLocalDraftIfAny() {
+            if (!localDraftEnabled) return;
+            var raw = null;
+            try {
+                raw = window.localStorage.getItem(localDraftKey);
+            } catch (_) {
                 return;
+            }
+            if (!raw) return;
+
+            var data = null;
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                return;
+            }
+            if (!data || !data.savedAt) return;
+
+            var ttlMs = localDraftTtlMinutes * 60 * 1000;
+            if (ttlMs > 0 && (Date.now() - data.savedAt) > ttlMs) {
+                try { window.localStorage.removeItem(localDraftKey); } catch (_) { }
+                return;
+            }
+
+            if (!isFormEmptyForRestore()) return;
+
+            if (invoiceDateInput && data.invoiceDate) {
+                invoiceDateInput.value = data.invoiceDate;
+            }
+            if (paymentMethodSelect && data.paymentMethod) {
+                paymentMethodSelect.value = data.paymentMethod;
+                paymentMethodSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (supplierSelect && data.supplierId) {
+                setSelectValue(supplierSelect, data.supplierId);
+            }
+            if (customerSelect && data.customerId) {
+                setSelectValue(customerSelect, data.customerId);
+            }
+            if (bankSelect && data.bankId) {
+                setSelectValue(bankSelect, data.bankId);
+            }
+            if (dueDateInput) {
+                dueDateInput.value = data.dueDate || '';
+            }
+            if (noteInput) {
+                noteInput.value = data.note || '';
+            }
+
+            var lines = Array.isArray(data.lines) ? data.lines : [];
+            if (lines.length) {
+                while (tableBody.querySelectorAll('tr').length < lines.length) {
+                    addLine();
+                }
+                while (tableBody.querySelectorAll('tr').length > Math.max(lines.length, 1)) {
+                    var rows = tableBody.querySelectorAll('tr');
+                    if (rows.length > 1) {
+                        rows[rows.length - 1].remove();
+                    } else {
+                        break;
+                    }
+                }
+                reindexLines();
+
+                var rows = tableBody.querySelectorAll('tr');
+                rows.forEach(function (row, index) {
+                    var line = lines[index] || {};
+                    var itemSelect = row.querySelector('.item-select');
+                    var qtyInput = row.querySelector('.qty-input');
+                    var priceInput = row.querySelector('.price-input');
+                    var sellPriceInput = row.querySelector('.sell-price-input');
+
+                    if (itemSelect && line.itemId) {
+                        setSelectValue(itemSelect, line.itemId);
+                    }
+                    if (qtyInput) {
+                        qtyInput.value = line.qty || '';
+                        qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (priceInput) {
+                        priceInput.value = line.unitPriceEur || '';
+                        priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (sellPriceInput) {
+                        sellPriceInput.value = line.sellPriceLyd || '';
+                        sellPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            }
+
+            calculateTotals();
+        }
+
+        function markDraftDirty() {
+            if (!holdUrl && !localDraftEnabled) return;
+            autoSaveDirty = true;
+            scheduleAutoSave();
+        }
+
+        function scheduleAutoSave() {
+            if (autoSaveTimer) {
+                window.clearTimeout(autoSaveTimer);
+            }
+            autoSaveTimer = window.setTimeout(runAutoSave, autoSaveDelayMs);
+        }
+
+        async function runAutoSave() {
+            if (!autoSaveDirty || autoSaveInFlight) return;
+            if (holdUrl && !hasDraftableContent()) {
+                autoSaveDirty = false;
+                return;
+            }
+
+            if (!holdUrl && localDraftEnabled && !hasLocalDraftContent()) {
+                autoSaveDirty = false;
+                return;
+            }
+
+            autoSaveInFlight = true;
+            autoSaveDirty = false;
+
+            try {
+                if (holdUrl) {
+                    var result = await saveHoldState({ redirectOnSuccess: false, silent: true });
+                    if (!result) {
+                        autoSaveDirty = true;
+                    }
+                } else if (localDraftEnabled) {
+                    var saved = saveLocalDraft();
+                    if (!saved) {
+                        autoSaveDirty = true;
+                    }
+                }
+            } finally {
+                autoSaveInFlight = false;
+            }
+        }
+
+        async function saveHoldState(options) {
+            var settings = options || {};
+            var redirectOnSuccess = settings.redirectOnSuccess !== false;
+            var silent = !!settings.silent;
+
+            if (!holdUrl) {
+                if (!silent) showWarning(msgHoldServiceUnavailable);
+                return null;
             }
 
             try {
@@ -628,13 +860,22 @@
 
                 var data = await response.json();
                 if (!response.ok || !data.success) {
-                    showWarning(data.error || msgUnableHoldInvoice);
-                    return;
+                    if (!silent) showWarning(data.error || msgUnableHoldInvoice);
+                    return null;
                 }
 
-                window.location.href = data.redirectUrl || newUrl || window.location.pathname;
+                if (data.draftId && draftIdInput) {
+                    draftIdInput.value = data.draftId;
+                }
+
+                if (redirectOnSuccess) {
+                    window.location.href = data.redirectUrl || newUrl || window.location.pathname;
+                }
+
+                return data;
             } catch (_) {
-                showWarning(msgUnableHoldInvoice);
+                if (!silent) showWarning(msgUnableHoldInvoice);
+                return null;
             }
         }
 
@@ -796,6 +1037,28 @@
             addItemById(data.itemId);
         }
 
+        function enqueueBarcode(code) {
+            var normalized = (code || '').trim();
+            if (!normalized) return;
+            barcodeQueue.push(normalized);
+            clearAndRefocusBarcodeInput();
+            processBarcodeQueue();
+        }
+
+        async function processBarcodeQueue() {
+            if (barcodeResolving || !barcodeQueue.length) return;
+            barcodeResolving = true;
+            var nextCode = barcodeQueue.shift();
+            try {
+                await resolveBarcode(nextCode);
+            } finally {
+                barcodeResolving = false;
+                if (barcodeQueue.length) {
+                    processBarcodeQueue();
+                }
+            }
+        }
+
         async function createCustomerInline() {
             if (!createCustomerUrl || !customerSelect || !quickCustomerNameInput) return;
 
@@ -885,7 +1148,7 @@
 
                 stopCamera();
                 cameraModal.hide();
-                resolveBarcode(result.text.trim());
+                enqueueBarcode(result.text.trim());
             });
         }
 
@@ -933,27 +1196,99 @@
         }
 
         if (barcodeAddBtn && barcodeInput) {
+            var barcodeAutoTimer = null;
+            var barcodeBurstCount = 0;
+            var barcodeBurstStartAt = 0;
+            var barcodeLastKeyAt = 0;
+            var barcodeLastInputWasPaste = false;
+            var barcodeAutoDelayMs = 70;
+            var barcodeMinLength = 3;
+            var barcodeMinBurstCount = 6;
+            var barcodeMinBurstCountShort = 3;
+            var barcodeMinLengthForShortBurst = 8;
+            var barcodeMaxBurstDurationMs = 900;
+
+            function clearBarcodeAutoTimer() {
+                if (!barcodeAutoTimer) return;
+                window.clearTimeout(barcodeAutoTimer);
+                barcodeAutoTimer = null;
+            }
+
+            function resetBarcodeBurst() {
+                barcodeBurstCount = 0;
+                barcodeBurstStartAt = 0;
+                barcodeLastKeyAt = 0;
+                barcodeLastInputWasPaste = false;
+            }
+
+            function noteBarcodeKeyPress(event) {
+                if (!event || !event.key || event.key.length !== 1) return;
+                var now = Date.now();
+                if (!barcodeLastKeyAt || now - barcodeLastKeyAt > 120) {
+                    barcodeBurstCount = 1;
+                    barcodeBurstStartAt = now;
+                } else {
+                    barcodeBurstCount += 1;
+                }
+                barcodeLastKeyAt = now;
+            }
+
+            function shouldAutoResolveBarcode(code) {
+                if (!code || code.length < barcodeMinLength) return false;
+                if (barcodeLastInputWasPaste) return true;
+                if (!barcodeBurstStartAt || !barcodeLastKeyAt) return false;
+
+                var burstDuration = barcodeLastKeyAt - barcodeBurstStartAt;
+                if (burstDuration > barcodeMaxBurstDurationMs) return false;
+
+                if (barcodeBurstCount >= barcodeMinBurstCount) return true;
+                if (barcodeBurstCount >= barcodeMinBurstCountShort && code.length >= barcodeMinLengthForShortBurst) return true;
+                return false;
+            }
+
+            function scheduleAutoResolveBarcode() {
+                clearBarcodeAutoTimer();
+                barcodeAutoTimer = window.setTimeout(function () {
+                    var code = (barcodeInput.value || '').trim();
+                    if (!shouldAutoResolveBarcode(code)) return;
+                    resetBarcodeBurst();
+                    enqueueBarcode(code);
+                }, barcodeAutoDelayMs);
+            }
+
             barcodeAddBtn.addEventListener('click', function () {
+                clearBarcodeAutoTimer();
+                resetBarcodeBurst();
                 var code = (barcodeInput.value || '').trim();
                 if (!code) {
                     showWarning(msgScanOrTypeFirst);
                     focusBarcodeInput();
                     return;
                 }
-                resolveBarcode(code);
+                enqueueBarcode(code);
             });
 
             barcodeInput.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter') {
+                if (event.key === 'Enter' || event.key === 'Tab') {
                     event.preventDefault();
+                    clearBarcodeAutoTimer();
+                    resetBarcodeBurst();
                     var code = (barcodeInput.value || '').trim();
                     if (code) {
-                        resolveBarcode(code);
+                        enqueueBarcode(code);
                     } else {
                         showWarning(msgScanOrTypeFirst);
                         focusBarcodeInput();
                     }
+                    return;
                 }
+
+                noteBarcodeKeyPress(event);
+            });
+
+            barcodeInput.addEventListener('input', function (event) {
+                barcodeLastInputWasPaste = event && (event.inputType === 'insertFromPaste' || (event.data && event.data.length > 1));
+                scheduleAutoResolveBarcode();
             });
         }
 
@@ -984,7 +1319,9 @@
         }
 
         if (holdInvoiceBtn) {
-            holdInvoiceBtn.addEventListener('click', saveHoldState);
+            holdInvoiceBtn.addEventListener('click', function () {
+                saveHoldState({ redirectOnSuccess: true, silent: false });
+            });
         }
 
         if (restoreInvoiceBtn) {
@@ -997,11 +1334,20 @@
             });
         }
 
+        form.addEventListener('input', markDraftDirty);
+        form.addEventListener('change', markDraftDirty);
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                runAutoSave();
+            }
+        });
+
         tableBody.querySelectorAll('tr').forEach(function (row) {
             applyDefaultPriceForRow(row, false);
             applyDefaultSellPriceForRow(row, false);
         });
 
+        restoreLocalDraftIfAny();
         syncCustomerRequirement();
         applyReturnUiState();
         calculateTotals();

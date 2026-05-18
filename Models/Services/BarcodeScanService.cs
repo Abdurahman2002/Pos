@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NewsApp2.Models.Entities;
 
 namespace NewsApp2.Models.Services
@@ -6,10 +8,12 @@ namespace NewsApp2.Models.Services
     public sealed class BarcodeScanService
     {
         private readonly AppDbContext _context;
+        private readonly ILogger<BarcodeScanService> _logger;
 
-        public BarcodeScanService(AppDbContext context)
+        public BarcodeScanService(AppDbContext context, ILogger<BarcodeScanService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<BarcodeResolveResult> ResolveAsync(string rawCode, Guid? warehouseId)
@@ -19,31 +23,43 @@ namespace NewsApp2.Models.Services
             {
                 return BarcodeResolveResult.CreateFailure("Barcode is empty.");
             }
-
-            // Try Raw type first (most common — internal + manually entered barcodes)
-            var rawMapping = await _context.Set<BarcodeMapping>()
-                .AsNoTracking()
-                .Include(m => m.Item)
-                .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Raw.ToString());
-
-            if (rawMapping != null)
+            try
             {
-                return BarcodeResolveResult.CreateSuccess(rawMapping, new BarcodeParseResult { Raw = normalized });
+                // Try Raw type first (most common — internal + manually entered barcodes)
+                var rawMapping = await _context.Set<BarcodeMapping>()
+                    .AsNoTracking()
+                    .Include(m => m.Item)
+                    .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Raw.ToString());
+
+                if (rawMapping != null)
+                {
+                    return BarcodeResolveResult.CreateSuccess(rawMapping, new BarcodeParseResult { Raw = normalized });
+                }
+
+                // Fallback: try GTIN type (GS1/retail barcodes mapped via scan-and-map flow)
+                var gtinMapping = await _context.Set<BarcodeMapping>()
+                    .AsNoTracking()
+                    .Include(m => m.Item)
+                    .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Gtin.ToString());
+
+                if (gtinMapping != null)
+                {
+                    return BarcodeResolveResult.CreateSuccess(gtinMapping, new BarcodeParseResult { Raw = normalized, Gtin = normalized });
+                }
+
+                // Not found in any mapping — prompt user to map it
+                return BarcodeResolveResult.CreateRequiresMapping(normalized, BarcodeCodeType.Raw, new BarcodeParseResult { Raw = normalized });
             }
-
-            // Fallback: try GTIN type (GS1/retail barcodes mapped via scan-and-map flow)
-            var gtinMapping = await _context.Set<BarcodeMapping>()
-                .AsNoTracking()
-                .Include(m => m.Item)
-                .FirstOrDefaultAsync(m => m.Code == normalized && m.CodeType == BarcodeCodeType.Gtin.ToString());
-
-            if (gtinMapping != null)
+            catch (SqlException ex)
             {
-                return BarcodeResolveResult.CreateSuccess(gtinMapping, new BarcodeParseResult { Raw = normalized, Gtin = normalized });
+                _logger.LogError(ex, "Barcode scan DB error for code {Code}", normalized);
+                return BarcodeResolveResult.CreateFailure("تعذر الاتصال بقاعدة البيانات. حاول مرة أخرى.");
             }
-
-            // Not found in any mapping — prompt user to map it
-            return BarcodeResolveResult.CreateRequiresMapping(normalized, BarcodeCodeType.Raw, new BarcodeParseResult { Raw = normalized });
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Barcode scan error for code {Code}", normalized);
+                return BarcodeResolveResult.CreateFailure("حدث خطأ غير متوقع أثناء قراءة الباركود.");
+            }
         }
 
         private static string NormalizeCode(string raw)

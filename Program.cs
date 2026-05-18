@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
@@ -15,22 +16,35 @@ using NewsApp2.Models.UnitOfWork;
 using NewsApp2.Models.Services;
 using System.Security.Claims;
 using System.Globalization;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var dataProtectionPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "keys");
+Directory.CreateDirectory(dataProtectionPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+    .SetApplicationName("NewsApp2");
 
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
 builder.Services.AddControllersWithViews(options =>
 {
     options.ModelBinderProviders.Insert(0, new DateOnlyModelBinderProvider());
+    options.ModelBinderProviders.Insert(0, new DecimalModelBinderProvider());
 })
     .AddViewLocalization()
     .AddDataAnnotationsLocalization();
 
 builder.Services.AddScoped(typeof(IUnitOfWork<>), typeof(UnitOfWork<>));
 
-builder.Services.AddDbContext<AppDbContext>
-    (x => x.UseSqlServer(builder.Configuration.GetConnectionString("DbCon")));
+builder.Services.AddDbContext<AppDbContext>(x =>
+    x.UseSqlServer(builder.Configuration.GetConnectionString("DbCon"), sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null);
+        sqlOptions.CommandTimeout(10);
+    })
+);
 
 //----------------------------------------------------------------------------
 //IdentityUser  �� ���� AspNetUsers
@@ -54,7 +68,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.ExpireTimeSpan = TimeSpan.FromDays(2);
+    options.ExpireTimeSpan = TimeSpan.FromDays(180);
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Error/403";

@@ -121,103 +121,107 @@ namespace NewsApp2.Controllers
             }
 
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-
-            // ---------------- Create User ----------------
-            var user = new ApplicationUser
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
             {
-                UserName = model.Email.Trim(),
-                Email = model.Email.Trim(),
-                Approval = true,
-                CreatedDate = DateTime.UtcNow
-            };
+                _context.ChangeTracker.Clear();
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-            var passwordGenerator = new Password(true, true, true, false, 5);
-            var generatedPassword = passwordGenerator.Next();
+                // ---------------- Create User ----------------
+                var user = new ApplicationUser
+                {
+                    UserName = model.Email.Trim(),
+                    Email = model.Email.Trim(),
+                    Approval = true,
+                    CreatedDate = DateTime.UtcNow
+                };
 
-            IdentityResult result;
-            try
-            {
-                result = await _userManager.CreateAsync(user, generatedPassword);
-            }
-            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
-            {
-                ModelState.AddModelError(nameof(model.Email), "This email is already used by another account.");
-                model.AvailableRoles = await GetAssignableRolesAsync();
-                return View(model);
-            }
+                var passwordGenerator = new Password(true, true, true, false, 5);
+                var generatedPassword = passwordGenerator.Next();
 
-            if (!result.Succeeded)
-            {
-                foreach (var error in result.Errors)
-                    ModelState.AddModelError(string.Empty, error.Description);
+                IdentityResult result;
+                try
+                {
+                    result = await _userManager.CreateAsync(user, generatedPassword);
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+                {
+                    ModelState.AddModelError(nameof(model.Email), "This email is already used by another account.");
+                    model.AvailableRoles = await GetAssignableRolesAsync();
+                    return View(model);
+                }
 
-                model.AvailableRoles = await GetAssignableRolesAsync();
-                return View(model);
-            }
+                if (!result.Succeeded)
+                {
+                    foreach (var error in result.Errors)
+                        ModelState.AddModelError(string.Empty, error.Description);
 
-            // ---------------- Create Employee ----------------
-            var employee = new Employee
-            {
-                Name = model.Employee.Name,
-                UserId = user.Id,
-                Created = DateTime.UtcNow
-            };
+                    model.AvailableRoles = await GetAssignableRolesAsync();
+                    return View(model);
+                }
 
-            try
-            {
-                _employee.Repository.Insert(employee);
-                await _employee.SaveAsync();
-            }
-            catch
-            {
-                TempData["ErrorMessage"] = "Failed to create employee profile";
-                return View("Error");
-            }
+                // ---------------- Create Employee ----------------
+                var employee = new Employee
+                {
+                    Name = model.Employee.Name,
+                    UserId = user.Id,
+                    Created = DateTime.UtcNow
+                };
 
-            // ---------------- Role Handling ----------------
-            if (!await _roleManager.RoleExistsAsync("Employee"))
-                await _roleManager.CreateAsync(new IdentityRole("Employee"));
+                try
+                {
+                    _employee.Repository.Insert(employee);
+                    await _employee.SaveAsync();
+                }
+                catch
+                {
+                    TempData["ErrorMessage"] = "Failed to create employee profile";
+                    return View("Error");
+                }
 
-            if (!await _userManager.IsInRoleAsync(user, "Employee"))
-                await _userManager.AddToRoleAsync(user, "Employee");
+                // ---------------- Role Handling ----------------
+                if (!await _roleManager.RoleExistsAsync("Employee"))
+                    await _roleManager.CreateAsync(new IdentityRole("Employee"));
 
-            if (!await _userManager.IsInRoleAsync(user, selectedRole))
-                await _userManager.AddToRoleAsync(user, selectedRole);
+                if (!await _userManager.IsInRoleAsync(user, "Employee"))
+                    await _userManager.AddToRoleAsync(user, "Employee");
 
-            // ---------------- Email Confirmation ----------------
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = Url.Action(
-                "EmailConfirm",
-                "Account",
-                new { userId = user.Id, token },
-                Request.Scheme
-            );
+                if (!await _userManager.IsInRoleAsync(user, selectedRole))
+                    await _userManager.AddToRoleAsync(user, selectedRole);
 
-            string content = ReadHtmlTemplate("ConfirmEmailWithPassword.html")
-                .Replace("{Subject}", "Email Confirmation")
-                .Replace("{UserName}", model.Email)
-                .Replace("{Password}", generatedPassword)
-                .Replace("{confirmationLink}", confirmationLink);
+                // ---------------- Email Confirmation ----------------
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var confirmationLink = Url.Action(
+                    "EmailConfirm",
+                    "Account",
+                    new { userId = user.Id, token },
+                    Request.Scheme
+                );
 
-            var message = new Message(new[] { model.Email }, "Email Confirmation", content, null);
+                string content = ReadHtmlTemplate("ConfirmEmailWithPassword.html")
+                    .Replace("{Subject}", "Email Confirmation")
+                    .Replace("{UserName}", model.Email)
+                    .Replace("{Password}", generatedPassword)
+                    .Replace("{confirmationLink}", confirmationLink);
 
-            try
-            {
-                await _emailSender.SendEmailAsync(message);
-                await transaction.CommitAsync();
+                var message = new Message(new[] { model.Email }, "Email Confirmation", content, null);
 
-                TempData["SuccessMessage"] = $"Employee created successfully with role '{selectedRole}'.";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                TempData["ErrorMessage"] = "An unexpected error occurred";
-                model.AvailableRoles = await GetAssignableRolesAsync();
-                return View(model);
-            }
+                try
+                {
+                    await _emailSender.SendEmailAsync(message);
+                    await transaction.CommitAsync();
+
+                    TempData["SuccessMessage"] = $"Employee created successfully with role '{selectedRole}'.";
+                    return RedirectToAction(nameof(Index));
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    TempData["ErrorMessage"] = "An unexpected error occurred";
+                    model.AvailableRoles = await GetAssignableRolesAsync();
+                    return View(model);
+                }
+            });
         }
 
         private async Task<List<SelectListItem>> GetAssignableRolesAsync()

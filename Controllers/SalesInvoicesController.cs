@@ -40,9 +40,18 @@ namespace NewsApp2.Controllers
         public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, Guid? customerId)
         {
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
+            var userId = _userManager.GetUserId(User);
+            var canViewAll = CanViewAllInvoices();
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
             var query = _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.Status != "Cancelled");
+
+            if (!canViewAll)
+            {
+                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate == today);
+            }
 
             if (from.HasValue)
                 query = query.Where(i => i.InvoiceDate >= from.Value);
@@ -73,6 +82,9 @@ namespace NewsApp2.Controllers
 
             if (invoice == null)
                 return View("NotFound");
+
+            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+                return Forbid();
 
             var lines = await _context.Set<SalesLine>()
                 .AsNoTracking()
@@ -376,16 +388,15 @@ namespace NewsApp2.Controllers
 
             if (simplePosMode)
             {
-                vm.DiscountType = "Percent";
                 vm.DiscountValue ??= 0m;
                 vm.Note = null;
 
-                var requestedDiscountPercent = vm.DiscountValue ?? 0m;
-                if (requestedDiscountPercent < 0)
-                    ModelState.AddModelError(nameof(vm.DiscountValue), "نسبة الخصم لا يمكن أن تكون سالبة.");
-
-                if (requestedDiscountPercent > maxCashierDiscountPercent)
-                    ModelState.AddModelError(nameof(vm.DiscountValue), $"الحد الأقصى لخصم الكاشير هو {maxCashierDiscountPercent:0.##}%.");
+                if (string.Equals(vm.DiscountType, "Percent", StringComparison.OrdinalIgnoreCase))
+                {
+                    var requestedDiscountPercent = vm.DiscountValue ?? 0m;
+                    if (requestedDiscountPercent > maxCashierDiscountPercent)
+                        ModelState.AddModelError(nameof(vm.DiscountValue), $"الحد الأقصى لخصم الكاشير هو {maxCashierDiscountPercent:0.##}%.");
+                }
 
                 var itemIds = vm.Lines
                     .Where(l => l.ItemId != Guid.Empty)
@@ -660,6 +671,9 @@ namespace NewsApp2.Controllers
             if (invoice == null)
                 return View("NotFound");
 
+            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+                return Forbid();
+
             var lines = await _context.Set<SalesLine>()
                 .AsNoTracking()
                 .Where(l => l.SalesInvoiceId == id)
@@ -772,13 +786,25 @@ namespace NewsApp2.Controllers
         public async Task<IActionResult> Report(DateOnly? from, DateOnly? to, Guid? customerId, string? paymentMethod)
         {
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
+            var userId = _userManager.GetUserId(User);
+            var canViewAll = CanViewAllInvoices();
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
             var query = _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.Status == "Posted");
-            if (from.HasValue)
-                query = query.Where(i => i.InvoiceDate >= from.Value);
-            if (to.HasValue)
-                query = query.Where(i => i.InvoiceDate <= to.Value);
+
+            if (canViewAll)
+            {
+                if (from.HasValue)
+                    query = query.Where(i => i.InvoiceDate >= from.Value);
+                if (to.HasValue)
+                    query = query.Where(i => i.InvoiceDate <= to.Value);
+            }
+            else
+            {
+                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate == today);
+            }
             if (customerId.HasValue && customerId.Value != Guid.Empty)
                 query = query.Where(i => i.CustomerId == customerId.Value);
 
@@ -840,11 +866,13 @@ namespace NewsApp2.Controllers
         public async Task<IActionResult> TodayReport(DateOnly? date)
         {
             var reportDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var userId = _userManager.GetUserId(User);
 
             var rows = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.InvoiceDate == reportDate)
                 .Where(i => i.Status != "Cancelled")
+                .Where(i => CanViewAllInvoices() || i.CreatedByUserId == userId)
                 .OrderByDescending(i => i.Created)
                 .Select(i => new SalesDailyInvoiceRowVM
                 {
@@ -1177,9 +1205,14 @@ namespace NewsApp2.Controllers
             }
         }
 
+        private bool CanViewAllInvoices()
+        {
+            return User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
+        }
+
         private bool CanSeeAllDrafts()
         {
-            return User.IsInRole("Admin") || User.IsInRole("Prog");
+            return User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
         }
 
         private bool CanAccessDraft(SalesInvoiceDraft draft)

@@ -252,34 +252,39 @@ namespace NewsApp2.Controllers
                 return View(vm);
             }
 
-            await using var trx = await _context.Database.BeginTransactionAsync();
-
-            var entity = new ExpenseEntry
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                ExpenseDate = vm.ExpenseDate,
-                Amount = vm.Amount,
-                ExpenseKind = vm.ExpenseKind,
-                Category = vm.Category,
-                EmployeeId = vm.EmployeeId,
-                PaymentMethod = vm.PaymentMethod,
-                ReferenceNo = vm.ReferenceNo,
-                Note = vm.Note,
-                CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-                CreatedByUserName = User.Identity?.Name
-            };
+                _context.ChangeTracker.Clear();
+                await using var trx = await _context.Database.BeginTransactionAsync();
 
-            _context.Set<ExpenseEntry>().Add(entity);
-            await _context.SaveChangesAsync();
+                var entity = new ExpenseEntry
+                {
+                    ExpenseDate = vm.ExpenseDate,
+                    Amount = vm.Amount,
+                    ExpenseKind = vm.ExpenseKind,
+                    Category = vm.Category,
+                    EmployeeId = vm.EmployeeId,
+                    PaymentMethod = vm.PaymentMethod,
+                    ReferenceNo = vm.ReferenceNo,
+                    Note = vm.Note,
+                    CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                    CreatedByUserName = User.Identity?.Name
+                };
 
-            AddFinancialEntriesForExpense(entity);
+                _context.Set<ExpenseEntry>().Add(entity);
+                await _context.SaveChangesAsync();
 
-            await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
+                AddFinancialEntriesForExpense(entity);
 
-            await _context.SaveChangesAsync();
+                await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
 
-            await trx.CommitAsync();
+                await _context.SaveChangesAsync();
 
-            return RedirectToAction(nameof(Index));
+                await trx.CommitAsync();
+
+                return RedirectToAction(nameof(Index));
+            });
         }
 
         [HttpGet]
@@ -336,12 +341,6 @@ namespace NewsApp2.Controllers
                 return View("NotFound");
             }
 
-            var entity = await _context.Set<ExpenseEntry>().FindAsync(id);
-            if (entity == null)
-            {
-                return View("NotFound");
-            }
-
             vm.ExpenseKind = NormalizeKind(vm.ExpenseKind) ?? "General";
             vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
             vm.Category = vm.Category?.Trim() ?? string.Empty;
@@ -363,28 +362,37 @@ namespace NewsApp2.Controllers
                 return View(vm);
             }
 
-            await using var trx = await _context.Database.BeginTransactionAsync();
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
+            {
+                _context.ChangeTracker.Clear();
+                await using var trx = await _context.Database.BeginTransactionAsync();
 
-            entity.ExpenseDate = vm.ExpenseDate;
-            entity.Amount = vm.Amount;
-            entity.ExpenseKind = vm.ExpenseKind;
-            entity.Category = vm.Category;
-            entity.EmployeeId = vm.EmployeeId;
-            entity.PaymentMethod = vm.PaymentMethod;
-            entity.ReferenceNo = vm.ReferenceNo;
-            entity.Note = vm.Note;
+                var entity = await _context.Set<ExpenseEntry>().FindAsync(id);
+                if (entity == null)
+                    return View("NotFound");
 
-            await RemoveFinancialEntriesAsync(entity.Id);
-            AddFinancialEntriesForExpense(entity);
+                entity.ExpenseDate = vm.ExpenseDate;
+                entity.Amount = vm.Amount;
+                entity.ExpenseKind = vm.ExpenseKind;
+                entity.Category = vm.Category;
+                entity.EmployeeId = vm.EmployeeId;
+                entity.PaymentMethod = vm.PaymentMethod;
+                entity.ReferenceNo = vm.ReferenceNo;
+                entity.Note = vm.Note;
 
-            await _context.SaveChangesAsync();
+                await RemoveFinancialEntriesAsync(entity.Id);
+                AddFinancialEntriesForExpense(entity);
 
-            await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
+                await _context.SaveChangesAsync();
 
-            await _context.SaveChangesAsync();
+                await UpsertLinkedSettlementAsync(entity, vm.AdvanceDeduction);
 
-            await trx.CommitAsync();
-            return RedirectToAction(nameof(Index));
+                await _context.SaveChangesAsync();
+
+                await trx.CommitAsync();
+                return RedirectToAction(nameof(Index));
+            });
         }
 
         [HttpGet]

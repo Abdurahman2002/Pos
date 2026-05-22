@@ -468,112 +468,117 @@ namespace NewsApp2.Controllers
             if (!ModelState.IsValid)
                 return View(viewName, model);
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-            var user = new ApplicationUser
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
             {
-                UserName = model.Email,
-                Email = model.Email,
-                Approval = false,
-            };
+                _context.ChangeTracker.Clear();
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.CreateAsync(user, model.Password);
-            if (!result.Succeeded)
-            {
-                foreach (var error in result.Errors)
-                    ModelState.AddModelError(string.Empty, error.Description);
-
-                return View(viewName, model);
-            }
-
-            var nameExists = await _employee.Repository
-                                         .GetWhere(e => e.Name == model.Employee.Name)
-                                         .AnyAsync();
-            if (nameExists)
-            {
-                TempData["ErrorMessage"] = "The Employee name is reserved";
-                return View(viewName, model);
-            }
-
-            var employee = new Employee
-            {
-                Name = model.Employee.Name,
-                UserId = user.Id,
-                Created = DateTime.UtcNow
-            };
-
-            try
-            {
-                _employee.Repository.Insert(employee);
-                await _employee.SaveAsync();
-            }
-            catch
-            {
-                TempData["ErrorMessage"] = "Failed to create employee profile";
-                return View("Error");
-            }
-
-            var pendingRoles = new[] { "EmployeePending" };
-            foreach (var roleName in pendingRoles)
-            {
-                if (!await _roleManager.RoleExistsAsync(roleName))
+                var user = new ApplicationUser
                 {
-                    var role = new IdentityRole
-                    {
-                        Name = roleName,
-                        ConcurrencyStamp = Guid.NewGuid().ToString()
-                    };
+                    UserName = model.Email,
+                    Email = model.Email,
+                    Approval = false,
+                };
 
-                    var roleResult = await _roleManager.CreateAsync(role);
-                    if (!roleResult.Succeeded)
+                var result = await _userManager.CreateAsync(user, model.Password);
+                if (!result.Succeeded)
+                {
+                    foreach (var error in result.Errors)
+                        ModelState.AddModelError(string.Empty, error.Description);
+
+                    return View(viewName, model);
+                }
+
+                var nameExists = await _employee.Repository
+                                             .GetWhere(e => e.Name == model.Employee.Name)
+                                             .AnyAsync();
+                if (nameExists)
+                {
+                    TempData["ErrorMessage"] = "The Employee name is reserved";
+                    return View(viewName, model);
+                }
+
+                var employee = new Employee
+                {
+                    Name = model.Employee.Name,
+                    UserId = user.Id,
+                    Created = DateTime.UtcNow
+                };
+
+                try
+                {
+                    _employee.Repository.Insert(employee);
+                    await _employee.SaveAsync();
+                }
+                catch
+                {
+                    TempData["ErrorMessage"] = "Failed to create employee profile";
+                    return View("Error");
+                }
+
+                var pendingRoles = new[] { "EmployeePending" };
+                foreach (var roleName in pendingRoles)
+                {
+                    if (!await _roleManager.RoleExistsAsync(roleName))
                     {
-                        TempData["ErrorMessage"] = $"Failed to create role '{roleName}'";
-                        return View("Error");
+                        var role = new IdentityRole
+                        {
+                            Name = roleName,
+                            ConcurrencyStamp = Guid.NewGuid().ToString()
+                        };
+
+                        var roleResult = await _roleManager.CreateAsync(role);
+                        if (!roleResult.Succeeded)
+                        {
+                            TempData["ErrorMessage"] = $"Failed to create role '{roleName}'";
+                            return View("Error");
+                        }
+                    }
+
+                    if (!await _userManager.IsInRoleAsync(user, roleName))
+                    {
+                        var addRoleResult = await _userManager.AddToRoleAsync(user, roleName);
+                        if (!addRoleResult.Succeeded)
+                        {
+                            TempData["ErrorMessage"] = $"Failed to assign role '{roleName}'";
+                            return View("Error");
+                        }
                     }
                 }
 
-                if (!await _userManager.IsInRoleAsync(user, roleName))
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var confirmationLink = Url.Action(
+                    "EmailConfirm",
+                    "Account",
+                    new { userId = user.Id, token },
+                    Request.Scheme
+                );
+
+                string content = ReadHtmlTemplate("ConfirmEmail.html");
+                string subject = "Email Confirmation";
+
+                content = content.Replace("{Subject}", subject)
+                                 .Replace("{UserName}", model.Email)
+                                 .Replace("{confirmationLink}", confirmationLink);
+
+                var message = new Message(new[] { model.Email }, subject, content, null);
+                try
                 {
-                    var addRoleResult = await _userManager.AddToRoleAsync(user, roleName);
-                    if (!addRoleResult.Succeeded)
-                    {
-                        TempData["ErrorMessage"] = $"Failed to assign role '{roleName}'";
-                        return View("Error");
-                    }
+                    await _emailSender.SendEmailAsync(message);
+                    await transaction.CommitAsync();
+
+                    ViewBag.SuccessTitle = "Email confirmation required";
+                    ViewBag.SuccessMessage = "Please check your email, we sent a confirmation link";
+
+                    return View("Result");
                 }
-            }
-
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = Url.Action(
-                "EmailConfirm",
-                "Account",
-                new { userId = user.Id, token },
-                Request.Scheme
-            );
-
-            string content = ReadHtmlTemplate("ConfirmEmail.html");
-            string subject = "Email Confirmation";
-
-            content = content.Replace("{Subject}", subject)
-                             .Replace("{UserName}", model.Email)
-                             .Replace("{confirmationLink}", confirmationLink);
-
-            var message = new Message(new[] { model.Email }, subject, content, null);
-            try
-            {
-                await _emailSender.SendEmailAsync(message);
-                await transaction.CommitAsync();
-
-                ViewBag.SuccessTitle = "Email confirmation required";
-                ViewBag.SuccessMessage = "Please check your email, we sent a confirmation link";
-
-                return View("Result");
-            }
-            catch
-            {
-                TempData["ErrorMessage"] = "User created, but email sending failed";
-                return View(viewName, model);
-            }
+                catch
+                {
+                    TempData["ErrorMessage"] = "User created, but email sending failed";
+                    return View(viewName, model);
+                }
+            });
         }
 
     }

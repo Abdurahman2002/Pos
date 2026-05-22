@@ -32,19 +32,19 @@ namespace NewsApp2.Models.Services
         {
             var lineList = lines.ToList();
             if (!lineList.Any())
-                throw new InvalidOperationException("Sales invoice requires at least one line.");
+                throw new InvalidOperationException("فاتورة البيع تتطلب بنداً واحداً على الأقل.");
 
             if (lineList.Count > 200)
-                throw new InvalidOperationException("Maximum allowed lines per invoice is 200.");
+                throw new InvalidOperationException("الحد الأقصى لبنود الفاتورة هو 200.");
 
             if (!IsSupportedCurrency(invoice.CurrencyCode))
-                throw new InvalidOperationException("Only EUR or LYD is allowed.");
+                throw new InvalidOperationException("يُسمح فقط باليورو أو الدينار الليبي.");
 
             invoice.CurrencyCode = NormalizeCurrency(invoice.CurrencyCode);
             if (invoice.CurrencyCode == "LYD")
                 invoice.EurToDinarRateSnapshot = 1m;
             else if (invoice.EurToDinarRateSnapshot <= 0)
-                throw new InvalidOperationException("Rate must be greater than zero.");
+                throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
             invoice.Number = string.IsNullOrWhiteSpace(invoice.Number)
                 ? await GenerateNumberAsync(invoice.InvoiceDate)
                 : invoice.Number.Trim();
@@ -55,125 +55,129 @@ namespace NewsApp2.Models.Services
 
             _logger.LogInformation("Creating sales invoice for user {User} with {LineCount} lines.", invoice.CreatedByUserName, lineList.Count);
 
-            using var tx = await _context.Database.BeginTransactionAsync();
-
-            _context.Set<SalesInvoice>().Add(invoice);
-            await _context.SaveChangesAsync();
-
-            decimal totalEur = 0;
-            decimal totalDinar = 0;
-
-            var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
-            var itemNames = await _context.Set<Item>()
-                .AsNoTracking()
-                .Where(i => itemIds.Contains(i.Id))
-                .ToDictionaryAsync(i => i.Id, i => i.Name);
-
-            for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                var line = lineList[lineIndex];
-                if (line.Qty <= 0)
-                    throw new InvalidOperationException("Quantity must be greater than zero.");
+                _context.ChangeTracker.Clear();
+                using var tx = await _context.Database.BeginTransactionAsync();
 
-                if (line.Qty != decimal.Truncate(line.Qty))
-                    throw new InvalidOperationException("Quantity must be a whole number.");
+                _context.Set<SalesInvoice>().Add(invoice);
+                await _context.SaveChangesAsync();
 
-                if (line.UnitPriceEur < 0)
-                    throw new InvalidOperationException("Unit price cannot be negative.");
+                decimal totalEur = 0;
+                decimal totalDinar = 0;
 
-                if (!itemNames.ContainsKey(line.ItemId))
-                    throw new InvalidOperationException("Selected item was not found.");
+                var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
+                var itemNames = await _context.Set<Item>()
+                    .AsNoTracking()
+                    .Where(i => itemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i.Name);
 
-                var stock = await _context.Set<InvStockBalance>()
-                    .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
-
-                var available = stock?.QuantityOnHand ?? 0m;
-                if (available < line.Qty)
+                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
                 {
-                    var itemName = itemNames.TryGetValue(line.ItemId, out var name) ? name : "item";
-                    throw new InvalidOperationException(
-                        $"Insufficient stock for {itemName}. Requested {FormatQuantity(line.Qty)}, available {FormatQuantity(available)}.");
+                    var line = lineList[lineIndex];
+                    if (line.Qty <= 0)
+                        throw new InvalidOperationException("يجب أن تكون الكمية أكبر من الصفر.");
+
+                    if (line.Qty != decimal.Truncate(line.Qty))
+                        throw new InvalidOperationException("يجب أن تكون الكمية رقماً صحيحاً.");
+
+                    if (line.UnitPriceEur < 0)
+                        throw new InvalidOperationException("لا يمكن أن يكون سعر الوحدة سالباً.");
+
+                    if (!itemNames.ContainsKey(line.ItemId))
+                        throw new InvalidOperationException("الصنف المحدد غير موجود.");
+
+                    var stock = await _context.Set<InvStockBalance>()
+                        .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
+
+                    var available = stock?.QuantityOnHand ?? 0m;
+                    if (available < line.Qty)
+                    {
+                        var itemName = itemNames.TryGetValue(line.ItemId, out var name) ? name : "صنف";
+                        throw new InvalidOperationException(
+                            $"رصيد غير كافٍ لـ {itemName}. المطلوب {FormatQuantity(line.Qty)}، المتاح {FormatQuantity(available)}.");
+                    }
+
+                    var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
+                    var lineTotalDinar = RoundMoney(lineTotalEur * invoice.EurToDinarRateSnapshot);
+
+                    totalEur += lineTotalEur;
+                    totalDinar += lineTotalDinar;
+
+                    var salesLine = new SalesLine
+                    {
+                        SalesInvoiceId = invoice.Id,
+                        ItemId = line.ItemId,
+                        Qty = line.Qty,
+                        LineOrder = lineIndex,
+                        UnitPriceEur = line.UnitPriceEur,
+                        LineTotalEur = lineTotalEur,
+                        LineTotalDinar = lineTotalDinar,
+                        CurrencyCode = invoice.CurrencyCode,
+                        ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
+                    };
+                    var unitCost = stock!.AverageCostLyd;
+                    salesLine.UnitCostLyd = unitCost;
+                    salesLine.LineCostDinar = RoundMoney(unitCost * line.Qty);
+                    _context.Set<SalesLine>().Add(salesLine);
+
+                    stock.QuantityOnHand -= line.Qty;
+
+                    var ledger = new InvStockLedger
+                    {
+                        ItemId = line.ItemId,
+                        MovementType = "Out",
+                        ReferenceType = "SalesInvoice",
+                        ReferenceId = invoice.Id,
+                        QuantityChange = -line.Qty,
+                        BalanceAfter = stock.QuantityOnHand,
+                        Note = invoice.Note,
+                        UnitCostLyd = unitCost
+                    };
+                    _context.Set<InvStockLedger>().Add(ledger);
                 }
 
-                var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
-                var lineTotalDinar = RoundMoney(lineTotalEur * invoice.EurToDinarRateSnapshot);
+                invoice.TotalEur = RoundMoney(totalEur);
+                invoice.TotalDinar = RoundMoney(totalDinar);
 
-                totalEur += lineTotalEur;
-                totalDinar += lineTotalDinar;
+                await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
 
-                var salesLine = new SalesLine
+                _context.Set<AuditLog>().Add(new AuditLog
                 {
-                    SalesInvoiceId = invoice.Id,
-                    ItemId = line.ItemId,
-                    Qty = line.Qty,
-                    LineOrder = lineIndex,
-                    UnitPriceEur = line.UnitPriceEur,
-                    LineTotalEur = lineTotalEur,
-                    LineTotalDinar = lineTotalDinar,
-                    CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
-                };
-                // compute COGS from current moving average
-                var unitCost = stock!.AverageCostLyd;
-                salesLine.UnitCostLyd = unitCost;
-                salesLine.LineCostDinar = RoundMoney(unitCost * line.Qty);
-                _context.Set<SalesLine>().Add(salesLine);
+                    Action = "Create",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}, TotalLYD: {invoice.TotalDinar:0.00}, Rate: {invoice.EurToDinarRateSnapshot:0.000000}",
+                    CreatedByUserId = invoice.CreatedByUserId,
+                    CreatedByUserName = invoice.CreatedByUserName
+                });
 
-                stock.QuantityOnHand -= line.Qty;
-
-                var ledger = new InvStockLedger
-                {
-                    ItemId = line.ItemId,
-                    MovementType = "Out",
-                    ReferenceType = "SalesInvoice",
-                    ReferenceId = invoice.Id,
-                    QuantityChange = -line.Qty,
-                    BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note,
-                    UnitCostLyd = unitCost
-                };
-                _context.Set<InvStockLedger>().Add(ledger);
-            }
-
-            invoice.TotalEur = RoundMoney(totalEur);
-            invoice.TotalDinar = RoundMoney(totalDinar);
-
-            await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
-
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "Create",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}, TotalLYD: {invoice.TotalDinar:0.00}, Rate: {invoice.EurToDinarRateSnapshot:0.000000}",
-                CreatedByUserId = invoice.CreatedByUserId,
-                CreatedByUserName = invoice.CreatedByUserName
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                _logger.LogInformation("Sales invoice {Number} created successfully.", invoice.Number);
+                return invoice.Id;
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-            _logger.LogInformation("Sales invoice {Number} created successfully.", invoice.Number);
-            return invoice.Id;
         }
 
         public async Task<Guid> CreateReturnAsync(SalesInvoice invoice, IEnumerable<(Guid ItemId, decimal Qty, decimal UnitPriceEur)> lines)
         {
             var lineList = lines.ToList();
             if (!lineList.Any())
-                throw new InvalidOperationException("Return invoice requires at least one line.");
+                throw new InvalidOperationException("فاتورة المرتجع تتطلب بنداً واحداً على الأقل.");
 
             if (lineList.Count > 200)
-                throw new InvalidOperationException("Maximum allowed lines per invoice is 200.");
+                throw new InvalidOperationException("الحد الأقصى لبنود الفاتورة هو 200.");
 
             if (!IsSupportedCurrency(invoice.CurrencyCode))
-                throw new InvalidOperationException("Only EUR or LYD is allowed.");
+                throw new InvalidOperationException("يُسمح فقط باليورو أو الدينار الليبي.");
 
             invoice.CurrencyCode = NormalizeCurrency(invoice.CurrencyCode);
             if (invoice.CurrencyCode == "LYD")
                 invoice.EurToDinarRateSnapshot = 1m;
             else if (invoice.EurToDinarRateSnapshot <= 0)
-                throw new InvalidOperationException("Rate must be greater than zero.");
+                throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
             invoice.Number = string.IsNullOrWhiteSpace(invoice.Number)
                 ? await GenerateReturnNumberAsync(invoice.InvoiceDate)
                 : invoice.Number.Trim();
@@ -182,217 +186,226 @@ namespace NewsApp2.Models.Services
             invoice.ApprovedAt ??= DateTime.UtcNow;
             invoice.ApprovedByUserName ??= invoice.CreatedByUserName;
 
-            using var tx = await _context.Database.BeginTransactionAsync();
-
-            _context.Set<SalesInvoice>().Add(invoice);
-            await _context.SaveChangesAsync();
-
-            decimal totalEur = 0;
-            decimal totalDinar = 0;
-
-            var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
-            var itemNames = await _context.Set<Item>()
-                .AsNoTracking()
-                .Where(i => itemIds.Contains(i.Id))
-                .ToDictionaryAsync(i => i.Id, i => i.Name);
-
-            for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                var line = lineList[lineIndex];
-                if (line.Qty <= 0)
-                    throw new InvalidOperationException("Quantity must be greater than zero.");
+                _context.ChangeTracker.Clear();
+                using var tx = await _context.Database.BeginTransactionAsync();
 
-                if (line.Qty != decimal.Truncate(line.Qty))
-                    throw new InvalidOperationException("Quantity must be a whole number.");
+                _context.Set<SalesInvoice>().Add(invoice);
+                await _context.SaveChangesAsync();
 
-                if (line.UnitPriceEur < 0)
-                    throw new InvalidOperationException("Unit price cannot be negative.");
+                decimal totalEur = 0;
+                decimal totalDinar = 0;
 
-                if (!itemNames.ContainsKey(line.ItemId))
-                    throw new InvalidOperationException("Selected item was not found.");
+                var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
+                var itemNames = await _context.Set<Item>()
+                    .AsNoTracking()
+                    .Where(i => itemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i.Name);
 
-                var stock = await _context.Set<InvStockBalance>()
-                    .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
-
-                if (stock == null)
+                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
                 {
-                    stock = new InvStockBalance
+                    var line = lineList[lineIndex];
+                    if (line.Qty <= 0)
+                        throw new InvalidOperationException("يجب أن تكون الكمية أكبر من الصفر.");
+
+                    if (line.Qty != decimal.Truncate(line.Qty))
+                        throw new InvalidOperationException("يجب أن تكون الكمية رقماً صحيحاً.");
+
+                    if (line.UnitPriceEur < 0)
+                        throw new InvalidOperationException("لا يمكن أن يكون سعر الوحدة سالباً.");
+
+                    if (!itemNames.ContainsKey(line.ItemId))
+                        throw new InvalidOperationException("الصنف المحدد غير موجود.");
+
+                    var stock = await _context.Set<InvStockBalance>()
+                        .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
+
+                    if (stock == null)
+                    {
+                        stock = new InvStockBalance
+                        {
+                            ItemId = line.ItemId,
+                            QuantityOnHand = 0m
+                        };
+                        _context.Set<InvStockBalance>().Add(stock);
+                    }
+
+                    var qty = -line.Qty;
+                    var lineTotalEur = RoundMoney(qty * line.UnitPriceEur);
+                    var lineTotalDinar = RoundMoney(lineTotalEur * invoice.EurToDinarRateSnapshot);
+
+                    totalEur += lineTotalEur;
+                    totalDinar += lineTotalDinar;
+
+                    var unitCost = stock.AverageCostLyd;
+                    var salesLine = new SalesLine
+                    {
+                        SalesInvoiceId = invoice.Id,
+                        ItemId = line.ItemId,
+                        Qty = qty,
+                        LineOrder = lineIndex,
+                        UnitPriceEur = line.UnitPriceEur,
+                        LineTotalEur = lineTotalEur,
+                        LineTotalDinar = lineTotalDinar,
+                        CurrencyCode = invoice.CurrencyCode,
+                        ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot,
+                        UnitCostLyd = unitCost,
+                        LineCostDinar = RoundMoney(unitCost * qty)
+                    };
+                    _context.Set<SalesLine>().Add(salesLine);
+
+                    stock.QuantityOnHand += line.Qty;
+
+                    _context.Set<InvStockLedger>().Add(new InvStockLedger
                     {
                         ItemId = line.ItemId,
-                        QuantityOnHand = 0m
-                    };
-                    _context.Set<InvStockBalance>().Add(stock);
+                        MovementType = "In",
+                        ReferenceType = "SalesReturn",
+                        ReferenceId = invoice.Id,
+                        QuantityChange = line.Qty,
+                        BalanceAfter = stock.QuantityOnHand,
+                        Note = invoice.Note,
+                        UnitCostLyd = unitCost
+                    });
                 }
 
-                var qty = -line.Qty;
-                var lineTotalEur = RoundMoney(qty * line.UnitPriceEur);
-                var lineTotalDinar = RoundMoney(lineTotalEur * invoice.EurToDinarRateSnapshot);
+                invoice.TotalEur = RoundMoney(totalEur);
+                invoice.TotalDinar = RoundMoney(totalDinar);
 
-                totalEur += lineTotalEur;
-                totalDinar += lineTotalDinar;
+                await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
 
-                var unitCost = stock.AverageCostLyd;
-                var salesLine = new SalesLine
+                _context.Set<AuditLog>().Add(new AuditLog
                 {
-                    SalesInvoiceId = invoice.Id,
-                    ItemId = line.ItemId,
-                    Qty = qty,
-                    LineOrder = lineIndex,
-                    UnitPriceEur = line.UnitPriceEur,
-                    LineTotalEur = lineTotalEur,
-                    LineTotalDinar = lineTotalDinar,
-                    CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot,
-                    UnitCostLyd = unitCost,
-                    LineCostDinar = RoundMoney(unitCost * qty)
-                };
-                _context.Set<SalesLine>().Add(salesLine);
-
-                stock.QuantityOnHand += line.Qty;
-
-                _context.Set<InvStockLedger>().Add(new InvStockLedger
-                {
-                    ItemId = line.ItemId,
-                    MovementType = "In",
-                    ReferenceType = "SalesReturn",
-                    ReferenceId = invoice.Id,
-                    QuantityChange = line.Qty,
-                    BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note,
-                    UnitCostLyd = unitCost
+                    Action = "CreateReturn",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Return invoice. Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}",
+                    CreatedByUserId = invoice.CreatedByUserId,
+                    CreatedByUserName = invoice.CreatedByUserName
                 });
-            }
 
-            invoice.TotalEur = RoundMoney(totalEur);
-            invoice.TotalDinar = RoundMoney(totalDinar);
-
-            await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
-
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "CreateReturn",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Return invoice. Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}",
-                CreatedByUserId = invoice.CreatedByUserId,
-                CreatedByUserName = invoice.CreatedByUserName
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return invoice.Id;
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-            return invoice.Id;
         }
 
         public async Task CancelAsync(Guid invoiceId, string? cancelledBy)
         {
-            var invoice = await _context.Set<SalesInvoice>()
-                .Include(i => i.Lines)
-                .FirstOrDefaultAsync(i => i.Id == invoiceId);
-
-            if (invoice == null)
-                throw new InvalidOperationException("Invoice not found.");
-
-            if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Only posted invoices can be cancelled.");
-
-            var lines = invoice.Lines?.ToList() ?? new List<SalesLine>();
-            if (!lines.Any())
-                throw new InvalidOperationException("Invoice has no lines.");
-
-            // For return invoices (negative qty lines), cancelling restores negative qty to stock.
-            // Validate that no line would push stock below zero before entering the transaction.
-            var negativeLines = lines.Where(l => l.Qty < 0).ToList();
-            if (negativeLines.Any())
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                var negItemIds = negativeLines.Select(l => l.ItemId).Distinct().ToList();
-                var stockForNeg = await _context.Set<InvStockBalance>()
-                    .AsNoTracking()
-                    .Where(s => negItemIds.Contains(s.ItemId))
-                    .ToDictionaryAsync(s => s.ItemId, s => s.QuantityOnHand);
+                _context.ChangeTracker.Clear();
 
-                foreach (var negLine in negativeLines)
+                var invoice = await _context.Set<SalesInvoice>()
+                    .Include(i => i.Lines)
+                    .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+                if (invoice == null)
+                    throw new InvalidOperationException("لم يتم العثور على الفاتورة.");
+
+                if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("يمكن إلغاء الفواتير المرحلة فقط.");
+
+                var lines = invoice.Lines?.ToList() ?? new List<SalesLine>();
+                if (!lines.Any())
+                    throw new InvalidOperationException("الفاتورة لا تحتوي على بنود.");
+
+                var negativeLines = lines.Where(l => l.Qty < 0).ToList();
+                if (negativeLines.Any())
                 {
-                    var available = stockForNeg.TryGetValue(negLine.ItemId, out var qty) ? qty : 0m;
-                    var wouldBeRemoved = Math.Abs(negLine.Qty);
-                    if (available < wouldBeRemoved)
+                    var negItemIds = negativeLines.Select(l => l.ItemId).Distinct().ToList();
+                    var stockForNeg = await _context.Set<InvStockBalance>()
+                        .AsNoTracking()
+                        .Where(s => negItemIds.Contains(s.ItemId))
+                        .ToDictionaryAsync(s => s.ItemId, s => s.QuantityOnHand);
+
+                    foreach (var negLine in negativeLines)
                     {
-                        var itemName = await _context.Set<Item>()
-                            .AsNoTracking()
-                            .Where(i => i.Id == negLine.ItemId)
-                            .Select(i => i.Name)
-                            .FirstOrDefaultAsync() ?? negLine.ItemId.ToString();
-                        throw new InvalidOperationException(
-                            $"تعذر إلغاء المرتجع: الكمية المتاحة لـ {itemName} غير كافية. متاح: {FormatQuantity(available)}, مطلوب: {FormatQuantity(wouldBeRemoved)}.");
+                        var available = stockForNeg.TryGetValue(negLine.ItemId, out var qty) ? qty : 0m;
+                        var wouldBeRemoved = Math.Abs(negLine.Qty);
+                        if (available < wouldBeRemoved)
+                        {
+                            var itemName = await _context.Set<Item>()
+                                .AsNoTracking()
+                                .Where(i => i.Id == negLine.ItemId)
+                                .Select(i => i.Name)
+                                .FirstOrDefaultAsync() ?? negLine.ItemId.ToString();
+                            throw new InvalidOperationException(
+                                $"تعذر إلغاء المرتجع: الكمية المتاحة لـ {itemName} غير كافية. متاح: {FormatQuantity(available)}, مطلوب: {FormatQuantity(wouldBeRemoved)}.");
+                        }
                     }
                 }
-            }
 
-            using var tx = await _context.Database.BeginTransactionAsync();
+                using var tx = await _context.Database.BeginTransactionAsync();
 
-            _logger.LogInformation("Cancelling sales invoice {Number} ({Id}) by {User}.", invoice.Number, invoice.Id, cancelledBy);
+                _logger.LogInformation("Cancelling sales invoice {Number} ({Id}) by {User}.", invoice.Number, invoice.Id, cancelledBy);
 
-            foreach (var line in lines)
-            {
-                var stock = await _context.Set<InvStockBalance>()
-                    .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
-
-                if (stock == null)
+                foreach (var line in lines)
                 {
-                    stock = new InvStockBalance
+                    var stock = await _context.Set<InvStockBalance>()
+                        .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
+
+                    if (stock == null)
+                    {
+                        stock = new InvStockBalance
+                        {
+                            ItemId = line.ItemId,
+                            QuantityOnHand = line.Qty
+                        };
+                        _context.Set<InvStockBalance>().Add(stock);
+                    }
+                    else
+                    {
+                        stock.QuantityOnHand += line.Qty;
+                    }
+
+                    _context.Set<InvStockLedger>().Add(new InvStockLedger
                     {
                         ItemId = line.ItemId,
-                        QuantityOnHand = line.Qty
-                    };
-                    _context.Set<InvStockBalance>().Add(stock);
-                }
-                else
-                {
-                    stock.QuantityOnHand += line.Qty;
+                        MovementType = line.Qty >= 0 ? "In" : "Out",
+                        ReferenceType = "SalesInvoiceCancel",
+                        ReferenceId = invoice.Id,
+                        QuantityChange = line.Qty,
+                        BalanceAfter = stock.QuantityOnHand,
+                        Note = $"Cancelled by {cancelledBy ?? "unknown"}",
+                        UnitCostLyd = line.UnitCostLyd
+                    });
                 }
 
-                _context.Set<InvStockLedger>().Add(new InvStockLedger
+                invoice.Status = StatusCancelled;
+                await RemoveFinancialEntriesAsync(invoice.Id);
+
+                _context.Set<AuditLog>().Add(new AuditLog
                 {
-                    ItemId = line.ItemId,
-                    MovementType = line.Qty >= 0 ? "In" : "Out",
-                    ReferenceType = "SalesInvoiceCancel",
-                    ReferenceId = invoice.Id,
-                    QuantityChange = line.Qty,
-                    BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Cancelled by {cancelledBy ?? "unknown"}",
-                    UnitCostLyd = line.UnitCostLyd
+                    Action = "Cancel",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Cancelled sales invoice. Lines: {lines.Count}",
+                    CreatedByUserName = cancelledBy
                 });
-            }
 
-            invoice.Status = StatusCancelled;
-            await RemoveFinancialEntriesAsync(invoice.Id);
-
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "Cancel",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Cancelled sales invoice. Lines: {lines.Count}",
-                CreatedByUserName = cancelledBy
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                _logger.LogInformation("Sales invoice {Number} cancelled.", invoice.Number);
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-            _logger.LogInformation("Sales invoice {Number} cancelled.", invoice.Number);
         }
 
         public async Task<Guid> CreatePendingAsync(SalesInvoice invoice, IEnumerable<(Guid ItemId, decimal Qty)> lines)
         {
             var lineList = lines.ToList();
             if (!lineList.Any())
-                throw new InvalidOperationException("Sales invoice requires at least one line.");
+                throw new InvalidOperationException("فاتورة البيع تتطلب بنداً واحداً على الأقل.");
 
             if (lineList.Count > 200)
-                throw new InvalidOperationException("Maximum allowed lines per invoice is 200.");
+                throw new InvalidOperationException("الحد الأقصى لبنود الفاتورة هو 200.");
 
             if (!IsSupportedCurrency(invoice.CurrencyCode))
-                throw new InvalidOperationException("Only EUR or LYD is allowed.");
+                throw new InvalidOperationException("يُسمح فقط باليورو أو الدينار الليبي.");
 
             invoice.CurrencyCode = NormalizeCurrency(invoice.CurrencyCode);
             if (invoice.EurToDinarRateSnapshot <= 0)
@@ -412,57 +425,62 @@ namespace NewsApp2.Models.Services
 
             _logger.LogInformation("Creating pending sales invoice for user {User} with {LineCount} lines.", invoice.CreatedByUserName, lineList.Count);
 
-            using var tx = await _context.Database.BeginTransactionAsync();
-
-            _context.Set<SalesInvoice>().Add(invoice);
-            await _context.SaveChangesAsync();
-
-            var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
-            var itemExists = await _context.Set<Item>()
-                .AsNoTracking()
-                .Where(i => itemIds.Contains(i.Id))
-                .Select(i => i.Id)
-                .ToListAsync();
-
-            for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                var line = lineList[lineIndex];
-                if (line.Qty <= 0)
-                    throw new InvalidOperationException("Quantity must be greater than zero.");
+                _context.ChangeTracker.Clear();
+                using var tx = await _context.Database.BeginTransactionAsync();
 
-                if (!itemExists.Contains(line.ItemId))
-                    throw new InvalidOperationException("Selected item was not found.");
+                _context.Set<SalesInvoice>().Add(invoice);
+                await _context.SaveChangesAsync();
 
-                _context.Set<SalesLine>().Add(new SalesLine
+                var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
+                var itemExists = await _context.Set<Item>()
+                    .AsNoTracking()
+                    .Where(i => itemIds.Contains(i.Id))
+                    .Select(i => i.Id)
+                    .ToListAsync();
+
+                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
                 {
-                    SalesInvoiceId = invoice.Id,
-                    ItemId = line.ItemId,
-                    Qty = line.Qty,
-                    LineOrder = lineIndex,
-                    UnitPriceEur = 0,
-                    LineTotalEur = 0,
-                    LineTotalDinar = 0,
-                    CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
+                    var line = lineList[lineIndex];
+                    if (line.Qty <= 0)
+                        throw new InvalidOperationException("يجب أن تكون الكمية أكبر من الصفر.");
+
+                    if (!itemExists.Contains(line.ItemId))
+                        throw new InvalidOperationException("الصنف المحدد غير موجود.");
+
+                    _context.Set<SalesLine>().Add(new SalesLine
+                    {
+                        SalesInvoiceId = invoice.Id,
+                        ItemId = line.ItemId,
+                        Qty = line.Qty,
+                        LineOrder = lineIndex,
+                        UnitPriceEur = 0,
+                        LineTotalEur = 0,
+                        LineTotalDinar = 0,
+                        CurrencyCode = invoice.CurrencyCode,
+                        ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
+                    });
+                }
+
+                _context.Set<AuditLog>().Add(new AuditLog
+                {
+                    Action = "CreatePending",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Pending approval. Lines: {lineList.Count}",
+                    CreatedByUserId = invoice.CreatedByUserId,
+                    CreatedByUserName = invoice.CreatedByUserName
                 });
-            }
 
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "CreatePending",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Pending approval. Lines: {lineList.Count}",
-                CreatedByUserId = invoice.CreatedByUserId,
-                CreatedByUserName = invoice.CreatedByUserName
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                _logger.LogInformation("Pending sales invoice {Number} created successfully.", invoice.Number);
+                return invoice.Id;
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-
-            _logger.LogInformation("Pending sales invoice {Number} created successfully.", invoice.Number);
-            return invoice.Id;
         }
 
         public async Task ApprovePendingAsync(
@@ -474,117 +492,121 @@ namespace NewsApp2.Models.Services
         {
             var priceMap = linePrices.ToDictionary(x => x.LineId, x => x.UnitPriceEur);
             if (!priceMap.Any())
-                throw new InvalidOperationException("Line prices are required.");
+                throw new InvalidOperationException("أسعار البنود مطلوبة.");
 
             if (rate <= 0)
-                throw new InvalidOperationException("Rate must be greater than zero.");
+                throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
 
             var customerExists = await _context.Set<Customer>().AsNoTracking().AnyAsync(c => c.Id == customerId);
             if (!customerExists)
-                throw new InvalidOperationException("Customer not found.");
+                throw new InvalidOperationException("العميل المحدد غير موجود.");
 
             var invoice = await _context.Set<SalesInvoice>()
                 .Include(i => i.Lines)
                 .FirstOrDefaultAsync(i => i.Id == invoiceId);
 
             if (invoice == null)
-                throw new InvalidOperationException("Invoice not found.");
+                throw new InvalidOperationException("لم يتم العثور على الفاتورة.");
 
             if (!string.Equals(invoice.Status, StatusPendingApproval, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Only pending sales invoices can be approved.");
+                throw new InvalidOperationException("يمكن اعتماد فواتير البيع المعلقة فقط.");
 
             var lines = invoice.Lines?.ToList() ?? new List<SalesLine>();
             if (!lines.Any())
-                throw new InvalidOperationException("Invoice has no lines.");
+                throw new InvalidOperationException("الفاتورة لا تحتوي على بنود.");
 
             foreach (var line in lines)
             {
                 if (!priceMap.ContainsKey(line.Id))
-                    throw new InvalidOperationException("Missing price for one or more lines.");
+                    throw new InvalidOperationException("سعر واحد أو أكثر من البنود مفقود.");
             }
 
-            using var tx = await _context.Database.BeginTransactionAsync();
-
-            decimal totalEur = 0;
-            decimal totalDinar = 0;
-
-            var itemIds = lines.Select(l => l.ItemId).Distinct().ToList();
-            var itemNames = await _context.Set<Item>()
-                .AsNoTracking()
-                .Where(i => itemIds.Contains(i.Id))
-                .ToDictionaryAsync(i => i.Id, i => i.Name);
-
-            foreach (var line in lines)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                var unitPrice = priceMap[line.Id];
-                if (unitPrice < 0)
-                    throw new InvalidOperationException("Unit price cannot be negative.");
+                _context.ChangeTracker.Clear();
+                using var tx = await _context.Database.BeginTransactionAsync();
 
-                var stock = await _context.Set<InvStockBalance>()
-                    .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
+                decimal totalEur = 0;
+                decimal totalDinar = 0;
 
-                var available = stock?.QuantityOnHand ?? 0m;
-                if (available < line.Qty)
+                var itemIds = lines.Select(l => l.ItemId).Distinct().ToList();
+                var itemNames = await _context.Set<Item>()
+                    .AsNoTracking()
+                    .Where(i => itemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i.Name);
+
+                foreach (var line in lines)
                 {
-                    var itemName = itemNames.TryGetValue(line.ItemId, out var name) ? name : "item";
-                    throw new InvalidOperationException(
-                        $"Insufficient stock for {itemName}. Requested {FormatQuantity(line.Qty)}, available {FormatQuantity(available)}.");
+                    var unitPrice = priceMap[line.Id];
+                    if (unitPrice < 0)
+                        throw new InvalidOperationException("لا يمكن أن يكون سعر الوحدة سالباً.");
+
+                    var stock = await _context.Set<InvStockBalance>()
+                        .FirstOrDefaultAsync(s => s.ItemId == line.ItemId);
+
+                    var available = stock?.QuantityOnHand ?? 0m;
+                    if (available < line.Qty)
+                    {
+                        var itemName = itemNames.TryGetValue(line.ItemId, out var name) ? name : "صنف";
+                        throw new InvalidOperationException(
+                            $"رصيد غير كافٍ لـ {itemName}. المطلوب {FormatQuantity(line.Qty)}، المتاح {FormatQuantity(available)}.");
+                    }
+
+                    var lineTotalEur = RoundMoney(line.Qty * unitPrice);
+                    var lineTotalDinar = RoundMoney(lineTotalEur * rate);
+
+                    line.UnitPriceEur = unitPrice;
+                    line.LineTotalEur = lineTotalEur;
+                    line.LineTotalDinar = lineTotalDinar;
+                    line.ExchangeRateSnapshot = rate;
+
+                    var unitCost = stock!.AverageCostLyd;
+                    line.UnitCostLyd = unitCost;
+                    line.LineCostDinar = RoundMoney(unitCost * line.Qty);
+
+                    totalEur += lineTotalEur;
+                    totalDinar += lineTotalDinar;
+
+                    stock!.QuantityOnHand -= line.Qty;
+
+                    _context.Set<InvStockLedger>().Add(new InvStockLedger
+                    {
+                        ItemId = line.ItemId,
+                        MovementType = "Out",
+                        ReferenceType = "SalesInvoice",
+                        ReferenceId = invoice.Id,
+                        QuantityChange = -line.Qty,
+                        BalanceAfter = stock.QuantityOnHand,
+                        Note = invoice.Note,
+                        UnitCostLyd = unitCost
+                    });
                 }
 
-                var lineTotalEur = RoundMoney(line.Qty * unitPrice);
-                var lineTotalDinar = RoundMoney(lineTotalEur * rate);
+                invoice.CustomerId = customerId;
+                invoice.EurToDinarRateSnapshot = rate;
+                invoice.TotalEur = RoundMoney(totalEur);
+                invoice.TotalDinar = RoundMoney(totalDinar);
+                invoice.Status = StatusPosted;
+                invoice.ApprovedAt = DateTime.UtcNow;
+                invoice.ApprovedByUserName = approvedBy;
 
-                line.UnitPriceEur = unitPrice;
-                line.LineTotalEur = lineTotalEur;
-                line.LineTotalDinar = lineTotalDinar;
-                line.ExchangeRateSnapshot = rate;
+                await ReplaceFinancialEntriesAsync(invoice, null, approvedBy);
 
-                // record COGS from current average
-                var unitCost = stock!.AverageCostLyd;
-                line.UnitCostLyd = unitCost;
-                line.LineCostDinar = RoundMoney(unitCost * line.Qty);
-
-                totalEur += lineTotalEur;
-                totalDinar += lineTotalDinar;
-
-                stock!.QuantityOnHand -= line.Qty;
-
-                _context.Set<InvStockLedger>().Add(new InvStockLedger
+                _context.Set<AuditLog>().Add(new AuditLog
                 {
-                    ItemId = line.ItemId,
-                    MovementType = "Out",
-                    ReferenceType = "SalesInvoice",
-                    ReferenceId = invoice.Id,
-                    QuantityChange = -line.Qty,
-                    BalanceAfter = stock.QuantityOnHand,
-                    Note = invoice.Note,
-                    UnitCostLyd = unitCost
+                    Action = "Approve",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Approved pending sales invoice. Lines: {lines.Count}, TotalEUR: {invoice.TotalEur:0.00}",
+                    CreatedByUserName = approvedBy
                 });
-            }
 
-            invoice.CustomerId = customerId;
-            invoice.EurToDinarRateSnapshot = rate;
-            invoice.TotalEur = RoundMoney(totalEur);
-            invoice.TotalDinar = RoundMoney(totalDinar);
-            invoice.Status = StatusPosted;
-            invoice.ApprovedAt = DateTime.UtcNow;
-            invoice.ApprovedByUserName = approvedBy;
-
-            await ReplaceFinancialEntriesAsync(invoice, null, approvedBy);
-
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "Approve",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Approved pending sales invoice. Lines: {lines.Count}, TotalEUR: {invoice.TotalEur:0.00}",
-                CreatedByUserName = approvedBy
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                _logger.LogInformation("Pending sales invoice {Number} approved by {User}.", invoice.Number, approvedBy);
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-            _logger.LogInformation("Pending sales invoice {Number} approved by {User}.", invoice.Number, approvedBy);
         }
 
         public async Task UpdatePostedAsync(
@@ -598,186 +620,192 @@ namespace NewsApp2.Models.Services
         {
             var lineList = lines.ToList();
             if (!lineList.Any())
-                throw new InvalidOperationException("Sales invoice requires at least one line.");
+                throw new InvalidOperationException("فاتورة البيع تتطلب بنداً واحداً على الأقل.");
 
             if (lineList.Count > 200)
-                throw new InvalidOperationException("Maximum allowed lines per invoice is 200.");
+                throw new InvalidOperationException("الحد الأقصى لبنود الفاتورة هو 200.");
 
             if (rate <= 0)
-                throw new InvalidOperationException("Rate must be greater than zero.");
+                throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
 
             foreach (var line in lineList)
             {
                 if (line.Qty <= 0)
-                    throw new InvalidOperationException("Quantity must be greater than zero.");
+                    throw new InvalidOperationException("يجب أن تكون الكمية أكبر من الصفر.");
 
                 if (line.Qty != decimal.Truncate(line.Qty))
-                    throw new InvalidOperationException("Quantity must be a whole number.");
+                    throw new InvalidOperationException("يجب أن تكون الكمية رقماً صحيحاً.");
 
                 if (line.UnitPriceEur < 0)
-                    throw new InvalidOperationException("Unit price cannot be negative.");
+                    throw new InvalidOperationException("لا يمكن أن يكون سعر الوحدة سالباً.");
             }
 
-            if (customerId.HasValue)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                var customerExists = await _context.Set<Customer>()
-                    .AsNoTracking()
-                    .AnyAsync(c => c.Id == customerId.Value);
-                if (!customerExists)
-                    throw new InvalidOperationException("Customer not found.");
-            }
+                _context.ChangeTracker.Clear();
 
-            var invoice = await _context.Set<SalesInvoice>()
-                .Include(i => i.Lines)
-                .FirstOrDefaultAsync(i => i.Id == invoiceId);
-
-            if (invoice == null)
-                throw new InvalidOperationException("Invoice not found.");
-
-            if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Only posted sales invoices can be edited.");
-
-            if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase)
-                && !customerId.HasValue)
-                throw new InvalidOperationException("Customer is required when editing a credit sales invoice.");
-
-            var itemIds = lineList.Select(l => l.ItemId)
-                .Concat((invoice.Lines ?? new List<SalesLine>()).Select(l => l.ItemId))
-                .Distinct()
-                .ToList();
-
-            var itemNames = await _context.Set<Item>()
-                .AsNoTracking()
-                .Where(i => itemIds.Contains(i.Id))
-                .ToDictionaryAsync(i => i.Id, i => i.Name);
-
-            foreach (var id in lineList.Select(l => l.ItemId).Distinct())
-            {
-                if (!itemNames.ContainsKey(id))
-                    throw new InvalidOperationException("Selected item was not found.");
-            }
-
-            var oldQtyByItem = (invoice.Lines ?? new List<SalesLine>())
-                .GroupBy(l => l.ItemId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
-
-            var newQtyByItem = lineList
-                .GroupBy(l => l.ItemId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
-
-            var stockByItem = await _context.Set<InvStockBalance>()
-                .Where(s => itemIds.Contains(s.ItemId))
-                .ToDictionaryAsync(s => s.ItemId, s => s);
-
-            var unionItemIds = oldQtyByItem.Keys.Union(newQtyByItem.Keys).ToList();
-
-            foreach (var itemId in unionItemIds)
-            {
-                var oldQty = oldQtyByItem.TryGetValue(itemId, out var oldVal) ? oldVal : 0m;
-                var newQty = newQtyByItem.TryGetValue(itemId, out var newVal) ? newVal : 0m;
-                var deltaStock = oldQty - newQty;
-
-                if (!stockByItem.TryGetValue(itemId, out var stock))
+                if (customerId.HasValue)
                 {
-                    stock = new InvStockBalance
+                    var customerExists = await _context.Set<Customer>()
+                        .AsNoTracking()
+                        .AnyAsync(c => c.Id == customerId.Value);
+                    if (!customerExists)
+                        throw new InvalidOperationException("العميل المحدد غير موجود.");
+                }
+
+                var invoice = await _context.Set<SalesInvoice>()
+                    .Include(i => i.Lines)
+                    .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+                if (invoice == null)
+                    throw new InvalidOperationException("لم يتم العثور على الفاتورة.");
+
+                if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("يمكن تعديل فواتير البيع المرحلة فقط.");
+
+                if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase)
+                    && !customerId.HasValue)
+                    throw new InvalidOperationException("العميل مطلوب عند تعديل فاتورة بيع آجل.");
+
+                var itemIds = lineList.Select(l => l.ItemId)
+                    .Concat((invoice.Lines ?? new List<SalesLine>()).Select(l => l.ItemId))
+                    .Distinct()
+                    .ToList();
+
+                var itemNames = await _context.Set<Item>()
+                    .AsNoTracking()
+                    .Where(i => itemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i.Name);
+
+                foreach (var id in lineList.Select(l => l.ItemId).Distinct())
+                {
+                    if (!itemNames.ContainsKey(id))
+                        throw new InvalidOperationException("الصنف المحدد غير موجود.");
+                }
+
+                var oldQtyByItem = (invoice.Lines ?? new List<SalesLine>())
+                    .GroupBy(l => l.ItemId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+
+                var newQtyByItem = lineList
+                    .GroupBy(l => l.ItemId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+
+                var stockByItem = await _context.Set<InvStockBalance>()
+                    .Where(s => itemIds.Contains(s.ItemId))
+                    .ToDictionaryAsync(s => s.ItemId, s => s);
+
+                var unionItemIds = oldQtyByItem.Keys.Union(newQtyByItem.Keys).ToList();
+
+                foreach (var itemId in unionItemIds)
+                {
+                    var oldQty = oldQtyByItem.TryGetValue(itemId, out var oldVal) ? oldVal : 0m;
+                    var newQty = newQtyByItem.TryGetValue(itemId, out var newVal) ? newVal : 0m;
+                    var deltaStock = oldQty - newQty;
+
+                    if (!stockByItem.TryGetValue(itemId, out var stock))
+                    {
+                        stock = new InvStockBalance
+                        {
+                            ItemId = itemId,
+                            QuantityOnHand = 0m
+                        };
+                        _context.Set<InvStockBalance>().Add(stock);
+                        stockByItem[itemId] = stock;
+                    }
+
+                    var resultQty = stock.QuantityOnHand + deltaStock;
+                    if (resultQty < 0)
+                    {
+                        var itemName = itemNames.TryGetValue(itemId, out var name) ? name : "صنف";
+                        throw new InvalidOperationException(
+                            $"رصيد غير كافٍ لـ {itemName}. المطلوب {FormatQuantity(newQty)}، المتاح بعد التعديل {FormatQuantity(stock.QuantityOnHand + oldQty)}.");
+                    }
+                }
+
+                using var tx = await _context.Database.BeginTransactionAsync();
+
+                foreach (var itemId in unionItemIds)
+                {
+                    var oldQty = oldQtyByItem.TryGetValue(itemId, out var oldVal) ? oldVal : 0m;
+                    var newQty = newQtyByItem.TryGetValue(itemId, out var newVal) ? newVal : 0m;
+                    var deltaStock = oldQty - newQty;
+                    if (deltaStock == 0)
+                        continue;
+
+                    var stock = stockByItem[itemId];
+                    stock.QuantityOnHand += deltaStock;
+
+                    _context.Set<InvStockLedger>().Add(new InvStockLedger
                     {
                         ItemId = itemId,
-                        QuantityOnHand = 0m
+                        MovementType = deltaStock >= 0 ? "In" : "Out",
+                        ReferenceType = "SalesInvoiceEdit",
+                        ReferenceId = invoice.Id,
+                        QuantityChange = deltaStock,
+                        BalanceAfter = stock.QuantityOnHand,
+                        Note = $"Edited by {editedBy ?? "unknown"}",
+                        UnitCostLyd = stock.AverageCostLyd
+                    });
+                }
+
+                _context.Set<SalesLine>().RemoveRange(invoice.Lines ?? new List<SalesLine>());
+
+                decimal totalEur = 0m;
+                decimal totalDinar = 0m;
+
+                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+                {
+                    var line = lineList[lineIndex];
+                    var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
+                    var lineTotalDinar = RoundMoney(lineTotalEur * rate);
+
+                    totalEur += lineTotalEur;
+                    totalDinar += lineTotalDinar;
+
+                    var unitCost = stockByItem[line.ItemId].AverageCostLyd;
+                    var salesLine = new SalesLine
+                    {
+                        SalesInvoiceId = invoice.Id,
+                        ItemId = line.ItemId,
+                        Qty = line.Qty,
+                        LineOrder = lineIndex,
+                        UnitPriceEur = line.UnitPriceEur,
+                        LineTotalEur = lineTotalEur,
+                        LineTotalDinar = lineTotalDinar,
+                        CurrencyCode = invoice.CurrencyCode,
+                        ExchangeRateSnapshot = rate,
+                        UnitCostLyd = unitCost,
+                        LineCostDinar = RoundMoney(unitCost * line.Qty)
                     };
-                    _context.Set<InvStockBalance>().Add(stock);
-                    stockByItem[itemId] = stock;
+                    _context.Set<SalesLine>().Add(salesLine);
                 }
 
-                var resultQty = stock.QuantityOnHand + deltaStock;
-                if (resultQty < 0)
+                invoice.InvoiceDate = invoiceDate;
+                invoice.CurrencyCode = NormalizeCurrency(invoice.CurrencyCode);
+                invoice.CustomerId = customerId;
+                invoice.EurToDinarRateSnapshot = invoice.CurrencyCode == "LYD" ? 1m : rate;
+                invoice.Note = note;
+                invoice.TotalEur = RoundMoney(totalEur);
+                invoice.TotalDinar = RoundMoney(totalDinar);
+
+                await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
+
+                _context.Set<AuditLog>().Add(new AuditLog
                 {
-                    var itemName = itemNames.TryGetValue(itemId, out var name) ? name : "item";
-                    throw new InvalidOperationException(
-                        $"Insufficient stock for {itemName}. Requested {FormatQuantity(newQty)}, available after edit {FormatQuantity(stock.QuantityOnHand + oldQty)}.");
-                }
-            }
-
-            using var tx = await _context.Database.BeginTransactionAsync();
-
-            foreach (var itemId in unionItemIds)
-            {
-                var oldQty = oldQtyByItem.TryGetValue(itemId, out var oldVal) ? oldVal : 0m;
-                var newQty = newQtyByItem.TryGetValue(itemId, out var newVal) ? newVal : 0m;
-                var deltaStock = oldQty - newQty;
-                if (deltaStock == 0)
-                    continue;
-
-                var stock = stockByItem[itemId];
-                stock.QuantityOnHand += deltaStock;
-
-                _context.Set<InvStockLedger>().Add(new InvStockLedger
-                {
-                    ItemId = itemId,
-                    MovementType = deltaStock >= 0 ? "In" : "Out",
-                    ReferenceType = "SalesInvoiceEdit",
-                    ReferenceId = invoice.Id,
-                    QuantityChange = deltaStock,
-                    BalanceAfter = stock.QuantityOnHand,
-                    Note = $"Edited by {editedBy ?? "unknown"}",
-                    UnitCostLyd = stock.AverageCostLyd
+                    Action = "Edit",
+                    EntityType = "SalesInvoice",
+                    EntityId = invoice.Id,
+                    EntityNumber = invoice.Number,
+                    Description = $"Edited sales invoice. Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}",
+                    CreatedByUserName = editedBy
                 });
-            }
 
-            _context.Set<SalesLine>().RemoveRange(invoice.Lines ?? new List<SalesLine>());
-
-            decimal totalEur = 0m;
-            decimal totalDinar = 0m;
-
-            for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
-            {
-                var line = lineList[lineIndex];
-                var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
-                var lineTotalDinar = RoundMoney(lineTotalEur * rate);
-
-                totalEur += lineTotalEur;
-                totalDinar += lineTotalDinar;
-
-                var unitCost = stockByItem[line.ItemId].AverageCostLyd;
-                var salesLine = new SalesLine
-                {
-                    SalesInvoiceId = invoice.Id,
-                    ItemId = line.ItemId,
-                    Qty = line.Qty,
-                    LineOrder = lineIndex,
-                    UnitPriceEur = line.UnitPriceEur,
-                    LineTotalEur = lineTotalEur,
-                    LineTotalDinar = lineTotalDinar,
-                    CurrencyCode = invoice.CurrencyCode,
-                    ExchangeRateSnapshot = rate,
-                    UnitCostLyd = unitCost,
-                    LineCostDinar = RoundMoney(unitCost * line.Qty)
-                };
-                _context.Set<SalesLine>().Add(salesLine);
-            }
-
-            invoice.InvoiceDate = invoiceDate;
-            invoice.CurrencyCode = NormalizeCurrency(invoice.CurrencyCode);
-            invoice.CustomerId = customerId;
-            invoice.EurToDinarRateSnapshot = invoice.CurrencyCode == "LYD" ? 1m : rate;
-            invoice.Note = note;
-            invoice.TotalEur = RoundMoney(totalEur);
-            invoice.TotalDinar = RoundMoney(totalDinar);
-
-            await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
-
-            _context.Set<AuditLog>().Add(new AuditLog
-            {
-                Action = "Edit",
-                EntityType = "SalesInvoice",
-                EntityId = invoice.Id,
-                EntityNumber = invoice.Number,
-                Description = $"Edited sales invoice. Lines: {lineList.Count}, TotalEUR: {invoice.TotalEur:0.00}",
-                CreatedByUserName = editedBy
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                _logger.LogInformation("Sales invoice {Number} edited by {User}.", invoice.Number, editedBy);
             });
-
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-            _logger.LogInformation("Sales invoice {Number} edited by {User}.", invoice.Number, editedBy);
         }
 
         private async Task<string> GenerateNumberAsync(DateOnly invoiceDate)

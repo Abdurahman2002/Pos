@@ -284,14 +284,6 @@
             </tr>
         </table>
 
-        @if (!string.IsNullOrWhiteSpace(Model.Note))
-        {
-            <div class="divider"></div>
-            <div style="font-size: 9px; text-align: right; padding: 1mm; color: #000;">
-                <strong>ملاحظة: </strong>@Model.Note
-            </div>
-        }
-
         <div class="footer">
             <div class="thank-you">شكراً لتسوقكم</div>
             <div class="footer-text">معالج: @(Model.CreatedByUserName ?? "-")</div>

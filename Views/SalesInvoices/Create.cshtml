@@ -15,8 +15,6 @@
     var shiftReturnUrl = ViewBag.ShiftReturnUrl as string ?? Url.Action("Create", "SalesInvoices") ?? "/SalesInvoices/Create";
     var heldDrafts = ViewBag.HeldDrafts as IEnumerable<NewsApp2.ViewModels.Sales.SalesInvoiceDraftSummaryVM> ?? Enumerable.Empty<NewsApp2.ViewModels.Sales.SalesInvoiceDraftSummaryVM>();
     var createUrl = Url.Action("Create", "SalesInvoices") ?? "/SalesInvoices/Create";
-    var autoPrintInvoiceId = ViewBag.AutoPrintInvoiceId as Guid?;
-    var receiptUrlTemplate = Url.Action("Receipt", "SalesInvoices", new { id = "__invoiceId__", autoPrint = true }) ?? "/SalesInvoices/Receipt/__invoiceId__?autoPrint=true";
     var soundUserKey = (User?.Identity?.Name ?? "anonymous").Trim().ToLowerInvariant();
 }
 
@@ -548,37 +546,6 @@
             } else {
                 refresh();
             }
-        })();
-    </script>
-    <script>
-        (function () {
-            var autoPrintInvoiceId = '@(autoPrintInvoiceId?.ToString() ?? string.Empty)';
-            if (!autoPrintInvoiceId) {
-                return;
-            }
-
-              var receiptUrlTemplate = '@Html.Raw(receiptUrlTemplate)';
-              var receiptUrl = receiptUrlTemplate.replace('__invoiceId__', autoPrintInvoiceId);
-              
-              // إضافة متغير لمعرفة أنها في نافذة خفية والطباعة الصامتة
-              receiptUrl += "&isIframe=true";
-
-              // إنشاء نافذة خفية للطباعة بدون تغيير الصفحة الحالية ولا نوافذ منبثقة جديدة
-              var printFrame = document.createElement("iframe");
-              printFrame.style.position = "absolute";
-              printFrame.style.width = "0px";
-              printFrame.style.height = "0px";
-              printFrame.style.border = "none";
-              printFrame.src = receiptUrl;
-              
-              document.body.appendChild(printFrame);
-              
-              // بمجرد أن يحصل الطباعة سيظل ال iframe موجودا لفترة ثم يحذف لتنظيف الصفحة من الذاكرة
-              setTimeout(function () {
-                  if (document.body.contains(printFrame)) {
-                      document.body.removeChild(printFrame);
-                  }
-              }, 10000);
         })();
     </script>
 }

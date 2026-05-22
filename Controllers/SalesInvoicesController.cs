@@ -237,10 +237,6 @@ namespace NewsApp2.Controllers
         {
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
             ViewBag.SimplePosMode = IsSimplePosMode();
-            if (TempData["AutoPrintInvoiceId"] is string autoPrintInvoiceIdText && Guid.TryParse(autoPrintInvoiceIdText, out var autoPrintInvoiceId))
-            {
-                ViewBag.AutoPrintInvoiceId = autoPrintInvoiceId;
-            }
             ViewBag.MaxCashierDiscountPercent = await GetMaxCashierDiscountPercentAsync();
             ViewBag.ShiftReturnUrl = Url.Action(nameof(Create), new { customerId, draftId });
 
@@ -510,22 +506,14 @@ namespace NewsApp2.Controllers
                     ? "تم ترحيل فاتورة المرتجع بنجاح."
                     : "تم ترحيل فاتورة البيع بنجاح.";
 
-                if (simplePosMode)
-                {
-                    // Old behavior kept in comment for traceability: always redirected to Create without any print hint.
-                    if (vm.AutoPrintReceipt)
-                    {
-                        TempData["AutoPrintInvoiceId"] = id.ToString();
-                    }
-                    return RedirectToAction(nameof(Create));
-                }
-
                 if (vm.AutoPrintReceipt)
                 {
                     return RedirectToAction(nameof(Receipt), new { id, autoPrint = true });
                 }
 
-                return RedirectToAction(nameof(Details), new { id });
+                return simplePosMode
+                    ? RedirectToAction(nameof(Create))
+                    : RedirectToAction(nameof(Details), new { id });
             }
             catch (Exception ex)
             {

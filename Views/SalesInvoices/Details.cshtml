@@ -31,11 +31,11 @@
 
 <dl class="row">
     <dt class="col-sm-3">@L["Number"]</dt><dd class="col-sm-9">@Model.Number</dd>
-    <dt class="col-sm-3">@L["Date"]</dt><dd class="col-sm-9"><span dir="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy")</span></dd>
+    <dt class="col-sm-3">@L["Date"]</dt><dd class="col-sm-9"><span dir="ltr">@Model.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></dd>
     <dt class="col-sm-3">العميل</dt><dd class="col-sm-9">@shownCustomerName</dd>
     <dt class="col-sm-3">طريقة الدفع</dt><dd class="col-sm-9">@paymentText</dd>
-    <dt class="col-sm-3">وقت الترحيل</dt><dd class="col-sm-9">@(Model.SubmittedAt.HasValue ? Model.SubmittedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") : "-")</dd>
-    <dt class="col-sm-3">وقت الاعتماد</dt><dd class="col-sm-9">@(Model.ApprovedAt.HasValue ? Model.ApprovedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") : "-")</dd>
+    <dt class="col-sm-3">وقت الترحيل</dt><dd class="col-sm-9">@(Model.SubmittedAt.HasValue ? Model.SubmittedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) : "-")</dd>
+    <dt class="col-sm-3">وقت الاعتماد</dt><dd class="col-sm-9">@(Model.ApprovedAt.HasValue ? Model.ApprovedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) : "-")</dd>
     <dt class="col-sm-3">الحالة</dt><dd class="col-sm-9">@localizedStatus</dd>
     <dt class="col-sm-3">الإجمالي</dt><dd class="col-sm-9">@Model.TotalDinar.ToString("0.00") دينار</dd>
 </dl>
@@ -139,6 +139,8 @@
 </div>
 
 <p>
+    <a asp-action="Receipt" asp-route-id="@Model.Id" asp-route-autoPrint="false" target="_blank" class="btn btn-outline-dark">طباعة</a>
+    <a asp-action="Pdf" asp-route-id="@Model.Id" target="_blank" class="btn btn-outline-info">PDF</a>
     @if ((User.IsInRole("Admin") || User.IsInRole("Prog")) && string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase))
     {
         <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">@L["Edit"]</a>

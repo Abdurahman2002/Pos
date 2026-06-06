@@ -20,11 +20,19 @@ using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var dataProtectionPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "keys");
-Directory.CreateDirectory(dataProtectionPath);
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
-    .SetApplicationName("NewsApp2");
+try
+{
+    var dataProtectionPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "keys");
+    Directory.CreateDirectory(dataProtectionPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+        .SetApplicationName("NewsApp2");
+}
+catch
+{
+    builder.Services.AddDataProtection()
+        .SetApplicationName("NewsApp2");
+}
 
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
@@ -200,7 +208,16 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    await db.Database.MigrateAsync();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Migration failed at startup. App will continue but database may be outdated.");
+    }
 
     var requiredRoles = new[]
     {
@@ -240,6 +257,8 @@ app.UseStaticFiles();
 var defaultCulture = new CultureInfo("ar-IQ");
 defaultCulture.DateTimeFormat.ShortDatePattern = "dd/MM/yyyy";
 defaultCulture.DateTimeFormat.DateSeparator = "/";
+defaultCulture.DateTimeFormat.Calendar = new GregorianCalendar();
+defaultCulture.NumberFormat.DigitSubstitution = DigitShapes.None;
 
 var supportedCultures = new[]
 {

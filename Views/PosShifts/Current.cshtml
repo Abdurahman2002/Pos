@@ -8,10 +8,12 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="m-0">@L["نظام الورديات"]</h2>
     <div class="d-flex gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary">سجل الورديات</a>
         @if (ViewBag.LatestClosedShiftId is Guid latestClosedShiftId)
         {
             <a asp-action="Report" asp-route-id="@latestClosedShiftId" class="btn btn-outline-secondary">تقرير آخر وردية</a>
         }
+        <a asp-action="CashierPerformance" class="btn btn-outline-secondary">أداء الكاشير</a>
         <a asp-controller="SalesInvoices" asp-action="Create" class="btn btn-outline-primary">العودة لنقطة البيع</a>
     </div>
 </div>
@@ -43,7 +45,7 @@ else
     <div class="card mb-3 border-primary-subtle">
         <div class="card-body row g-3">
             <div class="col-md-3"><strong>فتح بواسطة:</strong> @Model.ActiveShift.OpenedByUserName</div>
-            <div class="col-md-3"><strong>وقت الفتح:</strong> @Model.ActiveShift.OpenedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="col-md-3"><strong>وقت الفتح:</strong> @Model.ActiveShift.OpenedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</div>
             <div class="col-md-3"><strong>رصيد البداية:</strong> @Model.ActiveShift.OpeningCashLyd.ToString("0.00") دينار</div>
             <div class="col-md-3"><strong>الحالة:</strong> <span class="badge bg-success">مفتوحة</span></div>
         </div>

@@ -9,7 +9,7 @@
     <a class="btn btn-primary" asp-action="Create">فاتورة بيع جديدة</a>
     <a class="btn btn-outline-primary" asp-action="Drafts">الفواتير المعلقة</a>
     <a class="btn btn-outline-secondary" asp-action="Report">تقرير</a>
-    <a class="btn btn-outline-dark" asp-action="TodayReport">تقرير فواتير اليوم</a>
+    <a class="btn btn-outline-dark" asp-action="SimpleDailyReport">تقرير المبيعات اليومي</a>
 </p>
 
 <form method="get" class="row g-3 mb-3">
@@ -67,6 +67,8 @@
                 <td>@row.TotalDinar.ToString("0.00")</td>
                 <td>
                     <a asp-action="Details" asp-route-id="@row.Id">@L["Details"]</a>
+                    <span> | </span><a asp-action="Receipt" asp-route-id="@row.Id" asp-route-autoPrint="false" target="_blank">طباعة</a>
+                    <span> | </span><a asp-action="Pdf" asp-route-id="@row.Id" target="_blank">PDF</a>
                     @if ((User.IsInRole("Admin") || User.IsInRole("Prog")) && string.Equals(row.Status, "Posted", StringComparison.OrdinalIgnoreCase))
                     {
                         <span> | </span><a asp-action="Edit" asp-route-id="@row.Id">@L["Edit"]</a>

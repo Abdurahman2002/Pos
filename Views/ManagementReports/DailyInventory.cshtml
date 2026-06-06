@@ -1,0 +1,113 @@
+@model NewsApp2.ViewModels.ManagementReports.DailyInventoryVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "الجرد اليومي";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">الجرد اليومي للمخزون</h1>
+</div>
+
+<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
+    <div class="col-md-4">
+        <label class="form-label small fw-bold">التاريخ</label>
+        <input type="text" name="date" value="@Model.ReportDate?.ToString("dd/MM/yyyy")" class="form-control form-control-sm" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">عرض</button>
+        <a asp-action="DailyInventory" class="btn btn-outline-secondary btn-sm">اليوم</a>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <h6 class="fw-normal opacity-75 mb-1">إجمالي الأصناف</h6>
+                <h3 class="mb-0 fw-bold">@Model.TotalItems</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
+            <div class="card-body text-center">
+                <h6 class="fw-normal opacity-75 mb-1">أصناف منخفضة</h6>
+                <h3 class="mb-0 fw-bold">@Model.LowStockCount</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-danger text-white h-100">
+            <div class="card-body text-center">
+                <h6 class="fw-normal opacity-75 mb-1">أصناف نافذة</h6>
+                <h3 class="mb-0 fw-bold">@Model.OutOfStockCount</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">قائمة الجرد</h6>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge bg-info fs-6">قيمة المخزون بالتكلفة: @Model.TotalStockValueLyd.ToString("N2") د.ل</span>
+            <span class="badge bg-success fs-6">قيمة المخزون بسعر البيع: @Model.TotalSaleValueLyd.ToString("N2") د.ل</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="inventory-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>الصنف</th>
+                        <th>التصنيف</th>
+                        <th>الباركود</th>
+                        <th class="text-center">الكمية</th>
+                        <th class="text-center">متوسط التكلفة</th>
+                        <th class="text-center">سعر البيع</th>
+                        <th class="text-center">قيمة التكلفة</th>
+                        <th class="text-center">قيمة البيع</th>
+                        <th class="text-center">الربح المتوقع</th>
+                        <th class="text-center">حد إعادة الطلب</th>
+                        <th class="text-center">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        var statusClass = row.Status == "نفذ" ? "danger" : (row.Status == "منخفض" ? "warning" : "success");
+                        <tr>
+                            <td class="fw-semibold">@row.ItemName</td>
+                            <td><span class="badge bg-secondary bg-opacity-25 text-dark">@row.CategoryName</span></td>
+                            <td class="small text-muted" dir="ltr">@row.Barcode</td>
+                            <td class="text-center fw-bold">@row.QuantityOnHand.ToString("N0")</td>
+                            <td class="text-center">@row.AverageCostLyd.ToString("N2")</td>
+                            <td class="text-center">@(row.DefaultSalePriceLyd?.ToString("N2") ?? "-")</td>
+                            <td class="text-center fw-semibold">@row.StockValueLyd.ToString("N2")</td>
+                            <td class="text-center fw-semibold">@row.SaleValueLyd.ToString("N2")</td>
+                            <td class="text-center fw-bold text-success">@(row.DefaultSalePriceLyd.HasValue ? row.ExpectedProfitLyd.ToString("N2") : "-")</td>
+                            <td class="text-center">@(row.ReorderLevel?.ToString("N0") ?? "-")</td>
+                            <td class="text-center">
+                                <span class="badge bg-@statusClass">@row.Status</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="6" class="text-end">الإجمالي</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.StockValueLyd).ToString("N2")</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.SaleValueLyd).ToString("N2")</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.ExpectedProfitLyd).ToString("N2")</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card { border-radius: 10px !important; }
+    #inventory-table td, #inventory-table th { white-space: nowrap; }
+</style>

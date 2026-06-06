@@ -9,7 +9,7 @@
     <div class="card-body">
         <dl class="row mb-0">
             <dt class="col-sm-3">التاريخ</dt>
-            <dd class="col-sm-9">@Model.ExpenseDate.ToString("dd/MM/yyyy")</dd>
+            <dd class="col-sm-9"><span dir="ltr">@Model.ExpenseDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></dd>
 
             <dt class="col-sm-3">النوع</dt>
             <dd class="col-sm-9">@Model.ExpenseKind</dd>

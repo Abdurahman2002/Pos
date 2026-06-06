@@ -135,16 +135,22 @@ namespace NewsApp2.Controllers
 
             await LoadItemsAsync();
             await LoadCustomersAsync(invoice.CustomerId);
+            await LoadBanksAsync();
+            ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
+            ViewBag.EditInvoiceNumber = invoice.Number;
 
-            var vm = new SalesEditVM
+            var vm = new SalesCreateVM
             {
-                InvoiceId = invoice.Id,
+                EditInvoiceId = invoice.Id,
                 InvoiceDate = invoice.InvoiceDate,
-                CurrencyCode = invoice.CurrencyCode,
-                EurToDinarRateSnapshot = invoice.EurToDinarRateSnapshot,
+                CurrencyCode = "LYD",
+                EurToDinarRateSnapshot = 1m,
                 CustomerId = invoice.CustomerId,
                 Note = invoice.Note,
-                Lines = lines.Select(l => new SalesEditLineVM
+                PaymentMethod = invoice.PaymentMethod ?? "Cash",
+                BankId = invoice.BankId,
+                IsOnAccount = string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase),
+                Lines = lines.Select(l => new SalesLineInputVM
                 {
                     ItemId = l.ItemId,
                     Qty = (int)Math.Truncate(l.Qty),
@@ -153,9 +159,9 @@ namespace NewsApp2.Controllers
             };
 
             if (!vm.Lines.Any())
-                vm.Lines.Add(new SalesEditLineVM());
+                vm.Lines.Add(new SalesLineInputVM());
 
-            return View(vm);
+            return View("Create", vm);
         }
 
         [HttpPost]
@@ -176,17 +182,22 @@ namespace NewsApp2.Controllers
             if (vm.CustomerId.HasValue && vm.CustomerId.Value == Guid.Empty)
                 vm.CustomerId = null;
 
-            var invoicePaymentMethod = await _context.Set<SalesInvoice>()
-                .AsNoTracking()
-                .Where(i => i.Id == vm.InvoiceId)
-                .Select(i => i.PaymentMethod)
-                .FirstOrDefaultAsync();
+            vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
 
-            if (string.Equals(invoicePaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase)
-                && !vm.CustomerId.HasValue)
+            var isCreditPayment = string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase);
+            if (!isCreditPayment)
+                vm.CustomerId = null;
+
+            if (isCreditPayment && !vm.CustomerId.HasValue)
             {
-                ModelState.AddModelError(nameof(vm.CustomerId), "لا يمكن ترك العميل فارغا في فاتورة بيع آجل.");
+                ModelState.AddModelError(nameof(vm.CustomerId), "العميل مطلوب عند البيع الآجل.");
             }
+
+            var isTransferPayment = string.Equals(vm.PaymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase);
+            if (isTransferPayment && (!vm.BankId.HasValue || vm.BankId == Guid.Empty))
+                ModelState.AddModelError(nameof(vm.BankId), "حدد المصرف عند الدفع بالتحويل.");
+            if (!isTransferPayment)
+                vm.BankId = null;
 
             if (vm.Lines.Any(l => !l.Qty.HasValue || l.Qty.Value <= 0))
                 ModelState.AddModelError("Lines", "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
@@ -198,6 +209,7 @@ namespace NewsApp2.Controllers
             {
                 await LoadItemsAsync();
                 await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
                 ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
                 return View(vm);
             }
@@ -217,7 +229,9 @@ namespace NewsApp2.Controllers
                     vm.EurToDinarRateSnapshot!.Value,
                     vm.Note,
                     lines,
-                    User?.Identity?.Name);
+                    User?.Identity?.Name,
+                    vm.PaymentMethod,
+                    vm.BankId);
 
                 TempData["SuccessMessage"] = "تم تحديث فاتورة البيع بنجاح.";
                 return RedirectToAction(nameof(Details), new { id = vm.InvoiceId });
@@ -228,6 +242,7 @@ namespace NewsApp2.Controllers
                     UserMessageSanitizer.Sanitize(ex.Message, "تعذر تحديث فاتورة البيع."));
                 await LoadItemsAsync();
                 await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
                 return View(vm);
             }
         }
@@ -353,6 +368,11 @@ namespace NewsApp2.Controllers
             ViewBag.SimplePosMode = simplePosMode;
             var maxCashierDiscountPercent = await GetMaxCashierDiscountPercentAsync();
             ViewBag.MaxCashierDiscountPercent = maxCashierDiscountPercent;
+
+            if (vm.EditInvoiceId.HasValue)
+            {
+                return await EditFromPos(vm);
+            }
 
             // Old behavior kept in comment for traceability: InvoiceDate relied on posted value and could fail due client-side format differences.
             ModelState.Remove(nameof(vm.InvoiceDate));
@@ -527,6 +547,104 @@ namespace NewsApp2.Controllers
             }
         }
 
+        private async Task<IActionResult> EditFromPos(SalesCreateVM vm)
+        {
+            vm.Lines = vm.Lines?.Where(l => l != null).ToList() ?? new List<SalesLineInputVM>();
+            vm.CurrencyCode = "LYD";
+            vm.EurToDinarRateSnapshot = 1m;
+            vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+            vm.IsOnAccount = vm.IsOnAccount || string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase);
+            if (vm.IsOnAccount)
+                vm.PaymentMethod = PaymentCredit;
+
+            var isTransferPayment = string.Equals(vm.PaymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase);
+            if (isTransferPayment && (!vm.BankId.HasValue || vm.BankId == Guid.Empty))
+                ModelState.AddModelError(nameof(vm.BankId), "حدد المصرف عند الدفع بالتحويل.");
+            if (!isTransferPayment)
+                vm.BankId = null;
+
+            if (vm.CustomerId.HasValue && vm.CustomerId.Value == Guid.Empty)
+                vm.CustomerId = null;
+
+            var originalInvoice = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == vm.EditInvoiceId);
+
+            if (originalInvoice == null)
+                return View("NotFound");
+
+            vm.InvoiceDate = originalInvoice.InvoiceDate;
+
+            var isNewCredit = string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase);
+            if (!isNewCredit)
+                vm.CustomerId = null;
+
+            if (isNewCredit && !vm.CustomerId.HasValue)
+                ModelState.AddModelError(nameof(vm.CustomerId), "العميل مطلوب عند البيع الآجل.");
+
+            if (!vm.Lines.Any())
+                ModelState.AddModelError("Lines", "أضف سطر صنف واحد على الأقل.");
+
+            if (vm.Lines.Any(l => !l.Qty.HasValue || l.Qty.Value <= 0))
+                ModelState.AddModelError("Lines", "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
+
+            if (vm.Lines.Any(l => !l.UnitPriceEur.HasValue))
+                ModelState.AddModelError("Lines", "سعر الوحدة مطلوب لجميع السطور.");
+
+            if (vm.Lines.Any(l => l.UnitPriceEur.HasValue && l.UnitPriceEur.Value < 0))
+                ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر الوحدة سالبا.");
+
+            if (!ModelState.IsValid)
+            {
+                await LoadItemsAsync();
+                await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
+                ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
+                ViewBag.EditInvoiceNumber = originalInvoice?.Number;
+                return View("Create", vm);
+            }
+
+            try
+            {
+                var lines = vm.Lines.Select(l => (
+                    l.ItemId,
+                    (decimal)l.Qty!.Value,
+                    l.UnitPriceEur!.Value
+                ));
+
+                await _salesService.UpdatePostedAsync(
+                    vm.EditInvoiceId.Value,
+                    vm.InvoiceDate,
+                    vm.CustomerId,
+                    vm.EurToDinarRateSnapshot!.Value,
+                    vm.Note,
+                    lines,
+                    User?.Identity?.Name,
+                    vm.PaymentMethod,
+                    vm.BankId);
+
+                TempData["SuccessMessage"] = "تم تحديث فاتورة البيع بنجاح.";
+
+                if (vm.AutoPrintReceipt)
+                {
+                    return RedirectToAction(nameof(Receipt), new { id = vm.EditInvoiceId.Value, autoPrint = false });
+                }
+
+                return RedirectToAction(nameof(Details), new { id = vm.EditInvoiceId.Value });
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError(string.Empty,
+                    UserMessageSanitizer.Sanitize(ex.Message, "تعذر تحديث فاتورة البيع."));
+                await LoadItemsAsync();
+                await LoadCustomersAsync(vm.CustomerId);
+                await LoadBanksAsync();
+                ViewBag.HeldDrafts = await LoadHeldDraftsAsync();
+                ViewBag.EditInvoiceNumber = originalInvoice?.Number;
+                return View("Create", vm);
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Policy = "InventoryCreatePolicy")]
@@ -649,6 +767,40 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> Pdf(Guid id)
+        {
+            var invoice = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Include(i => i.Customer)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (invoice == null)
+                return View("NotFound");
+
+            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+                return Forbid();
+
+            var lines = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => l.SalesInvoiceId == id)
+                .IgnoreQueryFilters()
+                .Include(l => l.Item)
+                .OrderBy(l => l.LineOrder)
+                .ThenBy(l => l.Created)
+                .ThenBy(l => l.Id)
+                .ToListAsync();
+
+            var siteInfo = await _context.Set<SiteInfo>()
+                .AsNoTracking()
+                .OrderByDescending(s => s.Created)
+                .FirstOrDefaultAsync();
+
+            ViewBag.Lines = lines;
+            ViewBag.ShopName = siteInfo?.Name;
+            ViewBag.ShopLogo = siteInfo?.LogoUrl;
+            return View(invoice);
+        }
+
         public async Task<IActionResult> Receipt(Guid id, bool autoPrint = true)
         {
             var invoice = await _context.Set<SalesInvoice>()
@@ -681,7 +833,6 @@ namespace NewsApp2.Controllers
             ViewBag.AutoPrint = autoPrint;
             ViewBag.ShopName = siteInfo?.Name;
             ViewBag.ShopLogo = siteInfo?.LogoUrl;
-            ViewBag.ShopActivity = siteInfo?.Activity;
             return View(invoice);
         }
 
@@ -881,6 +1032,180 @@ namespace NewsApp2.Controllers
             {
                 ReportDate = reportDate,
                 Rows = rows
+            };
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DetailedReport(DateOnly? from, DateOnly? to)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate.AddDays(-30);
+            if (fromDate > toDate) { var t = fromDate; fromDate = toDate; toDate = t; }
+
+            var invoices = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Where(i => i.Status == "Posted" && i.InvoiceDate >= fromDate && i.InvoiceDate <= toDate)
+                .ToListAsync();
+
+            var grossSales = invoices.Where(i => i.TotalDinar >= 0).Sum(i => i.TotalDinar);
+            var returns = invoices.Where(i => i.TotalDinar < 0).Sum(i => Math.Abs(i.TotalDinar));
+            var netSales = grossSales - returns;
+            var cashSales = invoices.Where(i => i.TotalDinar >= 0 && (i.PaymentMethod == null || i.PaymentMethod == "Cash")).Sum(i => i.TotalDinar);
+            var cardSales = invoices.Where(i => i.TotalDinar >= 0 && i.PaymentMethod == "Card").Sum(i => i.TotalDinar);
+            var transferSales = invoices.Where(i => i.TotalDinar >= 0 && i.PaymentMethod == "Transfer").Sum(i => i.TotalDinar);
+            var creditSales = invoices.Where(i => i.TotalDinar >= 0 && i.PaymentMethod == "Credit").Sum(i => i.TotalDinar);
+
+            var invoiceIds = invoices.Select(i => i.Id).ToList();
+            var totalCogs = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => invoiceIds.Contains(l.SalesInvoiceId))
+                .SumAsync(l => Math.Abs(l.LineCostDinar));
+
+            var expenses = await _context.Set<ExpenseEntry>()
+                .AsNoTracking()
+                .Where(e => e.ExpenseDate >= fromDate && e.ExpenseDate <= toDate)
+                .ToListAsync();
+
+            var generalExpenses = expenses.Where(e => e.ExpenseKind == "General").Sum(e => e.Amount);
+            var salaries = expenses.Where(e => e.ExpenseKind == "Salary").Sum(e => e.Amount);
+            var advances = expenses.Where(e => e.ExpenseKind == "Advance").Sum(e => e.Amount);
+            var totalExpenses = generalExpenses + salaries + advances;
+
+            var grossProfit = netSales - totalCogs;
+            var grossProfitPercent = netSales > 0 ? Math.Round(grossProfit / netSales * 100m, 2) : 0m;
+            var netProfit = grossProfit - totalExpenses;
+            var netProfitPercent = netSales > 0 ? Math.Round(netProfit / netSales * 100m, 2) : 0m;
+
+            var vm = new SalesDetailedReportVM
+            {
+                From = fromDate,
+                To = toDate,
+                InvoiceCount = invoices.Count,
+                GrossSalesLyd = RoundMoney(grossSales),
+                ReturnsLyd = RoundMoney(returns),
+                NetSalesLyd = RoundMoney(netSales),
+                CashSalesLyd = RoundMoney(cashSales),
+                CardSalesLyd = RoundMoney(cardSales),
+                TransferSalesLyd = RoundMoney(transferSales),
+                CreditSalesLyd = RoundMoney(creditSales),
+                TotalCogsLyd = RoundMoney(totalCogs),
+                GrossProfitLyd = RoundMoney(grossProfit),
+                GrossProfitPercent = grossProfitPercent,
+                GeneralExpensesLyd = RoundMoney(generalExpenses),
+                SalariesLyd = RoundMoney(salaries),
+                AdvancesLyd = RoundMoney(advances),
+                TotalExpensesLyd = RoundMoney(totalExpenses),
+                NetProfitLyd = RoundMoney(netProfit),
+                NetProfitPercent = netProfitPercent
+            };
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SimpleDailyReport(DateOnly? from, DateOnly? to)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var toDate = to ?? today;
+            var fromDate = from ?? toDate;
+            if (fromDate > toDate) { var t = fromDate; fromDate = toDate; toDate = t; }
+
+            var invoices = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Where(i => i.Status == "Posted" && i.InvoiceDate >= fromDate && i.InvoiceDate <= toDate)
+                .ToListAsync();
+
+            var salesInvoices = invoices.Where(i => i.TotalDinar > 0).ToList();
+            var salesInvoiceIds = salesInvoices.Select(i => i.Id).ToList();
+
+            var lines = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => salesInvoiceIds.Contains(l.SalesInvoiceId) && l.Qty > 0 && l.LineTotalDinar > 0)
+                .Include(l => l.Item)
+                .ToListAsync();
+
+            var items = lines
+                .Where(l => l.Item != null)
+                .GroupBy(l => l.Item!.Name)
+                .Select(g => new SalesSimpleReportItemVM
+                {
+                    ItemName = g.Key,
+                    SoldQty = g.Sum(l => l.Qty),
+                    ReturnQty = 0m,
+                    NetQty = g.Sum(l => l.Qty),
+                    GrossSalesDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
+                    ReturnDinar = 0m,
+                    NetDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
+                    TotalCostLyd = RoundMoney(g.Sum(l => l.LineCostDinar)),
+                    GrossProfitLyd = RoundMoney(g.Sum(l => l.LineTotalDinar - l.LineCostDinar))
+                })
+                .OrderByDescending(x => x.NetDinar)
+                .ToList();
+
+            var grossSales = salesInvoices.Sum(i => i.TotalDinar);
+            var netSales = grossSales;
+            var cashSales = salesInvoices.Where(i => i.PaymentMethod == null || i.PaymentMethod == "Cash").Sum(i => i.TotalDinar);
+            var cardSales = salesInvoices.Where(i => i.PaymentMethod == "Card").Sum(i => i.TotalDinar);
+            var transferSales = salesInvoices.Where(i => i.PaymentMethod == "Transfer").Sum(i => i.TotalDinar);
+            var creditSales = salesInvoices.Where(i => i.PaymentMethod == "Credit").Sum(i => i.TotalDinar);
+
+            var expenses = await _context.Set<ExpenseEntry>()
+                .AsNoTracking()
+                .Include(e => e.Employee)
+                .Where(e => e.ExpenseDate >= fromDate && e.ExpenseDate <= toDate)
+                .ToListAsync();
+
+            var reportExpenses = expenses
+                .Where(e =>
+                    string.Equals(e.ExpenseKind, "General", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.ExpenseKind, "Salary", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.ExpenseKind, "Advance", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.ExpenseKind, "CommissionWithdrawal", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var totalExpenses = reportExpenses.Sum(e => e.Amount);
+            var cashExpenses = reportExpenses.Where(e => e.PaymentMethod == null || e.PaymentMethod == "Cash").Sum(e => e.Amount);
+            var cardExpenses = reportExpenses.Where(e => e.PaymentMethod == "Card").Sum(e => e.Amount);
+            var transferExpenses = reportExpenses.Where(e => e.PaymentMethod == "Transfer").Sum(e => e.Amount);
+            var internalExpenses = reportExpenses.Where(e => e.PaymentMethod == "Internal").Sum(e => e.Amount);
+
+            var vm = new SalesSimpleReportVM
+            {
+                From = fromDate,
+                To = toDate,
+                Items = items,
+                Expenses = reportExpenses
+                    .OrderBy(e => e.ExpenseDate)
+                    .ThenBy(e => e.Created)
+                    .Select(e => new SalesSimpleReportExpenseVM
+                    {
+                        ExpenseDate = e.ExpenseDate,
+                        ExpenseKind = e.ExpenseKind,
+                        Category = e.Category,
+                        PaymentMethod = e.PaymentMethod,
+                        EmployeeName = e.Employee?.Name,
+                        Note = e.Note,
+                        Amount = RoundMoney(e.Amount)
+                    })
+                    .ToList(),
+                GrossSalesLyd = RoundMoney(grossSales),
+                ReturnsLyd = 0m,
+                NetSalesLyd = RoundMoney(netSales),
+                CashSalesLyd = RoundMoney(cashSales),
+                CardSalesLyd = RoundMoney(cardSales),
+                TransferSalesLyd = RoundMoney(transferSales),
+                CreditSalesLyd = RoundMoney(creditSales),
+                TotalExpensesLyd = RoundMoney(totalExpenses),
+                CashExpensesLyd = RoundMoney(cashExpenses),
+                CardExpensesLyd = RoundMoney(cardExpenses),
+                TransferExpensesLyd = RoundMoney(transferExpenses),
+                InternalExpensesLyd = RoundMoney(internalExpenses),
+                InvoiceCount = salesInvoices.Count,
+                SoldInvoiceCount = salesInvoices.Count,
+                ReturnInvoiceCount = 0
             };
 
             return View(vm);

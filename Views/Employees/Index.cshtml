@@ -42,7 +42,7 @@
     <!-- Top Buttons -->
     <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
         <div class="d-flex gap-2">
-            <a asp-action="CreateEmployee" class="btn btn-primary px-4">+ Create Employee</a>
+            <a asp-action="CreateEmployee" class="btn btn-primary px-4">+ Create Employee / Worker</a>
             <a asp-action="Pending" class="btn btn-outline-warning px-4">Pending Approval</a>
         </div>
     </div>
@@ -76,17 +76,21 @@
                                 @item.Name
                             </a>
                         </td>
-                        <td>@item.ApplicationUser.Email</td>
+                        <td>@(item.ApplicationUser?.Email ?? "No login account")</td>
                         <td>
                             @{
-                                var roles = userRoles.TryGetValue(item.UserId, out var assignedRoles)
+                                var roles = !string.IsNullOrWhiteSpace(item.UserId) && userRoles.TryGetValue(item.UserId, out var assignedRoles)
                                 ? assignedRoles.Where(r => r != "Employee").ToList()
                                 : new List<string>();
                             }
-                            @(roles.Any() ? string.Join(", ", roles) : "-")
+                            @(roles.Any() ? string.Join(", ", roles) : "Worker / no login")
                         </td>
                         <td>
-                            @if (item.ApplicationUser.Approval == true)
+                            @if (item.ApplicationUser == null)
+                            {
+                                <span class="badge bg-secondary">No login</span>
+                            }
+                            else if (item.ApplicationUser.Approval == true)
                             {
                                 <span class="badge bg-success">Approved</span>
                             }
@@ -97,7 +101,7 @@
                         </td>
 
                         <td class="text-center">
-                            @if (item.ApplicationUser.Approval == false)
+                            @if (item.ApplicationUser?.Approval == false)
                             {
                                 <a asp-action="Approve" asp-route-id="@item.Id" class="btn btn-success btn-sm px-3">Approve</a>
                             }

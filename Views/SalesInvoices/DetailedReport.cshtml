@@ -1,0 +1,86 @@
+@model NewsApp2.ViewModels.Sales.SalesDetailedReportVM
+@{
+    ViewData["Title"] = "تقرير مبيعات تفصيلي";
+}
+<style>
+    @@media print {
+        .sidebar, .navbar, .navbar-brand-wrapper, .navbar-menu-wrapper { display: none !important; }
+        .content-wrapper { margin: 0 !important; padding: 20px !important; }
+        .page-body-wrapper { margin: 0 !important; }
+        @@page { size: A4; margin: 10mm; }
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">تقرير مبيعات تفصيلي</h2>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة / PDF</button>
+        <a asp-action="Report" class="btn btn-outline-secondary">رجوع</a>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-3">
+        <label class="form-label">من</label>
+        <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">إلى</label>
+        <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-success w-100">عرض</button>
+    </div>
+</form>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card border-primary"><div class="card-body text-center"><div class="small text-muted">إجمالي المبيعات</div><div class="fs-5 fw-bold">@Model.GrossSalesLyd.ToString("N2")</div></div></div></div>
+    <div class="col-md-3"><div class="card border-danger"><div class="card-body text-center"><div class="small text-muted">المرتجعات</div><div class="fs-5 fw-bold text-danger">@Model.ReturnsLyd.ToString("N2")</div></div></div></div>
+    <div class="col-md-3"><div class="card border-info"><div class="card-body text-center"><div class="small text-muted">صافي المبيعات</div><div class="fs-5 fw-bold text-info">@Model.NetSalesLyd.ToString("N2")</div></div></div></div>
+    <div class="col-md-3"><div class="card border-success"><div class="card-body text-center"><div class="small text-muted">عدد الفواتير</div><div class="fs-5 fw-bold">@Model.InvoiceCount</div></div></div></div>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-6">
+        <div class="card"><div class="card-header fw-semibold">طرق الدفع</div>
+            <table class="table table-sm mb-0">
+                <tr><td class="fw-bold">نقدي</td><td class="text-end">@Model.CashSalesLyd.ToString("N2")</td></tr>
+                <tr><td class="fw-bold">بطاقة</td><td class="text-end">@Model.CardSalesLyd.ToString("N2")</td></tr>
+                <tr><td class="fw-bold">تحويل</td><td class="text-end">@Model.TransferSalesLyd.ToString("N2")</td></tr>
+                <tr><td class="fw-bold">آجل</td><td class="text-end">@Model.CreditSalesLyd.ToString("N2")</td></tr>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-primary"><div class="card-header fw-semibold text-primary">قائمة الدخل</div>
+            <table class="table table-sm mb-0">
+                <tr><td class="fw-bold">صافي المبيعات</td><td class="text-end">@Model.NetSalesLyd.ToString("N2")</td></tr>
+                <tr><td class="text-danger">تكلفة المبيعات (COGS)</td><td class="text-end text-danger">@Model.TotalCogsLyd.ToString("N2")</td></tr>
+                <tr class="table-success"><td class="fw-bold text-success">إجمالي الربح</td><td class="text-end fw-bold text-success">@Model.GrossProfitLyd.ToString("N2") (@Model.GrossProfitPercent.ToString("0.00")%)</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-6">
+        <div class="card border-warning"><div class="card-header fw-semibold text-warning">المصروفات</div>
+            <table class="table table-sm mb-0">
+                <tr><td>مصروفات عامة</td><td class="text-end">@Model.GeneralExpensesLyd.ToString("N2")</td></tr>
+                <tr><td>رواتب</td><td class="text-end">@Model.SalariesLyd.ToString("N2")</td></tr>
+                <tr><td>سلف</td><td class="text-end">@Model.AdvancesLyd.ToString("N2")</td></tr>
+                <tr class="fw-bold"><td>إجمالي المصروفات</td><td class="text-end">@Model.TotalExpensesLyd.ToString("N2")</td></tr>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-success border-2 h-100">
+            <div class="card-body text-center d-flex flex-column justify-content-center">
+                <div class="small text-muted">صافي الربح</div>
+                <div class="fs-2 fw-bold text-success">@Model.NetProfitLyd.ToString("N2")</div>
+                <div class="small text-muted">هامش الربح: @Model.NetProfitPercent.ToString("0.00")%</div>
+                <div class="small text-muted mt-2">@Model.NetSalesLyd.ToString("N2") - @Model.TotalCogsLyd.ToString("N2") - @Model.TotalExpensesLyd.ToString("N2")</div>
+            </div>
+        </div>
+    </div>
+</div>

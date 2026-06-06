@@ -34,6 +34,11 @@ namespace NewsApp2.ViewModels.Sales
 
         public Guid? CustomerId { get; set; }
 
+        [StringLength(20)]
+        public string PaymentMethod { get; set; } = "Cash";
+
+        public Guid? BankId { get; set; }
+
         [StringLength(500)]
         public string? Note { get; set; }
 

@@ -6,6 +6,7 @@ using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
 using NewsApp2.ViewModels.Financial;
+using NewsApp2.Models.Services;
 
 namespace NewsApp2.Controllers
 {
@@ -15,10 +16,12 @@ namespace NewsApp2.Controllers
     public class FinancialReportsController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly SalesService _salesService;
 
-        public FinancialReportsController(AppDbContext context)
+        public FinancialReportsController(AppDbContext context, SalesService salesService)
         {
             _context = context;
+            _salesService = salesService;
         }
 
         [HttpGet]
@@ -553,6 +556,31 @@ namespace NewsApp2.Controllers
 
             var fileName = $"trial_balance_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx";
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+
+        [HttpGet]
+        public IActionResult BackfillCogs()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BackfillCogs(string? confirm)
+        {
+            if (confirm != "نعم")
+            {
+                TempData["Error"] = "الرجاء كتابة 'نعم' للتأكيد.";
+                return RedirectToAction(nameof(BackfillCogs));
+            }
+
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userName = User.Identity?.Name;
+
+            var (processed, skipped) = await _salesService.BackfillMissingCogsEntriesAsync(userId, userName);
+
+            TempData["Success"] = $"تمت المعالجة: {processed} فاتورة تم ترحيلها، {skipped} فاتورة تم تخطيها.";
+            return RedirectToAction(nameof(TrialBalance));
         }
 
         private static decimal Round2(decimal value)

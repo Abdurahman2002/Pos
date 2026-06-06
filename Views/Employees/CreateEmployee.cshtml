@@ -28,10 +28,16 @@
                     <form asp-action="CreateEmployee">
                         <div asp-validation-summary="All" class="text-danger mb-4"></div>
 
-                        <!-- User Information -->
-                        <div class="section-title">User Information</div>
+                        <div class="form-check form-switch mb-3">
+                            <input asp-for="CreateSystemAccount" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="CreateSystemAccount" class="form-check-label fw-semibold">Create system login account</label>
+                            <div class="form-text">Turn this off for workers who only need salary, advances and deductions tracking.</div>
+                        </div>
 
-                        <div class="row">
+                        <!-- User Information -->
+                        <div class="section-title account-fields">User Information</div>
+
+                        <div class="row account-fields">
                             <div class="col-md-6 mb-3">
                                 <label asp-for="Email" class="form-label fw-semibold"></label>
                                 <input asp-for="Email" class="form-control" />
@@ -52,6 +58,14 @@
                                 <label asp-for="Employee.Name" class="form-label fw-semibold"></label>
                                 <input asp-for="Employee.Name" class="form-control" />
                                 <span asp-validation-for="Employee.Name" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Employee.BaseSalaryLyd" class="form-label fw-semibold">الراتب الأساسي</label>
+                                <div class="input-group">
+                                    <input asp-for="Employee.BaseSalaryLyd" class="form-control" type="number" step="0.01" min="0" />
+                                    <span class="input-group-text">د.ل</span>
+                                </div>
+                                <span asp-validation-for="Employee.BaseSalaryLyd" class="text-danger"></span>
                             </div>
 
                         </div>
@@ -84,6 +98,19 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const toggle = document.getElementById('CreateSystemAccount');
+            const fields = document.querySelectorAll('.account-fields');
+
+            function syncAccountFields() {
+                fields.forEach(field => field.classList.toggle('d-none', !toggle.checked));
+            }
+
+            toggle?.addEventListener('change', syncAccountFields);
+            syncAccountFields();
+        })();
+    </script>
 }
 
 

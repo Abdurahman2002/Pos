@@ -16,11 +16,11 @@
         <form method="get" class="row g-2 align-items-end">
             <div class="col-md-3">
                 <label class="form-label">من</label>
-                <input type="text" class="form-control" name="from" value="@Model.From.ToString("dd/MM/yyyy")" placeholder="dd/MM/yyyy" />
+                <input type="text" class="form-control" name="from" value="@Model.From.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">إلى</label>
-                <input type="text" class="form-control" name="to" value="@Model.To.ToString("dd/MM/yyyy")" placeholder="dd/MM/yyyy" />
+                <input type="text" class="form-control" name="to" value="@Model.To.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" />
             </div>
             <div class="col-md-4">
                 <label class="form-label">الموظف</label>
@@ -106,7 +106,7 @@
                     <td class="text-end">@row.SettlementsTotal.ToString("N2")</td>
                     <td class="text-end fw-semibold">@row.OutstandingAdvanceBalance.ToString("N2")</td>
                     <td class="text-end fw-bold @(row.NetDue >= 0 ? "text-success" : "text-danger")">@row.NetDue.ToString("N2")</td>
-                    <td>@(row.LastMovementDate.HasValue ? row.LastMovementDate.Value.ToString("dd/MM/yyyy") : "-")</td>
+                    <td>@(row.LastMovementDate.HasValue ? row.LastMovementDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-")</td>
                 </tr>
             }
         }

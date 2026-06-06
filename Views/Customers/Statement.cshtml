@@ -35,11 +35,11 @@
     <input type="hidden" name="id" value="@Model.CustomerId" />
     <div class="col-md-3">
         <label class="form-label">من تاريخ</label>
-        <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-3">
         <label class="form-label">إلى تاريخ</label>
-        <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-2 align-self-end">
         <button class="btn btn-primary w-100" type="submit">تصفية</button>
@@ -69,7 +69,7 @@
             <input type="hidden" name="CustomerId" value="@Model.CustomerId" />
             <div class="col-md-2">
                 <label class="form-label">التاريخ</label>
-                <input name="ReceiptDate" type="text" class="form-control" value="@Model.PaymentInput.ReceiptDate.ToString("dd/MM/yyyy")" placeholder="dd/MM/yyyy" required />
+                <input name="ReceiptDate" type="text" class="form-control" value="@Model.PaymentInput.ReceiptDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" required />
             </div>
             <div class="col-md-2">
                 <label class="form-label">المبلغ</label>
@@ -114,7 +114,7 @@
             @foreach (var row in Model.Rows)
             {
                 <tr>
-                    <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy")</span></td>
+                    <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                     <td>@row.Reference</td>
                     <td>@row.Type</td>
                     <td class="text-end">@row.Debit.ToString("0.00")</td>

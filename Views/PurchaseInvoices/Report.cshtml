@@ -1,57 +1,261 @@
-﻿@model NewsApp2.ViewModels.Purchasing.PurchaseReportVM
+@model NewsApp2.ViewModels.Purchasing.PurchaseReportVM
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
 @{
     ViewData["Title"] = "تقرير المشتريات";
+    var fromValue = Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "البداية";
+    var toValue = Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "النهاية";
 }
 
-<h1>تقرير المشتريات</h1>
+<style>
+    .report-shell {
+        color: #17202a;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    }
 
-<form method="get" class="row g-3 mb-3">
-    <div class="col-md-3">
-        <label class="form-label">@L["From"]</label>
-        <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
-    </div>
-    <div class="col-md-3">
-        <label class="form-label">@L["To"]</label>
-        <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy"))" class="form-control" placeholder="dd/MM/yyyy" />
-    </div>
-    <div class="col-md-3 align-self-end">
-        <button type="submit" class="btn btn-primary">تصفية</button>
-        <a asp-action="Report" class="btn btn-secondary">إعادة تعيين</a>
-    </div>
-</form>
+    .report-toolbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
 
-<div class="alert alert-secondary mb-3">
-    إجمالي المشتريات: <strong>@Model.SumDinar.ToString("0.00")</strong> دينار
-</div>
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(160px, 1fr)) auto auto;
+        gap: 10px;
+        align-items: end;
+        width: min(760px, 100%);
+    }
 
-<div class="table-responsive">
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>@L["Number"]</th>
-                <th>@L["Date"]</th>
-                <th>الحالة</th>
-                <th>طريقة الدفع</th>
-                <th>المصرف</th>
-                <th>الإجمالي</th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var row in Model.Rows)
-        {
-            var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;
-            <tr>
-                <td>@row.Number</td>
-                <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@row.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
-                <td>@localizedStatus</td>
-                <td>@row.PaymentMethod</td>
-                <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
-                <td>@row.TotalDinar.ToString("0.00")</td>
-            </tr>
+    .report-paper {
+        width: 210mm;
+        min-height: 297mm;
+        max-width: 100%;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #d8dee5;
+        padding: 12mm;
+    }
+
+    .report-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 2px solid #17202a;
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+    }
+
+    .report-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    .report-range {
+        margin-top: 4px;
+        color: #52616f;
+        font-weight: 600;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .summary-cell {
+        border: 1px solid #d8dee5;
+        padding: 9px 10px;
+        background: #f8fafc;
+    }
+
+    .summary-label {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .summary-value {
+        font-size: 19px;
+        font-weight: 800;
+        margin-top: 2px;
+    }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 12px;
+    }
+
+    .report-table th,
+    .report-table td {
+        border: 1px solid #d8dee5;
+        padding: 7px 6px;
+        vertical-align: middle;
+        overflow-wrap: anywhere;
+    }
+
+    .report-table th {
+        background: #17202a;
+        color: #fff;
+        text-align: center;
+        font-weight: 800;
+    }
+
+    .report-table td {
+        text-align: center;
+    }
+
+    .report-table .text-start {
+        text-align: right;
+    }
+
+    .num {
+        direction: ltr;
+        unicode-bidi: isolate;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    @@media (max-width: 900px) {
+        .report-toolbar {
+            display: block;
         }
-        </tbody>
-    </table>
+
+        .filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@page {
+        size: A4 portrait;
+        margin: 8mm;
+    }
+
+    @@media print {
+        body {
+            background: #fff !important;
+        }
+
+        .navbar,
+        .sidebar,
+        .report-toolbar,
+        .btn,
+        footer {
+            display: none !important;
+        }
+
+        .content-wrapper,
+        .main-panel,
+        .page-body-wrapper,
+        .container,
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .report-paper {
+            width: auto;
+            min-height: auto;
+            max-width: none;
+            border: 0;
+            padding: 0;
+            margin: 0;
+        }
+
+        .report-table {
+            font-size: 10.5px;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+<div class="report-shell" dir="rtl">
+    <div class="report-toolbar">
+        <form method="get" class="filter-form">
+            <div>
+                <label class="form-label">@L["From"]</label>
+                <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
+            </div>
+            <div>
+                <label class="form-label">@L["To"]</label>
+                <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
+            </div>
+            <button type="submit" class="btn btn-primary">تصفية</button>
+            <a asp-action="Report" class="btn btn-outline-secondary">إعادة تعيين</a>
+        </form>
+        <button type="button" class="btn btn-dark" onclick="window.print()">طباعة A4 / PDF</button>
+    </div>
+
+    <section class="report-paper">
+        <header class="report-head">
+            <div>
+                <h1 class="report-title">تقرير المشتريات</h1>
+                <div class="report-range">من <span class="num">@fromValue</span> إلى <span class="num">@toValue</span></div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold">تاريخ الطباعة</div>
+                <div class="num">@DateTime.Now.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</div>
+            </div>
+        </header>
+
+        <div class="summary-grid">
+            <div class="summary-cell">
+                <div class="summary-label">عدد الفواتير</div>
+                <div class="summary-value num">@Model.Rows.Count</div>
+            </div>
+            <div class="summary-cell">
+                <div class="summary-label">إجمالي المشتريات</div>
+                <div class="summary-value num">@Model.SumDinar.ToString("0.00") د.ل</div>
+            </div>
+            <div class="summary-cell">
+                <div class="summary-label">عدد الموردين</div>
+                <div class="summary-value num">@Model.Rows.Select(r => r.SupplierName).Where(s => !string.IsNullOrWhiteSpace(s) && s != "-").Distinct().Count()</div>
+            </div>
+        </div>
+
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">@L["Number"]</th>
+                    <th style="width: 12%;">@L["Date"]</th>
+                    <th style="width: 24%;">المورد</th>
+                    <th style="width: 11%;">الحالة</th>
+                    <th style="width: 12%;">طريقة الدفع</th>
+                    <th style="width: 15%;">المصرف</th>
+                    <th style="width: 14%;">الإجمالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;
+                    <tr>
+                        <td class="num">@row.Number</td>
+                        <td class="num">@row.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        <td class="text-start">@(string.IsNullOrWhiteSpace(row.SupplierName) ? "-" : row.SupplierName)</td>
+                        <td>@localizedStatus</td>
+                        <td>@row.PaymentMethod</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
+                        <td class="num">@row.TotalDinar.ToString("0.00")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
 </div>
-
-

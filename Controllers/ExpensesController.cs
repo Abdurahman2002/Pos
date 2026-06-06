@@ -17,6 +17,8 @@ namespace NewsApp2.Controllers
         private const string SalaryKind = "Salary";
         private const string AdvanceKind = "Advance";
         private const string AdvanceSettlementKind = "AdvanceSettlement";
+        private const string DeductionKind = "Deduction";
+        private const string CommissionWithdrawalKind = "CommissionWithdrawal";
         private const string JournalSourceType = "ExpenseEntry";
 
         private const string AccountCashCode = "1101";
@@ -32,7 +34,7 @@ namespace NewsApp2.Controllers
         private const string AccountPayrollClearingCode = "2102";
         private const string AccountPayrollClearingName = "تسويات رواتب";
 
-        private static readonly string[] AllowedKinds = { "General", SalaryKind, AdvanceKind };
+        private static readonly string[] AllowedKinds = { "General", SalaryKind, AdvanceKind, DeductionKind, CommissionWithdrawalKind };
         private static readonly string[] AllowedPaymentMethods = { "Cash", "Card", "Transfer", "Internal" };
 
         private readonly AppDbContext _context;
@@ -48,6 +50,9 @@ namespace NewsApp2.Controllers
         {
             var deny = DenyCashierAccess();
             if (deny != null) return deny;
+
+            if (HttpContext != null)
+                return RedirectToAction("CashierPerformance", "PosShifts", new { from, to, employeeId });
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var toDate = to ?? today;
@@ -269,7 +274,8 @@ namespace NewsApp2.Controllers
                     ReferenceNo = vm.ReferenceNo,
                     Note = vm.Note,
                     CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
-                    CreatedByUserName = User.Identity?.Name
+                    CreatedByUserName = User.Identity?.Name,
+                    PosShiftId = await GetOpenShiftIdForCurrentUserAsync()
                 };
 
                 _context.Set<ExpenseEntry>().Add(entity);
@@ -380,6 +386,7 @@ namespace NewsApp2.Controllers
                 entity.PaymentMethod = vm.PaymentMethod;
                 entity.ReferenceNo = vm.ReferenceNo;
                 entity.Note = vm.Note;
+                entity.PosShiftId ??= await GetOpenShiftIdForCurrentUserAsync();
 
                 await RemoveFinancialEntriesAsync(entity.Id);
                 AddFinancialEntriesForExpense(entity);
@@ -467,7 +474,9 @@ namespace NewsApp2.Controllers
             {
                 new { Value = "General", Text = "مصروف عام" },
                 new { Value = "Salary", Text = "مرتب موظف" },
-                new { Value = "Advance", Text = "سلفة موظف" }
+                new { Value = "Advance", Text = "سلفة موظف" },
+                new { Value = "CommissionWithdrawal", Text = "سحب عمولة" },
+                new { Value = "Deduction", Text = "خصم موظف" }
             }, "Value", "Text", selectedExpenseKind);
             ViewBag.PaymentMethods = new SelectList(new[]
             {
@@ -493,9 +502,12 @@ namespace NewsApp2.Controllers
 
         private void ValidateEmployeeRequirement(ExpenseEntryFormVM vm)
         {
-            if ((vm.ExpenseKind == SalaryKind || vm.ExpenseKind == AdvanceKind) && !vm.EmployeeId.HasValue)
+            if ((vm.ExpenseKind == SalaryKind ||
+                 vm.ExpenseKind == AdvanceKind ||
+                 vm.ExpenseKind == DeductionKind ||
+                 vm.ExpenseKind == CommissionWithdrawalKind) && !vm.EmployeeId.HasValue)
             {
-                ModelState.AddModelError(nameof(vm.EmployeeId), "يجب اختيار الموظف عند تسجيل مرتب أو سلفة.");
+                ModelState.AddModelError(nameof(vm.EmployeeId), "يجب اختيار الموظف عند تسجيل عملية مالية خاصة به.");
             }
 
             if (vm.ExpenseKind == "General")
@@ -656,6 +668,9 @@ namespace NewsApp2.Controllers
             if (amount <= 0)
                 return;
 
+            if (string.Equals(expense.ExpenseKind, DeductionKind, StringComparison.OrdinalIgnoreCase))
+                return;
+
             var documentNo = !string.IsNullOrWhiteSpace(expense.ReferenceNo)
                 ? expense.ReferenceNo
                 : $"EX-{expense.ExpenseDate:yyyyMMdd}-{expense.Id.ToString("N")[..6].ToUpperInvariant()}";
@@ -702,6 +717,9 @@ namespace NewsApp2.Controllers
             if (string.Equals(expenseKind, AdvanceKind, StringComparison.OrdinalIgnoreCase))
                 return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
 
+            if (string.Equals(expenseKind, CommissionWithdrawalKind, StringComparison.OrdinalIgnoreCase))
+                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
+
             if (string.Equals(expenseKind, AdvanceSettlementKind, StringComparison.OrdinalIgnoreCase))
                 return (AccountPayrollClearingCode, AccountPayrollClearingName);
 
@@ -735,6 +753,19 @@ namespace NewsApp2.Controllers
             }
 
             return null;
+        }
+
+        private async Task<Guid?> GetOpenShiftIdForCurrentUserAsync()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return null;
+
+            return await _context.Set<PosShift>()
+                .AsNoTracking()
+                .Where(s => s.OpenedByUserId == userId && s.Status == "Open")
+                .Select(s => (Guid?)s.Id)
+                .FirstOrDefaultAsync();
         }
     }
 }

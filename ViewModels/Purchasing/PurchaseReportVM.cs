@@ -4,6 +4,7 @@ namespace NewsApp2.ViewModels.Purchasing
     {
         public string Number { get; set; } = string.Empty;
         public DateOnly InvoiceDate { get; set; }
+        public string SupplierName { get; set; } = string.Empty;
         public decimal EurToSecondaryRate { get; set; }
         public decimal TotalEur { get; set; }
         public decimal TotalDinar { get; set; }

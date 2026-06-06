@@ -22,6 +22,7 @@ namespace NewsApp2.Controllers
         private const string PaymentCash = "Cash";
         private const string PaymentCredit = "Credit";
         private const string PaymentTransfer = "Transfer";
+        private const string DefaultCashSupplierName = "\u0645\u0648\u0631\u062f \u0646\u0642\u062f\u064a \u0627\u0641\u062a\u0631\u0627\u0636\u064a";
 
         private readonly AppDbContext _context;
         private readonly PurchaseService _purchaseService;
@@ -196,6 +197,8 @@ namespace NewsApp2.Controllers
             else
             {
                 vm.DueDate = null;
+                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                    vm.SupplierId = await GetOrCreateDefaultSupplierIdAsync();
             }
 
             if (!vm.Lines.Any())
@@ -297,6 +300,8 @@ namespace NewsApp2.Controllers
             else
             {
                 vm.DueDate = null;
+                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                    vm.SupplierId = await GetOrCreateDefaultSupplierIdAsync();
             }
 
             if (!vm.Lines.Any())
@@ -425,6 +430,7 @@ namespace NewsApp2.Controllers
                 {
                     Number = i.Number,
                     InvoiceDate = i.InvoiceDate,
+                    SupplierName = i.Supplier != null ? i.Supplier.Name : "-",
                     TotalDinar = i.TotalDinar,
                     Status = i.Status,
                     PaymentMethod = ToArabicPaymentMethod(i.PaymentMethod),
@@ -492,6 +498,24 @@ namespace NewsApp2.Controllers
 
             ViewBag.ItemDefaultPricesJson = JsonSerializer.Serialize(defaultPriceByItem);
             ViewBag.ItemSalePricesJson = JsonSerializer.Serialize(salePriceByItem);
+        }
+
+        private async Task<Guid> GetOrCreateDefaultSupplierIdAsync()
+        {
+            var supplier = await _context.Set<Supplier>()
+                .FirstOrDefaultAsync(s => s.Name == DefaultCashSupplierName);
+
+            if (supplier != null)
+                return supplier.Id;
+
+            supplier = new Supplier
+            {
+                Name = DefaultCashSupplierName
+            };
+
+            _context.Set<Supplier>().Add(supplier);
+            await _context.SaveChangesAsync();
+            return supplier.Id;
         }
 
         private bool TryResolveInvoiceDateFromRequest(out DateOnly invoiceDate)

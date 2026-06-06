@@ -28,6 +28,41 @@
         </div>
     </div>
 
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <label asp-for="PaymentMethod" class="form-label fw-bold text-muted small">طريقة الدفع</label>
+            <div class="d-flex flex-wrap gap-1" id="payment-method-buttons">
+                <div class="form-check payment-choice flex-fill m-0">
+                    <input class="form-check-input" type="radio" asp-for="PaymentMethod" value="Cash" id="pm-cash" />
+                    <label class="form-check-label w-100 py-1 px-2 border rounded text-center small" for="pm-cash">نقدي</label>
+                </div>
+                <div class="form-check payment-choice flex-fill m-0">
+                    <input class="form-check-input" type="radio" asp-for="PaymentMethod" value="Card" id="pm-card" />
+                    <label class="form-check-label w-100 py-1 px-2 border rounded text-center small" for="pm-card">بطاقة</label>
+                </div>
+                <div class="form-check payment-choice flex-fill m-0">
+                    <input class="form-check-input" type="radio" asp-for="PaymentMethod" value="Transfer" id="pm-transfer" />
+                    <label class="form-check-label w-100 py-1 px-2 border rounded text-center small" for="pm-transfer">تحويل</label>
+                </div>
+                <div class="form-check payment-choice flex-fill m-0 mt-1 w-100">
+                    <input class="form-check-input" type="radio" asp-for="PaymentMethod" value="Credit" id="pm-credit" />
+                    <label class="form-check-label w-100 py-1 px-2 border rounded text-center small" for="pm-credit">آجل (غير مدفوع)</label>
+                </div>
+            </div>
+            <span asp-validation-for="PaymentMethod" class="text-danger small d-block mt-1"></span>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-md-6 d-none" id="bank-section">
+            <label asp-for="BankId" class="form-label fw-bold text-muted small">المصرف (للتحويل)</label>
+            <select asp-for="BankId" asp-items="@(ViewData["Banks"] as SelectList)" class="form-select">
+                <option value="">اختر المصرف</option>
+            </select>
+            <span asp-validation-for="BankId" class="text-danger small"></span>
+        </div>
+    </div>
+
     <div class="mt-3">
         <label asp-for="Note" class="form-label"></label>
         <textarea asp-for="Note" class="form-control"></textarea>
@@ -109,8 +144,60 @@
     <td><button type="button" class="btn btn-danger remove-line">حذف</button></td>
 </template>
 
+<style>
+    #payment-method-buttons .payment-choice {
+        margin: 0;
+    }
+
+    #payment-method-buttons .payment-choice .form-check-input {
+        display: none;
+    }
+
+    #payment-method-buttons .payment-choice .form-check-label {
+        border: 1px solid #ced4da;
+        border-radius: 0.6rem;
+        padding: 0.65rem 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+        min-width: 120px;
+        text-align: center;
+        background: #fff;
+    }
+
+    #payment-method-buttons .payment-choice .form-check-input:checked + .form-check-label {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+</style>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/lines-table.js"></script>
-}
+    <script>
+        (function forceTransferBankVisibility() {
+            function refresh() {
+                var selected = document.querySelector('input[name="PaymentMethod"]:checked');
+                var bankSection = document.getElementById('bank-section');
+                var bankInput = document.getElementById('BankId');
+                if (!bankSection || !bankInput) return;
 
+                var isTransfer = !!selected && String(selected.value).toLowerCase() === 'transfer';
+                bankSection.classList.toggle('d-none', !isTransfer);
+                bankInput.required = isTransfer;
+                if (!isTransfer) bankInput.value = '';
+            }
+
+            document.addEventListener('change', function (event) {
+                if (event.target && event.target.name === 'PaymentMethod') refresh();
+            });
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', refresh);
+            } else {
+                refresh();
+            }
+        })();
+    </script>
+}

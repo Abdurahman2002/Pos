@@ -7,10 +7,10 @@ namespace NewsApp2.Models.Entities
     public class Employee : BaseEntity
     {
         [StringLength(100)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [ValidateNever]
-        public ApplicationUser ApplicationUser { get; set; }
+        public ApplicationUser? ApplicationUser { get; set; }
 
         [ForeignKey("ApplicationUser")]
         public string? UserId { get; set; }
@@ -19,6 +19,10 @@ namespace NewsApp2.Models.Entities
 
         [ValidateNever]
         public Warehouse? Warehouse { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        [Range(typeof(decimal), "0", "999999999999", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true)]
+        public decimal BaseSalaryLyd { get; set; }
 
     }
 }

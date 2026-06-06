@@ -33,10 +33,10 @@
                     <tr class="align-middle">
                         <td class="text-center">@i</td>
                         <td>@item.Name</td>
-                        <td>@item.ApplicationUser.Email</td>
+                        <td>@(item.ApplicationUser?.Email ?? "-")</td>
                         <td>
                             @{
-                                var roles = userRoles.TryGetValue(item.UserId, out var assignedRoles)
+                                var roles = !string.IsNullOrWhiteSpace(item.UserId) && userRoles.TryGetValue(item.UserId, out var assignedRoles)
                                 ? assignedRoles.Where(r => r != "Employee" && r != "EmployeePending").ToList()
                                 : new List<string>();
                             }

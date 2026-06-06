@@ -51,8 +51,8 @@
                 <tr>
                     <td>@row.CustomerName</td>
                     <td>@(string.IsNullOrWhiteSpace(row.Phone) ? "-" : row.Phone)</td>
-                    <td>@(row.LastCreditSaleDate.HasValue ? row.LastCreditSaleDate.Value.ToString("dd/MM/yyyy") : "-")</td>
-                    <td>@(row.LastPaymentDate.HasValue ? row.LastPaymentDate.Value.ToString("dd/MM/yyyy") : "-")</td>
+                    <td>@(row.LastCreditSaleDate.HasValue ? row.LastCreditSaleDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-")</td>
+                    <td>@(row.LastPaymentDate.HasValue ? row.LastPaymentDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-")</td>
                     <td class="text-end fw-semibold">@row.DebtAmount.ToString("0.00")</td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary" asp-action="Statement" asp-route-id="@row.CustomerId">كشف الحساب والتحصيل</a>

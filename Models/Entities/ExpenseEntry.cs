@@ -35,6 +35,9 @@ namespace NewsApp2.Models.Entities
         [StringLength(256)]
         public string? CreatedByUserName { get; set; }
 
+        public Guid? PosShiftId { get; set; }
+
         public Employee? Employee { get; set; }
+        public PosShift? PosShift { get; set; }
     }
 }

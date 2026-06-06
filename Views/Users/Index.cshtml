@@ -191,14 +191,14 @@
                             {
                                 <span class="badge bg-warning mb-2">@L["Locked"]</span>
                                 <br />
-                                <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt")</small>
+                                <small><span dir="ltr">@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt", System.Globalization.CultureInfo.InvariantCulture)</span></small>
                             }
                             else if (user.LockoutEnd != null)
                             {
                                 <span class="badge bg-white text-dark mb-2">@L["Locked"]</span>
                                 <br />
                                 <small>@*@user.LockoutEnd.Value.ToString("dd/MM/yyyy hh:MM:ss tt")*@</small>
-                                <small>@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt")</small>
+                                <small><span dir="ltr">@user.LockoutEnd.Value.ToLocalTime().ToString("dd/MM/yyyy hh:mm:ss tt", System.Globalization.CultureInfo.InvariantCulture)</span></small>
                             }
                             else
                             {

@@ -19,10 +19,22 @@
                 <input asp-for="MaxCashierDiscountPercent" class="form-control" type="number" step="0.01" min="0" max="100" readonly="@(canManagePricingPolicy ? null : "readonly")" />
                 <span asp-validation-for="MaxCashierDiscountPercent" class="text-danger"></span>
             </div>
-            <div class="col-md-8 text-muted">
+            <div class="col-md-4">
+                <label asp-for="CommissionSalesStepLyd" class="form-label">قيمة شريحة العمولة</label>
+                <input asp-for="CommissionSalesStepLyd" class="form-control" type="number" step="0.01" min="0.01" readonly="@(canManagePricingPolicy ? null : "readonly")" />
+                <span asp-validation-for="CommissionSalesStepLyd" class="text-danger"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="CommissionAmountPerStepLyd" class="form-label">عمولة كل شريحة</label>
+                <input asp-for="CommissionAmountPerStepLyd" class="form-control" type="number" step="0.01" min="0" readonly="@(canManagePricingPolicy ? null : "readonly")" />
+                <span asp-validation-for="CommissionAmountPerStepLyd" class="text-danger"></span>
+            </div>
+            <div class="col-12 text-muted">
                 @if (canManagePricingPolicy)
                 {
-                    @L["Cashier can only apply percent discount up to this limit."]
+                    <span>@L["Cashier can only apply percent discount up to this limit."]</span>
+                    <span class="mx-2">|</span>
+                    <span>العمولة تحسب بعدد الشرائح الكاملة من صافي البيع.</span>
                 }
                 else
                 {

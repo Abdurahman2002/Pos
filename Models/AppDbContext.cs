@@ -96,6 +96,7 @@ namespace NewsApp2.Models
             modelBuilder.Entity<SupplierPayment>().HasIndex(r => r.Number).IsUnique();
             modelBuilder.Entity<ExpenseEntry>().HasIndex(e => new { e.ExpenseDate, e.ExpenseKind });
             modelBuilder.Entity<ExpenseEntry>().HasIndex(e => new { e.EmployeeId, e.ExpenseDate });
+            modelBuilder.Entity<ExpenseEntry>().HasIndex(e => e.PosShiftId);
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.SourceType, e.SourceId });
             modelBuilder.Entity<FinJournalEntry>().HasIndex(e => new { e.EntryDate, e.AccountCode });
             modelBuilder.Entity<Bank>().HasIndex(b => b.Name).IsUnique();
@@ -214,6 +215,12 @@ namespace NewsApp2.Models
                 .WithMany()
                 .HasForeignKey(e => e.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ExpenseEntry>()
+                .HasOne(e => e.PosShift)
+                .WithMany()
+                .HasForeignKey(e => e.PosShiftId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Explicit cascade config to prevent accidental hard-delete data loss
             modelBuilder.Entity<BarcodeMapping>()

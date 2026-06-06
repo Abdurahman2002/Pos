@@ -163,8 +163,8 @@
                                     </li>
                                 }
                                 <li class="nav-item">
-                                    <a href="@Url.Action("TodayReport", "SalesInvoices")" class="nav-link ajax-link">
-                                        <i class="mdi mdi-calendar-today"></i> تقرير فواتير اليوم
+                                    <a href="@Url.Action("SimpleDailyReport", "SalesInvoices")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-calendar-today"></i> تقرير المبيعات اليومي
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -259,6 +259,37 @@
                         </div>
                     </li>
 
+                    <!-- التقارير المعتمدة -->
+                    <li class="nav-item">
+                        <span class="nav-link disabled text-uppercase small fw-bold text-muted" style="color:#10b981 !important;">التقارير</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="collapse" href="#managementReportsMenu" aria-expanded="false" aria-controls="managementReportsMenu">
+                            <span class="icon-bg"><i class="mdi mdi-chart-box menu-icon"></i></span>
+                            <span class="menu-title">تقارير الإدارة</span>
+                            <i class="menu-arrow"></i>
+                        </a>
+                        <div class="collapse" id="managementReportsMenu">
+                            <ul class="nav flex-column sub-menu">
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Reports", "ManagementReports")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-chart-bar"></i> التقارير المالية
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("DailyInventory", "ManagementReports")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-calendar-check"></i> الجرد اليومي
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="@Url.Action("Stock", "ManagementReports")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-package-variant-closed"></i> المخزون
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+
                     <!-- قسم المالية والإدارة -->
                     @if (User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager") || !User.IsInRole("Cashier"))
                     {
@@ -311,9 +342,15 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="@Url.Action("Index", "PosShifts")" class="nav-link ajax-link">
+                                <span class="icon-bg"><i class="mdi mdi-cash-register menu-icon"></i></span>
+                                <span class="menu-title">سجل الورديات</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="@Url.Action("CashierPerformance", "PosShifts")" class="nav-link ajax-link">
                                 <span class="icon-bg"><i class="mdi mdi-chart-line menu-icon"></i></span>
-                                <span class="menu-title">تقرير أداء الكاشير</span>
+                                <span class="menu-title">تقرير الموظفين والرواتب</span>
                             </a>
                         </li>
                     }

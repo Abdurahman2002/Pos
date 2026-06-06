@@ -9,11 +9,12 @@ namespace NewsApp2.ViewModels
     {
         [DataType(DataType.EmailAddress)]
         [Remote(action: "IsEmailInUse", controller: "Account")]
-        public required string Email { get; set; }
+        public string? Email { get; set; }
 
-        [Required]
         [Display(Name = "System Role")]
-        public string RoleName { get; set; } = "SalesOfficer";
+        public string? RoleName { get; set; } = "SalesOfficer";
+
+        public bool CreateSystemAccount { get; set; } = true;
 
         public Employee Employee { get; set; } = new Employee();
 

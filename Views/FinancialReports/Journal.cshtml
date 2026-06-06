@@ -101,7 +101,7 @@
         @foreach (var row in Model.Rows)
         {
             <tr>
-                <td>@row.EntryDate.ToString("dd/MM/yyyy")</td>
+                <td><span dir="ltr">@row.EntryDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                 <td>@row.SourceType</td>
                 <td>@row.DocumentNo</td>
                 <td>@row.AccountCode</td>

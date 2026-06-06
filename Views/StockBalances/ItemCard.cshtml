@@ -80,7 +80,7 @@ else
                                     ? Url.Action("Details", "SalesInvoices", new { id = r.ReferenceId })
                                     : null;
                             <tr class="@rowClass">
-                                <td>@r.Date.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td><span dir="ltr">@r.Date.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                                 <td>@r.TransactionType</td>
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(referenceUrl))

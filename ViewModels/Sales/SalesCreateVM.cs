@@ -18,6 +18,7 @@ namespace NewsApp2.ViewModels.Sales
     public class SalesCreateVM
     {
         public Guid? DraftId { get; set; }
+        public Guid? EditInvoiceId { get; set; }
 
         [DataType(DataType.Date)]
         public DateOnly InvoiceDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);

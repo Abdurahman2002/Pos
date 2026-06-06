@@ -1,0 +1,91 @@
+@model NewsApp2.ViewModels.ManagementReports.StockVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "المخزون";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">المخزون</h1>
+</div>
+
+<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
+    <div class="col-md-5">
+        <label class="form-label small fw-bold">بحث</label>
+        <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="اسم الصنف أو الباركود..." />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label small fw-bold">التصنيف</label>
+        <select name="categoryId" asp-items="@(ViewBag.Categories as SelectList)" class="form-select form-select-sm">
+            <option value="">جميع التصنيفات</option>
+        </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill">بحث</button>
+        <a asp-action="Stock" class="btn btn-outline-secondary btn-sm">مسح</a>
+    </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">قائمة الأصناف</h6>
+        <div>
+            <span class="badge bg-success me-1">@Model.Rows.Count(r => r.Status == "جيد") جيد</span>
+            <span class="badge bg-warning me-1">@Model.Rows.Count(r => r.Status == "منخفض") منخفض</span>
+            <span class="badge bg-danger">@Model.Rows.Count(r => r.Status == "نفذ") نافذ</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="stock-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>الصنف</th>
+                        <th>التصنيف</th>
+                        <th>الباركود</th>
+                        <th class="text-center">الكمية</th>
+                        <th class="text-center">متوسط التكلفة</th>
+                        <th class="text-center">سعر البيع</th>
+                        <th class="text-center">قيمة التكلفة</th>
+                        <th class="text-center">قيمة البيع</th>
+                        <th class="text-center">الربح المتوقع</th>
+                        <th class="text-center">حالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        var statusClass = row.Status == "نفذ" ? "danger" : (row.Status == "منخفض" ? "warning" : "success");
+                        <tr>
+                            <td class="fw-semibold">@row.ItemName</td>
+                            <td><span class="badge bg-secondary bg-opacity-25 text-dark">@row.CategoryName</span></td>
+                            <td class="small text-muted" dir="ltr">@row.Barcode</td>
+                            <td class="text-center fw-bold">@row.QuantityOnHand.ToString("N0")</td>
+                            <td class="text-center">@row.AverageCostLyd.ToString("N2")</td>
+                            <td class="text-center">@(row.DefaultSalePriceLyd?.ToString("N2") ?? "-")</td>
+                            <td class="text-center fw-semibold">@row.StockValueLyd.ToString("N2")</td>
+                            <td class="text-center fw-semibold">@row.SaleValueLyd.ToString("N2")</td>
+                            <td class="text-center fw-bold text-success">@(row.DefaultSalePriceLyd.HasValue ? row.ExpectedProfitLyd.ToString("N2") : "-")</td>
+                            <td class="text-center">
+                                <span class="badge bg-@statusClass">@row.Status</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="6" class="text-end">الإجمالي</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.StockValueLyd).ToString("N2") د.ل</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.SaleValueLyd).ToString("N2") د.ل</td>
+                        <td class="text-center">@Model.Rows.Sum(r => r.ExpectedProfitLyd).ToString("N2") د.ل</td>
+                        <td colspan="1"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card { border-radius: 10px !important; }
+    #stock-table td, #stock-table th { white-space: nowrap; }
+</style>

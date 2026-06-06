@@ -38,8 +38,8 @@
             <td>@row.SupplierName</td>
             <td>@row.Phone</td>
             <td>@row.DebtAmount.ToString("0.00")</td>
-            <td>@(row.LastCreditPurchaseDate?.ToString("dd/MM/yyyy") ?? "-")</td>
-            <td>@(row.LastPaymentDate?.ToString("dd/MM/yyyy") ?? "-")</td>
+            <td>@(row.LastCreditPurchaseDate?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "-")</td>
+            <td>@(row.LastPaymentDate?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "-")</td>
             <td>
                 <a asp-action="Statement" asp-route-id="@row.SupplierId" class="btn btn-sm btn-outline-dark">كشف الحساب والسداد</a>
                 <a asp-action="Pay" asp-route-supplierId="@row.SupplierId" asp-route-returnUrl="@Url.Action("Debts", "Suppliers")" class="btn btn-sm btn-outline-success">سداد</a>

@@ -20,7 +20,7 @@
         <h3 class="mb-3">سند قبض</h3>
         <div class="row g-2 mb-3">
             <div class="col-md-6"><strong>رقم السند:</strong> @Model.Id</div>
-            <div class="col-md-6"><strong>التاريخ:</strong> @Model.ReceiptDate.ToString("dd/MM/yyyy")</div>
+            <div class="col-md-6"><strong>التاريخ:</strong> <span dir="ltr">@Model.ReceiptDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></div>
             <div class="col-md-6"><strong>العميل:</strong> @(Model.Customer?.Name ?? "-")</div>
             <div class="col-md-6"><strong>طريقة التحصيل:</strong> @paymentMethod</div>
             <div class="col-md-6"><strong>المبلغ:</strong> @Model.Amount.ToString("0.00") دينار</div>

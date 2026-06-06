@@ -18,6 +18,10 @@ namespace NewsApp2.Models.Services
         private const string AccountCustomerName = "ذمم العملاء";
         private const string AccountSalesRevenueCode = "4101";
         private const string AccountSalesRevenueName = "إيراد المبيعات";
+        private const string AccountInventoryCode = "1301";
+        private const string AccountInventoryName = "المخزون";
+        private const string AccountCogsCode = "5001";
+        private const string AccountCogsName = "تكلفة البضاعة المباعة";
 
         private readonly AppDbContext _context;
         private readonly ILogger<SalesService> _logger;
@@ -616,7 +620,9 @@ namespace NewsApp2.Models.Services
             decimal rate,
             string? note,
             IEnumerable<(Guid ItemId, decimal Qty, decimal UnitPriceEur)> lines,
-            string? editedBy)
+            string? editedBy,
+            string? paymentMethod = null,
+            Guid? bankId = null)
         {
             var lineList = lines.ToList();
             if (!lineList.Any())
@@ -664,7 +670,9 @@ namespace NewsApp2.Models.Services
                 if (!string.Equals(invoice.Status, StatusPosted, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("يمكن تعديل فواتير البيع المرحلة فقط.");
 
-                if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase)
+                var normalizedPaymentMethod = NormalizePaymentMethod(paymentMethod ?? invoice.PaymentMethod);
+
+                if (string.Equals(normalizedPaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase)
                     && !customerId.HasValue)
                     throw new InvalidOperationException("العميل مطلوب عند تعديل فاتورة بيع آجل.");
 
@@ -789,6 +797,8 @@ namespace NewsApp2.Models.Services
                 invoice.Note = note;
                 invoice.TotalEur = RoundMoney(totalEur);
                 invoice.TotalDinar = RoundMoney(totalDinar);
+                invoice.PaymentMethod = normalizedPaymentMethod;
+                invoice.BankId = bankId;
 
                 await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
 
@@ -864,41 +874,120 @@ namespace NewsApp2.Models.Services
             await RemoveFinancialEntriesAsync(invoice.Id);
 
             var amount = RoundMoney(invoice.TotalDinar);
-            if (amount == 0m)
+
+            if (amount != 0m)
+            {
+                var (debitCode, debitName, creditCode, creditName, debitAmount, creditAmount) =
+                    ResolveSalesEntry(invoice.PaymentMethod, amount);
+
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = debitCode,
+                    AccountName = debitName,
+                    Debit = debitAmount,
+                    Credit = 0m,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
+
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = creditCode,
+                    AccountName = creditName,
+                    Debit = 0m,
+                    Credit = creditAmount,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
+            }
+
+            await AddCogsEntryAsync(invoice, amount >= 0m, userId, userName);
+        }
+
+        private async Task AddCogsEntryAsync(SalesInvoice invoice, bool isSale, string? userId, string? userName)
+        {
+            var lines = await _context.Set<SalesLine>()
+                .Where(l => l.SalesInvoiceId == invoice.Id)
+                .ToListAsync();
+
+            var totalCost = RoundMoney(lines.Sum(l => Math.Abs(l.LineCostDinar)));
+            if (totalCost == 0m)
                 return;
 
-            var (debitCode, debitName, creditCode, creditName, debitAmount, creditAmount) =
-                ResolveSalesEntry(invoice.PaymentMethod, amount);
-
-            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+            if (isSale)
             {
-                EntryDate = invoice.InvoiceDate,
-                SourceType = JournalSourceType,
-                SourceId = invoice.Id,
-                DocumentNo = invoice.Number,
-                AccountCode = debitCode,
-                AccountName = debitName,
-                Debit = debitAmount,
-                Credit = 0m,
-                Note = invoice.Note,
-                CreatedByUserId = userId,
-                CreatedByUserName = userName
-            });
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = AccountCogsCode,
+                    AccountName = AccountCogsName,
+                    Debit = totalCost,
+                    Credit = 0m,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
 
-            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = AccountInventoryCode,
+                    AccountName = AccountInventoryName,
+                    Debit = 0m,
+                    Credit = totalCost,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
+            }
+            else
             {
-                EntryDate = invoice.InvoiceDate,
-                SourceType = JournalSourceType,
-                SourceId = invoice.Id,
-                DocumentNo = invoice.Number,
-                AccountCode = creditCode,
-                AccountName = creditName,
-                Debit = 0m,
-                Credit = creditAmount,
-                Note = invoice.Note,
-                CreatedByUserId = userId,
-                CreatedByUserName = userName
-            });
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = AccountInventoryCode,
+                    AccountName = AccountInventoryName,
+                    Debit = totalCost,
+                    Credit = 0m,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
+
+                _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                {
+                    EntryDate = invoice.InvoiceDate,
+                    SourceType = JournalSourceType,
+                    SourceId = invoice.Id,
+                    DocumentNo = invoice.Number,
+                    AccountCode = AccountCogsCode,
+                    AccountName = AccountCogsName,
+                    Debit = 0m,
+                    Credit = totalCost,
+                    Note = invoice.Note,
+                    CreatedByUserId = userId,
+                    CreatedByUserName = userName
+                });
+            }
         }
 
         private async Task RemoveFinancialEntriesAsync(Guid invoiceId)
@@ -954,6 +1043,127 @@ namespace NewsApp2.Models.Services
         private static string NormalizeCurrency(string? currencyCode)
         {
             return string.Equals(currencyCode, "LYD", StringComparison.OrdinalIgnoreCase) ? "LYD" : "EUR";
+        }
+
+        private static string NormalizePaymentMethod(string? paymentMethod)
+        {
+            var normalized = (paymentMethod ?? string.Empty).Trim();
+            if (string.Equals(normalized, "Card", StringComparison.OrdinalIgnoreCase))
+                return "Card";
+            if (string.Equals(normalized, "Transfer", StringComparison.OrdinalIgnoreCase))
+                return "Transfer";
+            if (string.Equals(normalized, "Credit", StringComparison.OrdinalIgnoreCase))
+                return "Credit";
+            return "Cash";
+        }
+
+        public async Task<(int Processed, int Skipped)> BackfillMissingCogsEntriesAsync(string? userId, string? userName)
+        {
+            var invoices = await _context.Set<SalesInvoice>()
+                .Where(i => i.Status == StatusPosted)
+                .Select(i => new { i.Id, i.TotalDinar, i.InvoiceDate, i.Number, i.Note })
+                .ToListAsync();
+
+            var processed = 0;
+            var skipped = 0;
+
+            foreach (var inv in invoices)
+            {
+                var hasCogs = await _context.Set<FinJournalEntry>()
+                    .AnyAsync(e => e.SourceType == JournalSourceType
+                                   && e.SourceId == inv.Id
+                                   && e.AccountCode == AccountCogsCode);
+
+                if (hasCogs)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var cost = RoundMoney(await _context.Set<SalesLine>()
+                    .Where(l => l.SalesInvoiceId == inv.Id)
+                    .SumAsync(l => Math.Abs(l.LineCostDinar)));
+
+                if (cost == 0m)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var isSale = inv.TotalDinar >= 0m;
+
+                if (isSale)
+                {
+                    _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                    {
+                        EntryDate = inv.InvoiceDate,
+                        SourceType = JournalSourceType,
+                        SourceId = inv.Id,
+                        DocumentNo = inv.Number,
+                        AccountCode = AccountCogsCode,
+                        AccountName = AccountCogsName,
+                        Debit = cost,
+                        Credit = 0m,
+                        Note = inv.Note,
+                        CreatedByUserId = userId,
+                        CreatedByUserName = userName
+                    });
+
+                    _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                    {
+                        EntryDate = inv.InvoiceDate,
+                        SourceType = JournalSourceType,
+                        SourceId = inv.Id,
+                        DocumentNo = inv.Number,
+                        AccountCode = AccountInventoryCode,
+                        AccountName = AccountInventoryName,
+                        Debit = 0m,
+                        Credit = cost,
+                        Note = inv.Note,
+                        CreatedByUserId = userId,
+                        CreatedByUserName = userName
+                    });
+                }
+                else
+                {
+                    _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                    {
+                        EntryDate = inv.InvoiceDate,
+                        SourceType = JournalSourceType,
+                        SourceId = inv.Id,
+                        DocumentNo = inv.Number,
+                        AccountCode = AccountInventoryCode,
+                        AccountName = AccountInventoryName,
+                        Debit = cost,
+                        Credit = 0m,
+                        Note = inv.Note,
+                        CreatedByUserId = userId,
+                        CreatedByUserName = userName
+                    });
+
+                    _context.Set<FinJournalEntry>().Add(new FinJournalEntry
+                    {
+                        EntryDate = inv.InvoiceDate,
+                        SourceType = JournalSourceType,
+                        SourceId = inv.Id,
+                        DocumentNo = inv.Number,
+                        AccountCode = AccountCogsCode,
+                        AccountName = AccountCogsName,
+                        Debit = 0m,
+                        Credit = cost,
+                        Note = inv.Note,
+                        CreatedByUserId = userId,
+                        CreatedByUserName = userName
+                    });
+                }
+
+                processed++;
+            }
+
+            if (processed > 0)
+                await _context.SaveChangesAsync();
+
+            return (processed, skipped);
         }
     }
 }

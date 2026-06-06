@@ -65,6 +65,12 @@ namespace NewsApp2.Controllers
                     DefaultRateSource = "Manual",
                     MaxCashierDiscountPercent = canManagePricingPolicy
                         ? Math.Clamp(vm.MaxCashierDiscountPercent, 0m, 100m)
+                        : 10m,
+                    CommissionSalesStepLyd = canManagePricingPolicy && vm.CommissionSalesStepLyd > 0
+                        ? vm.CommissionSalesStepLyd
+                        : 1000m,
+                    CommissionAmountPerStepLyd = canManagePricingPolicy
+                        ? Math.Max(0m, vm.CommissionAmountPerStepLyd)
                         : 10m
                 };
                 _context.Set<InventorySettings>().Add(settings);
@@ -72,6 +78,8 @@ namespace NewsApp2.Controllers
             else if (canManagePricingPolicy)
             {
                 settings.MaxCashierDiscountPercent = Math.Clamp(vm.MaxCashierDiscountPercent, 0m, 100m);
+                settings.CommissionSalesStepLyd = vm.CommissionSalesStepLyd > 0 ? vm.CommissionSalesStepLyd : 1000m;
+                settings.CommissionAmountPerStepLyd = Math.Max(0m, vm.CommissionAmountPerStepLyd);
             }
 
             var postedIds = vm.Items.Select(i => i.ItemId).Distinct().ToList();
@@ -130,6 +138,8 @@ namespace NewsApp2.Controllers
             return new PricingPolicyVM
             {
                 MaxCashierDiscountPercent = settings?.MaxCashierDiscountPercent ?? 10m,
+                CommissionSalesStepLyd = settings?.CommissionSalesStepLyd > 0 ? settings.CommissionSalesStepLyd : 1000m,
+                CommissionAmountPerStepLyd = settings?.CommissionAmountPerStepLyd ?? 10m,
                 Items = items
             };
         }

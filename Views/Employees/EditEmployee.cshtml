@@ -37,84 +37,95 @@
                         </div>
                     }
 
-                    <!-- User Card -->
-                    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded-3">
-                        <div>
-                            <div class="fw-semibold">User Account</div>
-                            <small class="text-muted">@Model.ApplicationUser.Email</small>
+                    @if (Model.ApplicationUser == null)
+                    {
+                        <div class="alert alert-secondary rounded-3 mb-4">
+                            <div class="fw-semibold">Worker without system login</div>
+                            <small>This employee can receive salary payments, advances and deductions without accessing the system.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- User Card -->
+                        <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded-3">
+                            <div>
+                                <div class="fw-semibold">User Account</div>
+                                <small class="text-muted">@Model.ApplicationUser.Email</small>
+                            </div>
+
+                            @if (User.IsInRole("Prog"))
+                            {
+                                <a asp-action="EditUser"
+                                   asp-controller="Users"
+                                   asp-route-id="@Model.ApplicationUser.Id"
+                                   class="btn btn-outline-secondary">
+                                    <i class="bi bi-person"></i> Manage Roles
+                                </a>
+                            }
+
                         </div>
 
-                        @if (User.IsInRole("Prog"))
-                        {
-                            <a asp-action="EditUser"
-                               asp-controller="Users"
-                               asp-route-id="@Model.ApplicationUser.Id"
-                               class="btn btn-outline-secondary">
-                                <i class="bi bi-person"></i> Manage Roles
-                            </a>
-                        }
-
-                    </div>
-
-                    <form method="post" class="mb-4">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="userId" value="@Model.ApplicationUser.Id" />
-                        <div class="alert @(Model.ApplicationUser.EmailConfirmed ? "alert-success" : "alert-warning") rounded-3 mb-0">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                <div>
-                                    <b>Email Status:</b>
-                                    @(Model.ApplicationUser.EmailConfirmed ? "Confirmed" : "Not confirmed")
-                                </div>
-                                @if (!Model.ApplicationUser.EmailConfirmed)
-                                {
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" asp-action="ConfirmEmployeeEmail" class="btn btn-success btn-sm">
-                                            Confirm Email
-                                        </button>
-                                        <button type="submit" asp-action="SendEmployeeConfirmationLink" class="btn btn-outline-secondary btn-sm">
-                                            Send Confirmation Link
-                                        </button>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </form>
-
-                    <form method="post" class="mb-4">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="userId" value="@Model.ApplicationUser.Id" />
-                        @if (Model.ApplicationUser.LockoutEnd.HasValue && Model.ApplicationUser.LockoutEnd.Value > DateTimeOffset.UtcNow)
-                        {
-                            <div class="alert alert-danger rounded-3 mb-0">
+                        <form method="post" class="mb-4">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@Model.ApplicationUser.Id" />
+                            <div class="alert @(Model.ApplicationUser.EmailConfirmed ? "alert-success" : "alert-warning") rounded-3 mb-0">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                                     <div>
-                                        <b>Account Status:</b> Locked
-                                        <div class="small">Until @Model.ApplicationUser.LockoutEndLocal</div>
+                                        <b>Email Status:</b>
+                                        @(Model.ApplicationUser.EmailConfirmed ? "Confirmed" : "Not confirmed")
                                     </div>
-                                    <button type="submit" asp-action="LockoutEmployee" class="btn btn-success btn-sm">
-                                        Unlock
-                                    </button>
+                                    @if (!Model.ApplicationUser.EmailConfirmed)
+                                    {
+                                        <div class="d-flex gap-2">
+                                            <button type="submit" asp-action="ConfirmEmployeeEmail" class="btn btn-success btn-sm">
+                                                Confirm Email
+                                            </button>
+                                            <button type="submit" asp-action="SendEmployeeConfirmationLink" class="btn btn-outline-secondary btn-sm">
+                                                Send Confirmation Link
+                                            </button>
+                                        </div>
+                                    }
                                 </div>
                             </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-success rounded-3 mb-0">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                    <div>
-                                        <b>Account Status:</b> Active
+                        </form>
+
+                        <form method="post" class="mb-4">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@Model.ApplicationUser.Id" />
+                            @if (Model.ApplicationUser.LockoutEnd.HasValue && Model.ApplicationUser.LockoutEnd.Value > DateTimeOffset.UtcNow)
+                            {
+                                <div class="alert alert-danger rounded-3 mb-0">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <b>Account Status:</b> Locked
+                                            <div class="small">Until @Model.ApplicationUser.LockoutEndLocal</div>
+                                        </div>
+                                        <button type="submit" asp-action="LockoutEmployee" class="btn btn-success btn-sm">
+                                            Unlock
+                                        </button>
                                     </div>
-                                    <button type="submit" asp-action="LockoutEmployee" class="btn btn-warning btn-sm">
-                                        Lock
-                                    </button>
                                 </div>
-                            </div>
-                        }
-                    </form>
+                            }
+                            else
+                            {
+                                <div class="alert alert-success rounded-3 mb-0">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <b>Account Status:</b> Active
+                                        </div>
+                                        <button type="submit" asp-action="LockoutEmployee" class="btn btn-warning btn-sm">
+                                            Lock
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </form>
+                    }
 
                     <form asp-action="EditEmployee">
 
                         <div asp-validation-summary="ModelOnly" class="text-danger mb-4"></div>
+                        <input type="hidden" asp-for="Id" />
 
                         <div class="section-title">Employee Information</div>
 
@@ -124,6 +135,14 @@
                                 <input asp-for="Name" class="form-control" />
                                 <span asp-validation-for="Name" class="text-danger"></span>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="BaseSalaryLyd" class="form-label fw-semibold">الراتب الأساسي</label>
+                                <div class="input-group">
+                                    <input asp-for="BaseSalaryLyd" class="form-control" type="number" step="0.01" min="0" />
+                                    <span class="input-group-text">د.ل</span>
+                                </div>
+                                <span asp-validation-for="BaseSalaryLyd" class="text-danger"></span>
+                            </div>
                         </div>
 
                         <div class="section-title">Access Status</div>
@@ -132,7 +151,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <b>Account Approval:</b><br />
-                                    @(Model.ApplicationUser.Approval == true ? "Approved" : "Pending")
+                                    @(Model.ApplicationUser == null ? "No login account" : (Model.ApplicationUser.Approval == true ? "Approved" : "Pending"))
                                 </div>
                                 <div class="col-md-6">
                                     <b>Role Management:</b><br />
@@ -168,7 +187,13 @@
                                 </div>
 
                                 <div class="col-md-3 mb-2 mb-md-0">
-                                    @if (Model.ApplicationUser.Approval == false)
+                                    @if (Model.ApplicationUser == null)
+                                    {
+                                        <span class="btn btn-outline-secondary disabled w-100">
+                                            No Login
+                                        </span>
+                                    }
+                                    else if (Model.ApplicationUser.Approval == false)
                                     {
                                         <a asp-action="Approve"
                                            asp-route-id="@Model.Id"

@@ -1,0 +1,471 @@
+@using System.Globalization
+@model NewsApp2.ViewModels.Sales.SalesSimpleReportVM
+@{
+    ViewData["Title"] = "تقرير المبيعات اليومي";
+    var culture = CultureInfo.InvariantCulture;
+    Func<decimal, string> money = value => value.ToString("N2", culture);
+    Func<decimal, string> qty = value => value.ToString("0.##", culture);
+    var periodText = Model.From == Model.To
+        ? Model.From.ToString("dd/MM/yyyy", culture)
+        : $"{Model.From.ToString("dd/MM/yyyy", culture)} - {Model.To.ToString("dd/MM/yyyy", culture)}";
+
+    string PaymentText(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Equals("Card", StringComparison.OrdinalIgnoreCase)) return "بطاقة";
+        if (normalized.Equals("Transfer", StringComparison.OrdinalIgnoreCase)) return "تحويل";
+        if (normalized.Equals("Credit", StringComparison.OrdinalIgnoreCase)) return "آجل";
+        if (normalized.Equals("Internal", StringComparison.OrdinalIgnoreCase)) return "داخلي";
+        return "نقدي";
+    }
+
+    string ExpenseKindText(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Equals("Salary", StringComparison.OrdinalIgnoreCase)) return "مرتب";
+        if (normalized.Equals("Advance", StringComparison.OrdinalIgnoreCase)) return "سلفة";
+        if (normalized.Equals("CommissionWithdrawal", StringComparison.OrdinalIgnoreCase)) return "سحب عمولة";
+        if (normalized.Equals("Deduction", StringComparison.OrdinalIgnoreCase)) return "خصم";
+        return "مصروف عام";
+    }
+}
+
+<style>
+    .daily-report {
+        direction: rtl;
+        color: #101828;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    }
+
+    .screen-tools {
+        max-width: 210mm;
+        margin: 0 auto 14px;
+    }
+
+    .daily-page {
+        width: 210mm;
+        max-width: 100%;
+        min-height: 297mm;
+        margin: 0 auto 18px;
+        padding: 12mm;
+        background: #fff;
+        border: 1px solid #d0d7e2;
+    }
+
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #101828;
+        margin-bottom: 12px;
+    }
+
+    .report-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .report-subtitle {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: #475467;
+    }
+
+    .report-meta {
+        min-width: 58mm;
+        font-size: 11px;
+    }
+
+    .meta-line,
+    .summary-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 4px 0;
+        border-bottom: 1px solid #e4e7ec;
+    }
+
+    .meta-line:last-child,
+    .summary-line:last-child {
+        border-bottom: 0;
+    }
+
+    .label {
+        color: #475467;
+        font-weight: 700;
+    }
+
+    .num {
+        direction: ltr;
+        unicode-bidi: isolate;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .summary-area {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin: 10px 0 14px;
+    }
+
+    .summary-block h2,
+    .section-title {
+        margin: 0 0 7px;
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    .summary-block {
+        border-top: 1px solid #d0d7e2;
+        padding-top: 7px;
+        font-size: 12px;
+    }
+
+    .amount-good {
+        color: #087443;
+        font-weight: 800;
+    }
+
+    .amount-bad {
+        color: #b42318;
+        font-weight: 800;
+    }
+
+    .amount-strong {
+        color: #101828;
+        font-weight: 800;
+    }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-bottom: 12px;
+        font-size: 11px;
+    }
+
+    .report-table th,
+    .report-table td {
+        border: 1px solid #d0d7e2;
+        padding: 5px 6px;
+        vertical-align: middle;
+    }
+
+    .report-table th {
+        background: #f2f4f7;
+        color: #101828;
+        font-weight: 800;
+        text-align: center;
+    }
+
+    .report-table tbody tr:nth-child(even) td {
+        background: #fafbfc;
+    }
+
+    .report-table tfoot td {
+        background: #f2f4f7;
+        font-weight: 800;
+    }
+
+    .item-name {
+        text-align: right;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: break-word;
+        line-height: 1.55;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .text-left {
+        text-align: left;
+    }
+
+    .empty-row {
+        color: #667085;
+        padding: 14px !important;
+    }
+
+    .final-total {
+        margin-top: 4px;
+        border-top: 2px solid #101828;
+        padding-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    @@media screen and (max-width: 900px) {
+        .daily-page {
+            width: 100%;
+            min-height: auto;
+            padding: 14px;
+        }
+
+        .report-header,
+        .summary-area {
+            display: block;
+        }
+
+        .report-meta,
+        .summary-block {
+            margin-top: 12px;
+        }
+    }
+
+    @@media print {
+        @@page {
+            size: A4 portrait;
+            margin: 8mm;
+        }
+
+        * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        html,
+        body {
+            width: 210mm;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        .no-print,
+        .sidebar,
+        .navbar,
+        .navbar-brand-wrapper,
+        .navbar-menu-wrapper,
+        .footer {
+            display: none !important;
+        }
+
+        .page-body-wrapper,
+        .main-panel,
+        .content-wrapper,
+        .container,
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        .daily-page {
+            width: 194mm;
+            min-height: auto;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .report-header,
+        .summary-area,
+        .final-total {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        .report-table {
+            font-size: 10px;
+        }
+
+        .report-table th,
+        .report-table td {
+            padding: 4px 5px;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-row-group;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+<div class="daily-report">
+    <div class="screen-tools no-print">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="m-0">تقرير المبيعات اليومي</h2>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary" onclick="window.print()">طباعة / PDF</button>
+                <a asp-action="Report" class="btn btn-outline-secondary">رجوع</a>
+            </div>
+        </div>
+
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-3">
+                <label class="form-label">من</label>
+                <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd", culture)" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">إلى</label>
+                <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd", culture)" class="form-control" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-success w-100">عرض</button>
+            </div>
+        </form>
+    </div>
+
+    <section class="daily-page">
+        <header class="report-header">
+            <div>
+                <h1 class="report-title">تقرير المبيعات اليومي</h1>
+                <p class="report-subtitle">ملخص واضح للمبيعات، الأصناف، المصروفات، وصافي اليوم.</p>
+            </div>
+            <div class="report-meta">
+                <div class="meta-line"><span class="label">الفترة</span><strong class="num">@periodText</strong></div>
+                <div class="meta-line"><span class="label">عدد الفواتير</span><strong class="num">@Model.InvoiceCount</strong></div>
+                <div class="meta-line"><span class="label">تاريخ الطباعة</span><strong class="num">@DateTime.Now.ToString("dd/MM/yyyy HH:mm", culture)</strong></div>
+            </div>
+        </header>
+
+        <div class="summary-area">
+            <div class="summary-block">
+                <h2>ملخص المبيعات</h2>
+                <div class="summary-line"><span class="label">عدد فواتير البيع</span><strong class="num">@Model.SoldInvoiceCount</strong></div>
+                <div class="summary-line"><span class="label">إجمالي المبيعات</span><strong class="num amount-good">@money(Model.GrossSalesLyd)</strong></div>
+                <div class="summary-line"><span class="label">نقدي</span><strong class="num">@money(Model.CashSalesLyd)</strong></div>
+                <div class="summary-line"><span class="label">بطاقة</span><strong class="num">@money(Model.CardSalesLyd)</strong></div>
+                <div class="summary-line"><span class="label">تحويل / آجل</span><strong class="num">@money(Model.TransferSalesLyd) / @money(Model.CreditSalesLyd)</strong></div>
+            </div>
+
+            <div class="summary-block">
+                <h2>ملخص مالي</h2>
+                <div class="summary-line"><span class="label">تكلفة البضاعة</span><strong class="num">@money(Model.Items.Sum(x => x.TotalCostLyd))</strong></div>
+                <div class="summary-line"><span class="label">مجمل الربح</span><strong class="num amount-good">@money(Model.ItemsGrossProfitLyd)</strong></div>
+                <div class="summary-line"><span class="label">المصروفات</span><strong class="num amount-bad">@money(Model.TotalExpensesLyd)</strong></div>
+                <div class="summary-line"><span class="label">الصافي بعد المصروفات</span><strong class="num amount-strong">@money(Model.NetAfterExpensesLyd)</strong></div>
+            </div>
+        </div>
+
+        <h2 class="section-title">تفاصيل الأصناف</h2>
+        <table class="report-table">
+            <colgroup>
+                <col style="width: 8mm;" />
+                <col style="width: 82mm;" />
+                <col style="width: 22mm;" />
+                <col style="width: 30mm;" />
+                <col style="width: 26mm;" />
+                <col style="width: 26mm;" />
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الصنف</th>
+                    <th>الكمية</th>
+                    <th>إجمالي المبيعات</th>
+                    <th>التكلفة</th>
+                    <th>الربح</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Items.Any())
+                {
+                    <tr><td colspan="6" class="text-center empty-row">لا توجد مبيعات في هذه الفترة.</td></tr>
+                }
+                else
+                {
+                    var index = 1;
+                    foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td class="text-center num">@index</td>
+                            <td class="item-name">@item.ItemName</td>
+                            <td class="text-center num">@qty(item.SoldQty)</td>
+                            <td class="text-left num">@money(item.GrossSalesDinar)</td>
+                            <td class="text-left num">@money(item.TotalCostLyd)</td>
+                            <td class="text-left num">@money(item.GrossProfitLyd)</td>
+                        </tr>
+                        index++;
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2">الإجمالي</td>
+                    <td class="text-center num">@qty(Model.Items.Sum(x => x.SoldQty))</td>
+                    <td class="text-left num">@money(Model.Items.Sum(x => x.GrossSalesDinar))</td>
+                    <td class="text-left num">@money(Model.Items.Sum(x => x.TotalCostLyd))</td>
+                    <td class="text-left num">@money(Model.Items.Sum(x => x.GrossProfitLyd))</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <h2 class="section-title">مصروفات الفترة</h2>
+        <table class="report-table">
+            <colgroup>
+                <col style="width: 24mm;" />
+                <col style="width: 27mm;" />
+                <col />
+                <col style="width: 31mm;" />
+                <col style="width: 22mm;" />
+                <col style="width: 25mm;" />
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>النوع</th>
+                    <th>البيان</th>
+                    <th>الموظف</th>
+                    <th>الدفع</th>
+                    <th>القيمة</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Expenses.Any())
+                {
+                    <tr><td colspan="6" class="text-center empty-row">لا توجد مصروفات في هذه الفترة.</td></tr>
+                }
+                else
+                {
+                    foreach (var expense in Model.Expenses)
+                    {
+                        <tr>
+                            <td class="text-center num">@expense.ExpenseDate.ToString("dd/MM/yyyy", culture)</td>
+                            <td>@ExpenseKindText(expense.ExpenseKind)</td>
+                            <td class="item-name">@(string.IsNullOrWhiteSpace(expense.Note) ? expense.Category : $"{expense.Category} - {expense.Note}")</td>
+                            <td>@(expense.EmployeeName ?? "-")</td>
+                            <td>@PaymentText(expense.PaymentMethod)</td>
+                            <td class="text-left num">@money(expense.Amount)</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5">إجمالي المصروفات</td>
+                    <td class="text-left num">@money(Model.TotalExpensesLyd)</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="final-total">
+            <span>الصافي بعد المصروفات</span>
+            <span class="num">@money(Model.NetAfterExpensesLyd) د.ل</span>
+        </div>
+    </section>
+</div>

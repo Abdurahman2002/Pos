@@ -73,7 +73,7 @@ namespace NewsApp2.Controllers
                                            .GetAll()
                                            .Include(e => e.ApplicationUser)
                                            .Include(e => e.Warehouse)
-                                           .Where(e => e.ApplicationUser.Approval == false)
+                                           .Where(e => e.ApplicationUser != null && e.ApplicationUser.Approval == false)
                                            .OrderByDescending(u => u.Created)
                                            .ToListAsync();
 
@@ -88,6 +88,7 @@ namespace NewsApp2.Controllers
             var vm = new CreateEmployeeVM
             {
                 Email = string.Empty,
+                CreateSystemAccount = true,
                 AvailableRoles = await GetAssignableRolesAsync()
             };
 
@@ -98,10 +99,48 @@ namespace NewsApp2.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateEmployee(CreateEmployeeVM model)
         {
+            if (!model.CreateSystemAccount)
+            {
+                ModelState.Remove(nameof(model.Email));
+                ModelState.Remove(nameof(model.RoleName));
+            }
+
             if (!ModelState.IsValid)
             {
                 model.AvailableRoles = await GetAssignableRolesAsync();
                 return View(model);
+            }
+
+            if (!model.CreateSystemAccount)
+            {
+                var employeeName = model.Employee.Name?.Trim();
+                if (string.IsNullOrWhiteSpace(employeeName))
+                {
+                    ModelState.AddModelError("Employee.Name", "Employee name is required.");
+                    model.AvailableRoles = await GetAssignableRolesAsync();
+                    return View(model);
+                }
+
+                var worker = new Employee
+                {
+                    Name = employeeName,
+                    BaseSalaryLyd = model.Employee.BaseSalaryLyd,
+                    UserId = null,
+                    Created = DateTime.UtcNow
+                };
+
+                try
+                {
+                    _employee.Repository.Insert(worker);
+                    await _employee.SaveAsync();
+                    TempData["SuccessMessage"] = "Employee created without a system login account.";
+                    return RedirectToAction(nameof(Index));
+                }
+                catch
+                {
+                    TempData["ErrorMessage"] = "Failed to create employee profile";
+                    return View("Error");
+                }
             }
 
             var selectedRole = model.RoleName?.Trim() ?? string.Empty;
@@ -113,7 +152,15 @@ namespace NewsApp2.Controllers
                 return View(model);
             }
 
-            if (await _userManager.FindByEmailAsync(model.Email.Trim()) != null)
+            var email = model.Email?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                ModelState.AddModelError(nameof(model.Email), "Email is required when creating a system account.");
+                model.AvailableRoles = await GetAssignableRolesAsync();
+                return View(model);
+            }
+
+            if (await _userManager.FindByEmailAsync(email) != null)
             {
                 ModelState.AddModelError(nameof(model.Email), "This email is already used by another account.");
                 model.AvailableRoles = await GetAssignableRolesAsync();
@@ -130,8 +177,8 @@ namespace NewsApp2.Controllers
                 // ---------------- Create User ----------------
                 var user = new ApplicationUser
                 {
-                    UserName = model.Email.Trim(),
-                    Email = model.Email.Trim(),
+                    UserName = email,
+                    Email = email,
                     Approval = true,
                     CreatedDate = DateTime.UtcNow
                 };
@@ -163,7 +210,8 @@ namespace NewsApp2.Controllers
                 // ---------------- Create Employee ----------------
                 var employee = new Employee
                 {
-                    Name = model.Employee.Name,
+                    Name = model.Employee.Name?.Trim() ?? string.Empty,
+                    BaseSalaryLyd = model.Employee.BaseSalaryLyd,
                     UserId = user.Id,
                     Created = DateTime.UtcNow
                 };
@@ -200,11 +248,11 @@ namespace NewsApp2.Controllers
 
                 string content = ReadHtmlTemplate("ConfirmEmailWithPassword.html")
                     .Replace("{Subject}", "Email Confirmation")
-                    .Replace("{UserName}", model.Email)
+                    .Replace("{UserName}", email)
                     .Replace("{Password}", generatedPassword)
                     .Replace("{confirmationLink}", confirmationLink);
 
-                var message = new Message(new[] { model.Email }, "Email Confirmation", content, null);
+                var message = new Message(new[] { email }, "Email Confirmation", content, null);
 
                 try
                 {
@@ -412,7 +460,7 @@ namespace NewsApp2.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditEmployee([Bind("Id,Name,UserId,Created")] Employee employee)
+        public async Task<IActionResult> EditEmployee([Bind("Id,Name,UserId,Created,BaseSalaryLyd")] Employee employee)
         {
             if (!ModelState.IsValid)
                 return View(employee);
@@ -438,6 +486,7 @@ namespace NewsApp2.Controllers
             try
             {
                 existingEmployee.Name = employee.Name;
+                existingEmployee.BaseSalaryLyd = employee.BaseSalaryLyd;
                 existingEmployee.Modified = DateTime.UtcNow;
                 _employee.Repository.Update(existingEmployee);
                 await _employee.SaveAsync();

@@ -7,7 +7,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h2 class="mb-0">@ViewData["Title"]</h2>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-info" asp-action="EmployeeSummary"><i class="bi bi-people me-1"></i> تقرير حركة الموظفين</a>
+        <a class="btn btn-outline-info" asp-controller="PosShifts" asp-action="CashierPerformance"><i class="bi bi-people me-1"></i> تقرير الموظفين والرواتب</a>
         <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-circle me-1"></i> إضافة حركة</a>
     </div>
 </div>
@@ -17,11 +17,11 @@
         <form method="get" class="row g-2 align-items-end">
             <div class="col-md-2">
                 <label class="form-label">من</label>
-                <input type="text" class="form-control" name="from" value="@(Model.From?.ToString("dd/MM/yyyy"))" placeholder="dd/MM/yyyy" />
+                <input type="text" class="form-control" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" />
             </div>
             <div class="col-md-2">
                 <label class="form-label">إلى</label>
-                <input type="text" class="form-control" name="to" value="@(Model.To?.ToString("dd/MM/yyyy"))" placeholder="dd/MM/yyyy" />
+                <input type="text" class="form-control" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" />
             </div>
             <div class="col-md-2">
                 <label class="form-label">النوع</label>
@@ -113,7 +113,7 @@
             @foreach (var row in Model.Rows)
             {
                 <tr>
-                    <td>@row.ExpenseDate.ToString("dd/MM/yyyy")</td>
+                    <td><span dir="ltr">@row.ExpenseDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                     <td>
                         @if (row.ExpenseKind == "Salary")
                         {

@@ -9,7 +9,7 @@
                      alt="@Model.News.Title" class="news-main-image rounded-4 mb-4" />
                 <h1 class="news-title mb-2">@Model.News.Title</h1>
                 <p class="news-date text-muted mb-4">
-                    @(Model.News.Modified?.ToString("dd/MM/yyyy") ?? Model.News.Created.ToString("dd/MM/yyyy"))
+                    @(Model.News.Modified?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? Model.News.Created.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))
                 </p>
                 <div class="news-body fs-5 text-secondary">@Html.Raw(Model.News.Details)</div>
             </div>
@@ -26,7 +26,7 @@
                               class="related-thumb me-3" />
                         <div class="related-info flex-grow-1">
                             <h6 class="related-title">@n.Title.Substring(0, Math.Min(@n.Title.Length, 50))@(@n.Title.Length > 50 ? "..." : "")</h6>
-                            <small class="text-muted">@n.Created.ToString("dd/MM/yyyy")</small>
+                            <small class="text-muted">@n.Created.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</small>
                         </div>
                     </a>
                 }

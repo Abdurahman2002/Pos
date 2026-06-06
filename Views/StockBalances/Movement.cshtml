@@ -58,7 +58,7 @@
             var localizedMovementType = string.IsNullOrWhiteSpace(row.MovementType) ? "-" : L[row.MovementType].Value;
             var localizedReferenceType = string.IsNullOrWhiteSpace(row.ReferenceType) ? "-" : L[row.ReferenceType].Value;
             <tr>
-                <td><span dir="ltr">@row.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</span></td>
+                <td><span dir="ltr">@row.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                 <td>@row.ItemName</td>
                 <td>@localizedMovementType</td>
                 <td>@localizedReferenceType</td>

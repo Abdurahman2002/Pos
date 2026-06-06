@@ -361,7 +361,7 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Bank", b =>
@@ -391,7 +391,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Banks", (string)null);
+                    b.ToTable("Banks");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.BarcodeMapping", b =>
@@ -431,7 +431,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Code", "CodeType")
                         .IsUnique();
 
-                    b.ToTable("BarcodeMappings", (string)null);
+                    b.ToTable("BarcodeMappings");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Category", b =>
@@ -463,7 +463,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Contact", b =>
@@ -501,7 +501,7 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Contact", (string)null);
+                    b.ToTable("Contact");
 
                     b.HasData(
                         new
@@ -553,7 +553,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Customers", (string)null);
+                    b.ToTable("Customers");
 
                     b.HasData(
                         new
@@ -614,7 +614,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("CustomerId", "ReceiptDate");
 
-                    b.ToTable("CustomerReceipts", (string)null);
+                    b.ToTable("CustomerReceipts");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Employee", b =>
@@ -623,6 +623,9 @@ namespace NewsApp2.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWID()");
+
+                    b.Property<decimal>("BaseSalaryLyd")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
@@ -649,7 +652,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("Employees", (string)null);
+                    b.ToTable("Employees");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.ExpenseEntry", b =>
@@ -701,17 +704,22 @@ namespace NewsApp2.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid?>("PosShiftId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("ReferenceNo")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("PosShiftId");
+
                     b.HasIndex("EmployeeId", "ExpenseDate");
 
                     b.HasIndex("ExpenseDate", "ExpenseKind");
 
-                    b.ToTable("ExpenseEntries", (string)null);
+                    b.ToTable("ExpenseEntries");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.FinJournalEntry", b =>
@@ -776,7 +784,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("SourceType", "SourceId");
 
-                    b.ToTable("FinJournalEntries", (string)null);
+                    b.ToTable("FinJournalEntries");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.InvStockBalance", b =>
@@ -811,7 +819,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("ItemId")
                         .IsUnique();
 
-                    b.ToTable("InvStockBalances", null, t =>
+                    b.ToTable("InvStockBalances", t =>
                         {
                             t.HasCheckConstraint("CK_InvStockBalance_QtyOnHand_NonNegative", "[QuantityOnHand] >= 0");
                         });
@@ -865,7 +873,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("ReferenceType", "ReferenceId");
 
-                    b.ToTable("InvStockLedgers", (string)null);
+                    b.ToTable("InvStockLedgers");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.InventorySettings", b =>
@@ -879,6 +887,12 @@ namespace NewsApp2.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
+
+                    b.Property<decimal>("CommissionAmountPerStepLyd")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CommissionSalesStepLyd")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime2");
@@ -908,13 +922,15 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("InventorySettings", (string)null);
+                    b.ToTable("InventorySettings");
 
                     b.HasData(
                         new
                         {
                             Id = new Guid("d8ec402f-4f11-4f5e-97ed-c9dc2a58a232"),
                             BaseCurrencyCode = "EUR",
+                            CommissionAmountPerStepLyd = 10m,
+                            CommissionSalesStepLyd = 1000m,
                             Created = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DefaultRateSource = "Manual",
                             DinarCurrencyCode = "LYD",
@@ -976,7 +992,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Items", (string)null);
+                    b.ToTable("Items");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.News", b =>
@@ -1014,7 +1030,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("SectionId");
 
-                    b.ToTable("News", (string)null);
+                    b.ToTable("News");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.PosShift", b =>
@@ -1066,7 +1082,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("OpenedByUserId", "Status");
 
-                    b.ToTable("PosShifts", (string)null);
+                    b.ToTable("PosShifts");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.PurchaseInvoice", b =>
@@ -1144,7 +1160,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("SupplierId");
 
-                    b.ToTable("PurchaseInvoices", (string)null);
+                    b.ToTable("PurchaseInvoices");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.PurchaseLine", b =>
@@ -1198,7 +1214,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("PurchaseInvoiceId");
 
-                    b.ToTable("PurchaseLines", (string)null);
+                    b.ToTable("PurchaseLines");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.SalesInvoice", b =>
@@ -1288,7 +1304,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("PosShiftId");
 
-                    b.ToTable("SalesInvoices", (string)null);
+                    b.ToTable("SalesInvoices");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.SalesInvoiceDraft", b =>
@@ -1375,7 +1391,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.ToTable("SalesInvoiceDrafts", (string)null);
+                    b.ToTable("SalesInvoiceDrafts");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.SalesLine", b =>
@@ -1432,7 +1448,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("SalesInvoiceId");
 
-                    b.ToTable("SalesLines", (string)null);
+                    b.ToTable("SalesLines");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Section", b =>
@@ -1455,7 +1471,7 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Sections", (string)null);
+                    b.ToTable("Sections");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.SiteInfo", b =>
@@ -1494,7 +1510,7 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SiteInfo", (string)null);
+                    b.ToTable("SiteInfo");
 
                     b.HasData(
                         new
@@ -1529,7 +1545,7 @@ namespace NewsApp2.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SiteState", (string)null);
+                    b.ToTable("SiteState");
 
                     b.HasData(
                         new
@@ -1578,7 +1594,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Suppliers", (string)null);
+                    b.ToTable("Suppliers");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.SupplierPayment", b =>
@@ -1632,7 +1648,7 @@ namespace NewsApp2.Migrations
 
                     b.HasIndex("SupplierId", "PaymentDate");
 
-                    b.ToTable("SupplierPayments", (string)null);
+                    b.ToTable("SupplierPayments");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.Warehouse", b =>
@@ -1658,7 +1674,7 @@ namespace NewsApp2.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Warehouses", (string)null);
+                    b.ToTable("Warehouses");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1764,7 +1780,14 @@ namespace NewsApp2.Migrations
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("NewsApp2.Models.Entities.PosShift", "PosShift")
+                        .WithMany()
+                        .HasForeignKey("PosShiftId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Employee");
+
+                    b.Navigation("PosShift");
                 });
 
             modelBuilder.Entity("NewsApp2.Models.Entities.InvStockBalance", b =>

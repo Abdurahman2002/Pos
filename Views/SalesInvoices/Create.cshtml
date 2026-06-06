@@ -2,7 +2,8 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
 @{
     Layout = "_LayoutPOS";
-    ViewData["Title"] = "نقطة البيع";
+    var isEditMode = Model?.EditInvoiceId.HasValue == true;
+    ViewData["Title"] = isEditMode ? "تعديل فاتورة" : "نقطة البيع";
     var lineCount = Model?.Lines?.Count > 0 ? Model.Lines.Count : 1;
     var simplePosMode = ViewBag.SimplePosMode is bool mode && mode;
     var maxCashierDiscountPercent = ViewBag.MaxCashierDiscountPercent is decimal d ? d : 10m;
@@ -18,7 +19,18 @@
     var soundUserKey = (User?.Identity?.Name ?? "anonymous").Trim().ToLowerInvariant();
 }
 
-<h1>شاشة نقطة البيع</h1>
+<h1>@(isEditMode ? "تعديل فاتورة بيع" : "شاشة نقطة البيع")</h1>
+@if (isEditMode)
+{
+    <div class="alert alert-info d-flex align-items-center justify-content-between">
+        <span><i class="mdi mdi-pencil me-1"></i> أنت بصدد تعديل فاتورة رقم <strong>@ViewBag.EditInvoiceNumber</strong></span>
+        <div>
+            <a asp-action="Receipt" asp-route-id="@Model.EditInvoiceId" asp-route-autoPrint="false" target="_blank" class="btn btn-sm btn-outline-dark me-2">طباعة</a>
+            <a asp-action="Pdf" asp-route-id="@Model.EditInvoiceId" target="_blank" class="btn btn-sm btn-outline-info me-2">PDF</a>
+            <a asp-action="Details" asp-route-id="@Model.EditInvoiceId" class="btn btn-sm btn-secondary">إلغاء التعديل</a>
+        </div>
+    </div>
+}
 <script id="item-default-prices-json" type="application/json">@Html.Raw(itemDefaultPricesJson)</script>
 <form asp-action="Create" method="post" class="invoice-create-form"
     data-resolve-url="@Url.Action("Resolve", "BarcodeScan")"
@@ -50,6 +62,8 @@
     data-msg-unable-create-customer="تعذر إضافة العميل.">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <input asp-for="DraftId" type="hidden" />
+    <input asp-for="EditInvoiceId" type="hidden" />
+    <input asp-for="InvoiceDate" type="hidden" />
 
     <div class="card mb-3 border-success-subtle shadow-sm" style="border-radius: 10px;">
         <div class="card-body d-flex flex-wrap gap-3 align-items-center bg-light">
@@ -273,7 +287,7 @@
                         <label asp-for="InvoiceDate" class="form-label form-label-sm mb-1 fw-bold text-muted small"></label>
                         @* Old line kept for reference: <input asp-for="InvoiceDate" type="hidden" value="@(Model.InvoiceDate.ToString("dd/MM/yyyy"))" /> *@
                         @* Old line kept for reference: <input id="InvoiceDateDisplay" class="form-control form-control-sm text-center fw-bold" type="text" value="@(Model.InvoiceDate.ToString("dd/MM/yyyy"))" readonly dir="ltr" lang="en-GB" style="unicode-bidi: plaintext;" /> *@
-                        <input id="InvoiceDateDisplay" class="form-control form-control-sm text-center fw-bold" type="text" value="@((Model?.InvoiceDate ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToString("dd/MM/yyyy"))" readonly dir="ltr" lang="en-GB" style="direction:ltr; unicode-bidi:isolate;" />
+                        <input id="InvoiceDateDisplay" class="form-control form-control-sm text-center fw-bold" type="text" value="@((Model?.InvoiceDate ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" readonly dir="ltr" lang="en-GB" style="direction:ltr; unicode-bidi:isolate;" />
                     </div>
                     <input asp-for="CurrencyCode" type="hidden" />
                     <input asp-for="EurToDinarRateSnapshot" type="hidden" value="1" />
@@ -359,7 +373,7 @@
                     </div>
 
                     <div class="d-grid mt-4 pt-2 border-top">
-                        <button type="submit" class="btn btn-primary btn-lg fw-bold w-100" id="submit-pos-btn">ترحيل البيع</button>
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold w-100" id="submit-pos-btn">@(isEditMode ? "حفظ التعديلات" : "ترحيل البيع")</button>
                     </div>
                 </div>
             </div>
@@ -424,7 +438,7 @@
                                             <span class="badge bg-danger ms-2">مرتجع بيع</span>
                                         }
                                     </div>
-                                    <div class="small text-muted mt-1"><i class="mdi mdi-calendar"></i> <span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy")</span></div>
+                                    <div class="small text-muted mt-1"><i class="mdi mdi-calendar"></i> <span dir="ltr">@draft.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></div>
                                 </div>
                                 <div class="fw-bold text-success fs-6">@draft.NetDinar.ToString("0.00") د.ل</div>
                             </div>

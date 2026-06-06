@@ -1,94 +1,244 @@
 @model NewsApp2.ViewModels.Pos.CashierPerformanceVM
+@using System.Globalization
 @{
-    ViewData["Title"] = "تقرير أداء الكاشير";
+    ViewData["Title"] = "تقرير الموظفين والرواتب";
+    var culture = CultureInfo.InvariantCulture;
+    Func<decimal, string> money = value => value.ToString("N2", culture);
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="m-0">تقرير أداء الكاشير</h2>
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <h2 class="m-0">تقرير الموظفين والرواتب</h2>
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة</button>
-        <a asp-action="Current" class="btn btn-outline-secondary">الورديات</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة / PDF</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">سجل الورديات</a>
+        <a asp-action="Current" class="btn btn-outline-secondary">الوردية الحالية</a>
     </div>
 </div>
 
 <form method="get" class="row g-2 mb-3 no-print">
     <div class="col-md-3">
         <label class="form-label">من</label>
-        <input name="from" type="text" value="@Model.From.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+        <input name="from" type="date" value="@Model.From.ToString("yyyy-MM-dd", culture)" class="form-control" />
     </div>
     <div class="col-md-3">
         <label class="form-label">إلى</label>
-        <input name="to" type="text" value="@Model.To.ToString("dd/MM/yyyy")" class="form-control" placeholder="dd/MM/yyyy" />
+        <input name="to" type="date" value="@Model.To.ToString("yyyy-MM-dd", culture)" class="form-control" />
     </div>
-    <div class="col-md-3">
-        <label class="form-label">الموظف / الكاشير</label>
-        <select name="userId" asp-items="@(ViewData["CashierUsers"] as List<SelectListItem>)" class="form-select">
+    <div class="col-md-4">
+        <label class="form-label">الموظف / العامل</label>
+        <select name="employeeId" asp-items="@(ViewData["Employees"] as List<SelectListItem>)" class="form-select">
             <option value="">الكل</option>
         </select>
     </div>
-    <div class="col-md-2">
-        <label class="form-label">نسبة العمولة %</label>
-        <input name="commissionPercent" type="number" class="form-control" min="0" max="100" step="0.01" value="@Model.CommissionPercent.ToString("0.##")" />
-    </div>
-    <div class="col-md-1 d-grid align-self-end">
+    <div class="col-md-2 d-grid align-self-end">
         <button type="submit" class="btn btn-success">عرض</button>
     </div>
 </form>
 
-<div class="row g-3 mb-3">
-    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي الورديات</div><div class="fw-bold">@Model.TotalShiftCount</div></div></div></div>
-    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">الفواتير المباعة</div><div class="fw-bold">@Model.TotalSoldInvoiceCount</div></div></div></div>
-    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">صافي البيع</div><div class="fw-bold">@Model.TotalNetSalesLyd.ToString("0.00") دينار</div></div></div></div>
-    <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body"><div class="text-muted">إجمالي العمولة</div><div class="fw-bold text-success">@Model.TotalCommissionLyd.ToString("0.00") دينار</div></div></div></div>
-</div>
+<section class="performance-page" dir="rtl">
+    <header class="report-header">
+        <div>
+            <h1>تقرير الموظفين والرواتب</h1>
+            <p>الفترة: <span class="num">@Model.From.ToString("dd/MM/yyyy", culture) - @Model.To.ToString("dd/MM/yyyy", culture)</span></p>
+        </div>
+        <div class="commission-rule">
+            <span>قاعدة العمولة</span>
+            <strong class="num">كل @money(Model.CommissionSalesStepLyd) بيع = @money(Model.CommissionAmountPerStepLyd) د.ل</strong>
+        </div>
+    </header>
 
-<div class="table-responsive">
-    <table class="table table-striped table-bordered align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>الموظف</th>
-                <th class="text-center">ورديات</th>
-                <th class="text-center">بيع</th>
-                <th class="text-center">مرتجع</th>
-                <th class="text-end">نقدي</th>
-                <th class="text-end">بطاقة</th>
-                <th class="text-end">تحويل</th>
-                <th class="text-end">آجل</th>
-                <th class="text-end">صافي البيع</th>
-                <th class="text-end">العمولة</th>
-            </tr>
-        </thead>
-        <tbody>
-        @if (!Model.Rows.Any())
-        {
-            <tr>
-                <td colspan="10" class="text-center text-muted">لا توجد بيانات للفترة المحددة.</td>
-            </tr>
-        }
-        else
-        {
-            foreach (var row in Model.Rows)
-            {
+    <div class="summary-grid">
+        <div><span>الورديات</span><strong class="num">@Model.TotalShiftCount</strong></div>
+        <div><span>فواتير البيع</span><strong class="num">@Model.TotalSoldInvoiceCount</strong></div>
+        <div><span>صافي البيع</span><strong class="num">@money(Model.TotalNetSalesLyd)</strong></div>
+        <div><span>المرتبات</span><strong class="num">@money(Model.TotalBaseSalaryLyd)</strong></div>
+        <div><span>مدفوع المرتبات</span><strong class="num">@money(Model.TotalSalaryPaidLyd)</strong></div>
+        <div><span>العمولات</span><strong class="num">@money(Model.TotalCommissionLyd)</strong></div>
+        <div><span>الصافي المستحق</span><strong class="num">@money(Model.TotalNetDueLyd)</strong></div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle performance-table">
+            <thead>
                 <tr>
-                    <td>@row.UserName</td>
-                    <td class="text-center">@row.ShiftCount</td>
-                    <td class="text-center">@row.SoldInvoiceCount</td>
-                    <td class="text-center">@row.ReturnInvoiceCount</td>
-                    <td class="text-end">@row.CashSalesLyd.ToString("0.00")</td>
-                    <td class="text-end">@row.CardSalesLyd.ToString("0.00")</td>
-                    <td class="text-end">@row.TransferSalesLyd.ToString("0.00")</td>
-                    <td class="text-end">@row.CreditSalesLyd.ToString("0.00")</td>
-                    <td class="text-end fw-semibold">@row.NetSalesLyd.ToString("0.00")</td>
-                    <td class="text-end text-success fw-semibold">@row.CommissionAmountLyd.ToString("0.00")</td>
+                    <th>الموظف</th>
+                    <th>النوع</th>
+                    <th>ورديات</th>
+                    <th>فواتير</th>
+                    <th>مرتجع</th>
+                    <th>صافي البيع</th>
+                    <th>المرتب</th>
+                    <th>مدفوع</th>
+                    <th>العمولة</th>
+                    <th>سحب عمولة</th>
+                    <th>سلف</th>
+                    <th>خصومات</th>
+                    <th>الصافي المستحق</th>
                 </tr>
-            }
-        }
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                @if (!Model.Rows.Any())
+                {
+                    <tr><td colspan="13" class="text-center text-muted">لا توجد بيانات للفترة المحددة.</td></tr>
+                }
+                else
+                {
+                    foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@row.EmployeeName</div>
+                                @if (row.HasSystemAccount)
+                                {
+                                    <small class="text-muted">@row.UserName</small>
+                                }
+                            </td>
+                            <td class="text-center">@(row.HasSystemAccount ? "حساب نظام" : "عامل")</td>
+                            <td class="text-center num">@row.ShiftCount</td>
+                            <td class="text-center num">@row.SoldInvoiceCount</td>
+                            <td class="text-center num">@row.ReturnInvoiceCount</td>
+                            <td class="text-end num">@money(row.NetSalesLyd)</td>
+                            <td class="text-end num">@money(row.BaseSalaryLyd)</td>
+                            <td class="text-end num">@money(row.SalaryPaidLyd)</td>
+                            <td class="text-end num">@money(row.CommissionAmountLyd)</td>
+                            <td class="text-end num">@money(row.CommissionWithdrawalsLyd)</td>
+                            <td class="text-end num">@money(row.AdvancesLyd)</td>
+                            <td class="text-end num">@money(row.DeductionsLyd)</td>
+                            <td class="text-end fw-bold num">@money(row.NetDueLyd)</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
 <style>
-@@media print {
-    .no-print { display: none !important; }
-}
+    .performance-page {
+        background: #fff;
+        color: #172033;
+    }
+
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        border-bottom: 2px solid #172033;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+
+    .report-header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    .report-header p {
+        margin: 6px 0 0;
+        color: #657083;
+    }
+
+    .commission-rule {
+        border: 1px solid #d7dfe9;
+        border-radius: 6px;
+        padding: 8px 12px;
+        min-width: 260px;
+    }
+
+    .commission-rule span,
+    .summary-grid span {
+        display: block;
+        color: #657083;
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+
+    .commission-rule strong,
+    .summary-grid strong {
+        font-size: 16px;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .summary-grid > div {
+        border: 1px solid #d7dfe9;
+        border-radius: 6px;
+        padding: 9px 10px;
+        background: #f8fafc;
+    }
+
+    .performance-table {
+        font-size: 12px;
+    }
+
+    .performance-table th {
+        background: #172033;
+        color: #fff;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .num {
+        direction: ltr;
+        unicode-bidi: isolate;
+        font-variant-numeric: tabular-nums;
+    }
+
+    @@media (max-width: 991px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @@media print {
+        @@page {
+            size: A4 landscape;
+            margin: 8mm;
+        }
+
+        .no-print,
+        .sidebar,
+        .navbar,
+        .navbar-brand-wrapper,
+        .navbar-menu-wrapper,
+        .footer {
+            display: none !important;
+        }
+
+        .page-body-wrapper,
+        .main-panel,
+        .content-wrapper,
+        .container,
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        .summary-grid {
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+
+        .performance-table {
+            font-size: 9px;
+        }
+
+        .performance-table th,
+        .performance-table td {
+            padding: 4px 5px;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
 </style>

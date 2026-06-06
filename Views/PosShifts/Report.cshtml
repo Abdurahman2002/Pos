@@ -1,108 +1,326 @@
 @model NewsApp2.ViewModels.Pos.PosShiftReportVM
-@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@using System.Globalization
 @{
     ViewData["Title"] = "تقرير إغلاق الوردية";
+    var culture = CultureInfo.InvariantCulture;
+    Func<decimal, string> money = value => value.ToString("N2", culture);
+
+    string ExpenseKindText(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Equals("Salary", StringComparison.OrdinalIgnoreCase)) return "مرتب";
+        if (normalized.Equals("Advance", StringComparison.OrdinalIgnoreCase)) return "سلفة";
+        if (normalized.Equals("CommissionWithdrawal", StringComparison.OrdinalIgnoreCase)) return "سحب عمولة";
+        if (normalized.Equals("Deduction", StringComparison.OrdinalIgnoreCase)) return "خصم";
+        return "مصروف عام";
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3 no-print">
     <h2 class="m-0">تقرير إغلاق الوردية</h2>
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة</button>
-        <a asp-action="Current" class="btn btn-outline-secondary">رجوع</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">طباعة / PDF</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">سجل الورديات</a>
+        <a asp-action="Current" class="btn btn-outline-secondary">الوردية الحالية</a>
+        <a asp-action="CashierPerformance" class="btn btn-outline-secondary">أداء الكاشير</a>
     </div>
 </div>
 
-<div class="card mb-3">
-    <div class="card-body row g-3">
-        <div class="col-md-4"><strong>رقم الوردية:</strong> @Model.ShiftId</div>
-        <div class="col-md-4"><strong>فتح بواسطة:</strong> @Model.OpenedByUserName</div>
-        <div class="col-md-4"><strong>وقت الفتح:</strong> @Model.OpenedAtLocal.ToString("dd/MM/yyyy HH:mm")</div>
-        <div class="col-md-4"><strong>وقت الإغلاق:</strong> @(Model.ClosedAtLocal.HasValue ? Model.ClosedAtLocal.Value.ToString("dd/MM/yyyy HH:mm") : "-")</div>
-        <div class="col-md-4"><strong>عدد الفواتير:</strong> @Model.InvoiceCount</div>
-    </div>
-</div>
+<section class="shift-a4-page" dir="rtl">
+    <header class="shift-header">
+        <div>
+            <h1>تقرير إغلاق الوردية</h1>
+            <p>الكاشير: <strong>@Model.OpenedByUserName</strong></p>
+        </div>
+        <div class="shift-meta">
+            <div><span>رقم الوردية</span><strong>@Model.ShiftId</strong></div>
+            <div><span>فتح</span><strong class="num">@Model.OpenedAtLocal.ToString("dd/MM/yyyy HH:mm", culture)</strong></div>
+            <div><span>إغلاق</span><strong class="num">@(Model.ClosedAtLocal.HasValue ? Model.ClosedAtLocal.Value.ToString("dd/MM/yyyy HH:mm", culture) : "-")</strong></div>
+        </div>
+    </header>
 
-<div class="card mb-3">
-    <div class="card-body row g-3">
-        <div class="col-md-4"><strong>رصيد البداية:</strong> @Model.OpeningCashLyd.ToString("0.00") دينار</div>
-        <div class="col-md-4"><strong>إجمالي البيع:</strong> @Model.GrossSalesLyd.ToString("0.00") دينار</div>
-        <div class="col-md-4"><strong>إجمالي المرتجعات:</strong> @Model.ReturnsLyd.ToString("0.00") دينار</div>
-        <div class="col-md-4"><strong>صافي البيع:</strong> @Model.NetSalesLyd.ToString("0.00") دينار</div>
-        <div class="col-md-3"><strong>نقدي:</strong> @Model.CashSalesLyd.ToString("0.00")</div>
-        <div class="col-md-3"><strong>بطاقة:</strong> @Model.CardSalesLyd.ToString("0.00")</div>
-        <div class="col-md-3"><strong>تحويل:</strong> @Model.TransferSalesLyd.ToString("0.00")</div>
-        <div class="col-md-3"><strong>آجل:</strong> @Model.CreditSalesLyd.ToString("0.00")</div>
-        <div class="col-md-4"><strong>النقد المتوقع:</strong> @Model.ExpectedCashLyd.ToString("0.00") دينار</div>
-        <div class="col-md-4"><strong>النقد الفعلي:</strong> @(Model.ActualCashLyd.HasValue ? Model.ActualCashLyd.Value.ToString("0.00") : "-")</div>
-        <div class="col-md-4"><strong>الفرق:</strong> <span class="@(Model.CashDifferenceLyd == 0 ? "text-success" : "text-danger")">@Model.CashDifferenceLyd.ToString("0.00")</span></div>
-        <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي فقط.</small></div>
+    <div class="summary-grid">
+        <div><span>رصيد البداية</span><strong class="num">@money(Model.OpeningCashLyd)</strong></div>
+        <div><span>بيع نقدي</span><strong class="num">@money(Model.CashSalesLyd)</strong></div>
+        <div><span>تحصيلات نقدية</span><strong class="num">@money(Model.CashReceiptsLyd)</strong></div>
+        <div><span>مصروفات نقدية</span><strong class="num">@money(Model.CashExpensesLyd)</strong></div>
+        <div><span>النقد المتوقع</span><strong class="num">@money(Model.ExpectedCashLyd)</strong></div>
+        <div><span>النقد الفعلي</span><strong class="num">@(Model.ActualCashLyd.HasValue ? money(Model.ActualCashLyd.Value) : "-")</strong></div>
+        <div><span>الفرق</span><strong class="num @(Model.CashDifferenceLyd < 0 ? "negative" : "positive")">@money(Model.CashDifferenceLyd)</strong></div>
+        <div><span>عدد الفواتير</span><strong class="num">@Model.InvoiceCount</strong></div>
     </div>
-</div>
 
-<div class="card">
-    <div class="card-header fw-semibold">فواتير الوردية</div>
-    <div class="table-responsive">
-        <table class="table table-sm mb-0 align-middle">
-            <thead>
-                <tr>
-                    <th>@L["#"]</th>
-                    <th>الفاتورة</th>
-                    <th>التاريخ</th>
-                    <th>العميل</th>
-                    <th>الدفع</th>
-                    <th>النوع</th>
-                    <th class="text-end">الإجمالي</th>
-                    <th>الإنشاء</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!Model.Invoices.Any())
+    <div class="summary-grid compact">
+        <div><span>إجمالي البيع</span><strong class="num">@money(Model.GrossSalesLyd)</strong></div>
+        <div><span>المرتجعات</span><strong class="num negative">@money(Model.ReturnsLyd)</strong></div>
+        <div><span>صافي البيع</span><strong class="num positive">@money(Model.NetSalesLyd)</strong></div>
+        <div><span>بطاقة</span><strong class="num">@money(Model.CardSalesLyd)</strong></div>
+        <div><span>تحويل</span><strong class="num">@money(Model.TransferSalesLyd)</strong></div>
+        <div><span>آجل</span><strong class="num">@money(Model.CreditSalesLyd)</strong></div>
+        <div><span>كل المصروفات</span><strong class="num negative">@money(Model.TotalExpensesLyd)</strong></div>
+    </div>
+
+    <h2 class="section-title">فواتير الوردية</h2>
+    <table class="shift-table">
+        <thead>
+            <tr>
+                <th style="width: 8mm;">#</th>
+                <th>الفاتورة</th>
+                <th>التاريخ</th>
+                <th>العميل</th>
+                <th>الدفع</th>
+                <th>النوع</th>
+                <th>الإجمالي</th>
+                <th>وقت الإنشاء</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Invoices.Any())
+            {
+                <tr><td colspan="8" class="text-center text-muted">لا توجد فواتير في هذه الوردية.</td></tr>
+            }
+            else
+            {
+                var idx = 1;
+                foreach (var row in Model.Invoices)
                 {
                     <tr>
-                        <td colspan="8" class="text-center text-muted">لا توجد فواتير في هذه الوردية.</td>
+                        <td class="text-center num">@idx</td>
+                        <td>@row.Number</td>
+                        <td class="text-center num">@row.InvoiceDate.ToString("dd/MM/yyyy", culture)</td>
+                        <td>@row.CustomerName</td>
+                        <td>@row.PaymentMethod</td>
+                        <td>@(row.IsReturn ? "مرتجع" : "بيع")</td>
+                        <td class="text-end num">@money(row.TotalLyd)</td>
+                        <td class="text-center num">@row.CreatedLocal.ToString("HH:mm", culture)</td>
+                    </tr>
+                    idx++;
+                }
+            }
+        </tbody>
+    </table>
+
+    <h2 class="section-title">مصروفات الوردية</h2>
+    <table class="shift-table">
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>البيان</th>
+                <th>الدفع</th>
+                <th>القيمة</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Expenses.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted">لا توجد مصروفات مرتبطة بهذه الوردية.</td></tr>
+            }
+            else
+            {
+                foreach (var row in Model.Expenses)
+                {
+                    <tr>
+                        <td class="text-center num">@row.ExpenseDate.ToString("dd/MM/yyyy", culture)</td>
+                        <td>@ExpenseKindText(row.ExpenseKind)</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.Note) ? row.Category : $"{row.Category} - {row.Note}")</td>
+                        <td>@row.PaymentMethod</td>
+                        <td class="text-end num">@money(row.Amount)</td>
                     </tr>
                 }
-                else
-                {
-                    var idx = 1;
-                    foreach (var row in Model.Invoices)
-                    {
-                        <tr>
-                            <td>@idx</td>
-                            <td>@row.Number</td>
-                            <td><span dir="ltr">@row.InvoiceDate.ToString("dd/MM/yyyy")</span></td>
-                            <td>@row.CustomerName</td>
-                            <td>@row.PaymentMethod</td>
-                            <td>
-                                <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">
-                                    @(row.IsReturn ? "مرتجع" : "بيع")
-                                </span>
-                            </td>
-                            <td class="text-end">@row.TotalLyd.ToString("0.00")</td>
-                            <td><span dir="ltr">@row.CreatedLocal.ToString("dd/MM/yyyy HH:mm")</span></td>
-                        </tr>
-                        idx++;
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
+            }
+        </tbody>
+    </table>
+</section>
 
 <style>
-@@media print {
-    .no-print {
-        display: none !important;
+    .shift-a4-page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto 20px;
+        padding: 12mm;
+        background: #fff;
+        border: 1px solid #d9e0ea;
+        box-shadow: 0 14px 34px rgba(17, 30, 50, .08);
+        color: #172033;
     }
 
-    body {
-        background: #fff !important;
+    .shift-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        border-bottom: 2px solid #172033;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
     }
 
-    .card {
-        border: 1px solid #ddd !important;
-        box-shadow: none !important;
-        page-break-inside: avoid;
+    .shift-header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
     }
-}
+
+    .shift-header p {
+        margin: 6px 0 0;
+        color: #647083;
+    }
+
+    .shift-meta {
+        min-width: 78mm;
+        border: 1px solid #d7dfe9;
+        border-radius: 6px;
+        overflow: hidden;
+        font-size: 11px;
+    }
+
+    .shift-meta div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 8px;
+        border-bottom: 1px solid #e5eaf1;
+    }
+
+    .shift-meta div:last-child {
+        border-bottom: 0;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .summary-grid.compact {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .summary-grid > div {
+        border: 1px solid #d7dfe9;
+        border-radius: 6px;
+        padding: 8px 9px;
+        background: #f8fafc;
+    }
+
+    .summary-grid span {
+        display: block;
+        color: #647083;
+        font-size: 10px;
+        font-weight: 700;
+        margin-bottom: 3px;
+    }
+
+    .summary-grid strong {
+        font-size: 14px;
+    }
+
+    .positive { color: #087248; }
+    .negative { color: #b13b30; }
+
+    .section-title {
+        font-size: 14px;
+        font-weight: 800;
+        margin: 12px 0 6px;
+    }
+
+    .shift-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 10.8px;
+        margin-bottom: 10px;
+    }
+
+    .shift-table th,
+    .shift-table td {
+        border: 1px solid #d9e0ea;
+        padding: 5px 6px;
+        vertical-align: middle;
+        overflow-wrap: anywhere;
+    }
+
+    .shift-table th {
+        background: #172033;
+        color: #fff;
+        text-align: center;
+        font-weight: 800;
+    }
+
+    .shift-table tbody tr:nth-child(even) td {
+        background: #f7f9fc;
+    }
+
+    .text-end { text-align: left !important; }
+    .num {
+        direction: ltr;
+        unicode-bidi: isolate;
+        font-variant-numeric: tabular-nums;
+    }
+
+    @@media print {
+        @@page {
+            size: A4 portrait;
+            margin: 8mm;
+        }
+
+        * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .no-print,
+        .sidebar,
+        .navbar,
+        .navbar-brand-wrapper,
+        .navbar-menu-wrapper,
+        .footer {
+            display: none !important;
+        }
+
+        .page-body-wrapper,
+        .main-panel,
+        .content-wrapper,
+        .container,
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        .shift-a4-page {
+            width: 194mm;
+            min-height: auto;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            box-shadow: none;
+        }
+
+        .shift-header,
+        .summary-grid {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .shift-table {
+            font-size: 9.8px;
+        }
+
+        .shift-table th,
+        .shift-table td {
+            padding: 4px 5px;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
 </style>

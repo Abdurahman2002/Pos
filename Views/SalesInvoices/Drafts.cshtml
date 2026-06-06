@@ -22,11 +22,11 @@
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["From"]</label>
-        <input type="text" name="from" value="@(ViewBag.From?.ToString("dd/MM/yyyy") ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="from" value="@(ViewBag.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["To"]</label>
-        <input type="text" name="to" value="@(ViewBag.To?.ToString("dd/MM/yyyy") ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="to" value="@(ViewBag.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
     </div>
     <div class="col-md-2 d-flex align-items-end">
         <div class="form-check">
@@ -69,7 +69,7 @@
                         <div class="fw-semibold">@draft.Title</div>
                         @if (draft.Modified.HasValue)
                         {
-                            <div class="small text-muted">تحديث @draft.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="small text-muted">تحديث @draft.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</div>
                         }
                     </td>
                     <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@draft.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
@@ -79,7 +79,7 @@
                     </td>
                     <td>@draft.LineCount</td>
                     <td>@draft.NetDinar.ToString("0.00") دينار</td>
-                    <td>@draft.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@draft.Created.ToLocalTime().ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</td>
                     <td class="text-end">
                         <a asp-action="Create" asp-route-draftId="@draft.Id" class="btn btn-sm btn-outline-primary">استرجاع</a>
                         <form asp-action="DeleteDraft" method="post" class="d-inline">

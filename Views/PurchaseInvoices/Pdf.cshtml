@@ -29,6 +29,14 @@
             color: #111;
             direction: rtl;
         }
+        .invoice-page {
+            width: 210mm;
+            min-height: 297mm;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 12mm;
+            background: #fff;
+        }
         .header {
             display: flex;
             align-items: center;
@@ -148,12 +156,40 @@
             padding-top: 6px;
         }
         @@media print {
+            @@page {
+                size: A4 portrait;
+                margin: 8mm;
+            }
             .actions { display: none; }
-            body { padding: 10px; }
+            body {
+                padding: 0;
+                background: #fff;
+            }
+            .invoice-page {
+                width: auto;
+                min-height: auto;
+                max-width: none;
+                margin: 0;
+                padding: 0;
+            }
+            thead {
+                display: table-header-group;
+            }
+            tfoot {
+                display: table-footer-group;
+            }
+            tr {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            table {
+                page-break-inside: auto;
+            }
         }
     </style>
 </head>
 <body>
+<main class="invoice-page">
 
     <div class="header">
         <div class="header-logo">
@@ -171,7 +207,7 @@
         </div>
         <div class="header-num">
             <div>رقم: <strong>@Model.Number</strong></div>
-            <div>التاريخ: <strong>@Model.InvoiceDate.ToString("dd/MM/yyyy")</strong></div>
+            <div>التاريخ: <strong>@Model.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</strong></div>
         </div>
     </div>
 
@@ -181,7 +217,7 @@
         <div class="info-item"><span class="info-label">الحالة:</span> <span>@statusAr</span></div>
         @if (Model.DueDate.HasValue)
         {
-            <div class="info-item"><span class="info-label">تاريخ الاستحقاق:</span> <span>@Model.DueDate.Value.ToString("dd/MM/yyyy")</span></div>
+            <div class="info-item"><span class="info-label">تاريخ الاستحقاق:</span> <span>@Model.DueDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></div>
         }
         @if (Model.EurToDinarRateSnapshot > 0 && !string.Equals(Model.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase))
         {
@@ -249,8 +285,9 @@
     </div>
 
     <div class="footer-note">
-        تم إنشاء هذا المستند بواسطة النظام &mdash; @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+        تم إنشاء هذا المستند بواسطة النظام &mdash; @DateTime.Now.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)
     </div>
 
+</main>
 </body>
 </html>

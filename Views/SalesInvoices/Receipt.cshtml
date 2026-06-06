@@ -6,7 +6,6 @@
     var autoPrint = ViewBag.AutoPrint is bool shouldPrint && shouldPrint;
     var shopName = ViewBag.ShopName as string ?? "ايلورا";
     var shopLogo = ViewBag.ShopLogo as string;
-    var shopActivity = ViewBag.ShopActivity as string;
     var paymentText = (Model.PaymentMethod ?? string.Empty).Trim().ToLowerInvariant() switch
     {
         "card" => "بطاقة",
@@ -64,10 +63,6 @@
             font-size: 13px;
             font-weight: bold;
             margin-bottom: 0.3mm;
-        }
-        .shop-activity {
-            font-size: 8px;
-            margin-bottom: 0.5mm;
         }
         .invoice-title {
             font-size: 10px;
@@ -226,16 +221,12 @@
                 <img src="@logoUrl" alt="الشعار" />
             }
             <div class="shop-name">@shopName</div>
-            @if (!string.IsNullOrWhiteSpace(shopActivity))
-            {
-                <div class="shop-activity">@shopActivity</div>
-            }
             <div class="invoice-title">فاتورة مبيعات</div>
         </div>
 
         <div class="info-lines">
             <div class="info-line"><span class="info-label">رقم الفاتورة:</span><span class="info-value">@Model.Number</span></div>
-            <div class="info-line"><span class="info-label">التاريخ:</span><span class="info-value">@Model.InvoiceDate.ToString("dd/MM/yyyy") @DateTime.Now.ToString("HH:mm")</span></div>
+            <div class="info-line"><span class="info-label">التاريخ:</span><span class="info-value">@Model.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) @DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></div>
             <div class="info-line"><span class="info-label">العميل:</span><span class="info-value">@customerName</span></div>
             <div class="info-line"><span class="info-label">الدفع:</span><span class="info-value">@paymentText</span></div>
         </div>
@@ -287,7 +278,7 @@
         <div class="footer">
             <div class="thank-you">شكراً لتسوقكم</div>
             <div class="footer-text">معالج: @(Model.CreatedByUserName ?? "-")</div>
-            <div class="footer-text">@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="footer-text"><span dir="ltr">@DateTime.Now.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></div>
         </div>
 
         <div class="no-print" style="text-align: center; margin-top: 8px; display: flex; gap: 8px; justify-content: center;">

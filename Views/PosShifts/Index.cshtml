@@ -1,0 +1,96 @@
+@model List<NewsApp2.ViewModels.Pos.PosShiftListItemVM>
+@{
+    ViewData["Title"] = "سجل الورديات";
+    var from = (DateOnly?)ViewBag.From;
+    var to = (DateOnly?)ViewBag.To;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">سجل الورديات</h2>
+    <div class="d-flex gap-2">
+        <a asp-action="Current" class="btn btn-primary"><i class="mdi mdi-cash-register me-1"></i>الوردية الحالية</a>
+        <a asp-action="CashierPerformance" class="btn btn-info"><i class="mdi mdi-chart-line me-1"></i>أداء الكاشير</a>
+    </div>
+
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-3">
+        <label class="form-label">من</label>
+        <input type="date" name="from" value="@from?.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">إلى</label>
+        <input type="date" name="to" value="@to?.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-secondary w-100">تصفية</button>
+    </div>
+</form>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">لا توجد ورديات في هذه الفترة.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>الكاشير</th>
+                    <th>تاريخ الفتح</th>
+                    <th>تاريخ الإغلاق</th>
+                    <th>رصيد البداية</th>
+                    <th>المبيعات</th>
+                    <th>المرتجعات</th>
+                    <th>الصافي</th>
+                    <th>المتوقع</th>
+                    <th>الفعلي</th>
+                    <th>الفرق</th>
+                    <th>الفواتير</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model)
+                {
+                    <tr class="@(s.IsDeficit ? "table-danger" : s.Status == "Open" ? "table-success" : "")">
+                        <td>@s.CashierName</td>
+                        <td>@s.OpenedAtLocal.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@(s.ClosedAtLocal?.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                        <td>@s.OpeningCashLyd.ToString("0.00")</td>
+                        <td>@s.GrossSalesLyd.ToString("0.00")</td>
+                        <td>@s.ReturnsLyd.ToString("0.00")</td>
+                        <td><strong>@s.NetSalesLyd.ToString("0.00")</strong></td>
+                        <td>@s.ExpectedCashLyd.ToString("0.00")</td>
+                        <td>@(s.ActualCashLyd?.ToString("0.00") ?? "-")</td>
+                        <td class="@(s.IsDeficit ? "text-danger fw-bold" : s.CashDifferenceLyd > 0 ? "text-success fw-bold" : "")">
+                            @s.CashDifferenceText
+                        </td>
+                        <td>@s.InvoiceCount</td>
+                        <td>
+                            <a asp-action="Report" asp-route-id="@s.ShiftId" class="btn btn-sm btn-outline-primary">
+                                <i class="mdi mdi-file-chart"></i>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td colspan="3" class="text-center">الإجمالي</td>
+                    <td>@Model.Sum(x => x.OpeningCashLyd).ToString("0.00")</td>
+                    <td>@Model.Sum(x => x.GrossSalesLyd).ToString("0.00")</td>
+                    <td>@Model.Sum(x => x.ReturnsLyd).ToString("0.00")</td>
+                    <td>@Model.Sum(x => x.NetSalesLyd).ToString("0.00")</td>
+                    <td>@Model.Sum(x => x.ExpectedCashLyd).ToString("0.00")</td>
+                    <td>@(Model.Sum(x => x.ActualCashLyd ?? 0m).ToString("0.00"))</td>
+                    <td>@Model.Sum(x => x.CashDifferenceLyd).ToString("0.00")</td>
+                    <td>@Model.Sum(x => x.InvoiceCount)</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+}

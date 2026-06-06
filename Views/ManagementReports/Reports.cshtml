@@ -1,0 +1,250 @@
+@model NewsApp2.ViewModels.ManagementReports.ReportsVM
+@inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
+@{
+    ViewData["Title"] = "التقارير المالية";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">التقارير المالية</h1>
+</div>
+
+<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
+    <div class="col-md-4">
+        <label class="form-label small fw-bold">من تاريخ</label>
+        <input type="text" name="from" value="@Model.From?.ToString("dd/MM/yyyy")" class="form-control form-control-sm" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label small fw-bold">إلى تاريخ</label>
+        <input type="text" name="to" value="@Model.To?.ToString("dd/MM/yyyy")" class="form-control form-control-sm" placeholder="dd/MM/yyyy" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill">عرض</button>
+        <a asp-action="Reports" class="btn btn-outline-secondary btn-sm">اليوم</a>
+        <a asp-action="Reports" asp-route-from="@(new DateOnly(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1))" asp-route-to="@DateOnly.FromDateTime(DateTime.UtcNow)" class="btn btn-outline-secondary btn-sm">هذا الشهر</a>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div><i class="mdi mdi-cash fs-2 opacity-50"></i></div>
+                    <div class="text-end">
+                        <h6 class="fw-normal opacity-75 mb-1">صافي المبيعات</h6>
+                        <h3 class="mb-0 fw-bold">@Model.NetSalesLyd.ToString("N2")</h3>
+                    </div>
+                </div>
+                <div class="mt-2 small opacity-75">
+                    <span>مبيعات: @Model.TotalSalesLyd.ToString("N2")</span>
+                    <span class="mx-1">|</span>
+                    <span>مرتجعات: @Model.TotalReturnsLyd.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div><i class="mdi mdi-chart-line fs-2 opacity-50"></i></div>
+                    <div class="text-end">
+                        <h6 class="fw-normal opacity-75 mb-1">إجمالي الربح</h6>
+                        <h3 class="mb-0 fw-bold">@Model.GrossProfitLyd.ToString("N2")</h3>
+                    </div>
+                </div>
+                <div class="mt-2 small opacity-75">هامش الربح: @Model.MarginPercent.ToString("0.0")%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div><i class="mdi mdi-wallet fs-2 opacity-50"></i></div>
+                    <div class="text-end">
+                        <h6 class="fw-normal opacity-75 mb-1">صافي الربح</h6>
+                        <h3 class="mb-0 fw-bold">@Model.NetProfitLyd.ToString("N2")</h3>
+                    </div>
+                </div>
+                <div class="mt-2 small opacity-75">المصروفات: @Model.TotalExpensesLyd.ToString("N2")</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div><i class="mdi mdi-store fs-2 opacity-50"></i></div>
+                    <div class="text-end">
+                        <h6 class="fw-normal opacity-75 mb-1">قيمة المخزون</h6>
+                        <h3 class="mb-0 fw-bold">@Model.StockValueLyd.ToString("N2")</h3>
+                    </div>
+                </div>
+                <div class="mt-2 small opacity-75">
+                    <span>فواتير: @Model.TotalInvoices</span>
+                    <span class="mx-1">|</span>
+                    <span>تكلفة المبيعات: @Model.CostOfGoodsSoldLyd.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">تحليل المبيعات حسب طريقة الدفع</h6>
+                <span class="badge bg-secondary">@Model.TotalSalesLyd.ToString("N2") إجمالي</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tbody>
+                            @{
+                                var pmItems = new[] {
+                                    ("نقدي", Model.CashSalesLyd, "#0d6efd"),
+                                    ("بطاقة", Model.CardSalesLyd, "#198754"),
+                                    ("تحويل", Model.TransferSalesLyd, "#ffc107"),
+                                    ("آجل", Model.CreditSalesLyd, "#dc3545")
+                                };
+                            }
+                            @foreach (var (label, amount, color) in pmItems)
+                            {
+                                var pct = Model.TotalSalesLyd > 0 ? amount / Model.TotalSalesLyd * 100 : 0;
+                                <tr>
+                                    <td style="width:80px;"><span class="badge" style="background:@color">@label</span></td>
+                                    <td style="width:120px;" class="fw-bold">@amount.ToString("N2")</td>
+                                    <td>
+                                        <div class="progress" style="height:20px;">
+                                            <div class="progress-bar" style="width:@pct.ToString("0.0")%;background:@color" role="progressbar">@pct.ToString("0.0")%</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0 fw-bold">الذمم المالية</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="p-3 rounded border border-danger border-opacity-25 bg-danger bg-opacity-10 text-center h-100">
+                            <div class="text-danger small fw-bold">ديون العملاء</div>
+                            <div class="fs-4 fw-bold text-danger mt-1">@Model.CustomerDebtsLyd.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded border border-warning border-opacity-25 bg-warning bg-opacity-10 text-center h-100">
+                            <div class="text-warning-emphasis small fw-bold">ديون الموردين</div>
+                            <div class="fs-4 fw-bold text-warning-emphasis mt-1">@Model.SupplierDebtsLyd.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded border border-success border-opacity-25 bg-success bg-opacity-10 text-center h-100">
+                            <div class="text-success small fw-bold">المشتريات خلال الفترة</div>
+                            <div class="fs-4 fw-bold text-success mt-1">@Model.TotalPurchasesLyd.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded border border-info border-opacity-25 bg-info bg-opacity-10 text-center h-100">
+                            <div class="text-info small fw-bold">المصروفات</div>
+                            <div class="fs-4 fw-bold text-info mt-1">@Model.TotalExpensesLyd.ToString("N2")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.TopItems.Any())
+{
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="mb-0 fw-bold">أفضل 10 أصناف مبيعاً</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>الصنف</th>
+                            <th class="text-center">الكمية</th>
+                            <th class="text-center">الإيراد</th>
+                            <th class="text-center">التكلفة</th>
+                            <th class="text-center">الربح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rank = 0; }
+                        @foreach (var item in Model.TopItems)
+                        {
+                            rank++;
+                            <tr>
+                                <td>@rank</td>
+                                <td>@item.ItemName</td>
+                                <td class="text-center">@item.TotalQty.ToString("N0")</td>
+                                <td class="text-center fw-bold">@item.TotalRevenueLyd.ToString("N2")</td>
+                                <td class="text-center">@item.TotalCostLyd.ToString("N2")</td>
+                                <td class="text-center fw-bold text-success">@item.GrossProfitLyd.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.ExpenseBreakdown.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="mb-0 fw-bold">تحليل المصروفات</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>التصنيف</th>
+                            <th class="text-center">المبلغ</th>
+                            <th class="text-center">النسبة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var exp in Model.ExpenseBreakdown)
+                        {
+                            var pct = Model.TotalExpensesLyd > 0 ? exp.Amount / Model.TotalExpensesLyd * 100 : 0;
+                            <tr>
+                                <td>@exp.Category</td>
+                                <td class="text-center fw-bold">@exp.Amount.ToString("N2")</td>
+                                <td class="text-center">
+                                    <div class="progress" style="height:16px;max-width:200px;margin:0 auto;">
+                                        <div class="progress-bar bg-warning" style="width:@pct.ToString("0.0")%">@pct.ToString("0.0")%</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .card { border-radius: 10px !important; }
+    .progress { border-radius: 10px; background: #e9ecef; }
+    .progress-bar { border-radius: 10px; font-size: 11px; font-weight: bold; }
+</style>

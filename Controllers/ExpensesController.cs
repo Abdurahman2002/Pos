@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
+using NewsApp2.Models.Services;
 using NewsApp2.ViewModels.Expenses;
 using System.Security.Claims;
 
@@ -19,29 +20,19 @@ namespace NewsApp2.Controllers
         private const string AdvanceSettlementKind = "AdvanceSettlement";
         private const string DeductionKind = "Deduction";
         private const string CommissionWithdrawalKind = "CommissionWithdrawal";
-        private const string JournalSourceType = "ExpenseEntry";
 
-        private const string AccountCashCode = "1101";
-        private const string AccountCashName = "الصندوق";
-        private const string AccountBankCode = "1102";
-        private const string AccountBankName = "البنك";
-        private const string AccountGeneralExpenseCode = "5101";
-        private const string AccountGeneralExpenseName = "مصروفات عامة";
-        private const string AccountSalaryExpenseCode = "5102";
-        private const string AccountSalaryExpenseName = "مصروفات الرواتب";
-        private const string AccountEmployeeAdvanceCode = "1202";
-        private const string AccountEmployeeAdvanceName = "سلف الموظفين";
-        private const string AccountPayrollClearingCode = "2102";
-        private const string AccountPayrollClearingName = "تسويات رواتب";
+        // ملاحظة: منطق القيود المحاسبية وأكواد الحسابات انتقلت إلى ExpenseService (مصدر وحيد للحقيقة).
 
         private static readonly string[] AllowedKinds = { "General", SalaryKind, AdvanceKind, DeductionKind, CommissionWithdrawalKind };
         private static readonly string[] AllowedPaymentMethods = { "Cash", "Card", "Transfer", "Internal" };
 
         private readonly AppDbContext _context;
+        private readonly ExpenseService _expenseService;
 
-        public ExpensesController(AppDbContext context)
+        public ExpensesController(AppDbContext context, ExpenseService expenseService)
         {
             _context = context;
+            _expenseService = expenseService;
         }
 
         [HttpGet]
@@ -567,34 +558,8 @@ namespace NewsApp2.Controllers
             }
         }
 
-        private async Task<decimal> GetOutstandingAdvanceBalanceAsync(Guid? employeeId, Guid? ignoreSalaryExpenseId)
-        {
-            if (!employeeId.HasValue)
-            {
-                return 0m;
-            }
-
-            var employee = employeeId.Value;
-
-            var advances = await _context.Set<ExpenseEntry>()
-                .AsNoTracking()
-                .Where(e => e.EmployeeId == employee && e.ExpenseKind == AdvanceKind)
-                .SumAsync(e => (decimal?)e.Amount) ?? 0m;
-
-            var settlementsQuery = _context.Set<ExpenseEntry>()
-                .AsNoTracking()
-                .Where(e => e.EmployeeId == employee && e.ExpenseKind == AdvanceSettlementKind);
-
-            if (ignoreSalaryExpenseId.HasValue)
-            {
-                var refNo = BuildSettlementRef(ignoreSalaryExpenseId.Value);
-                settlementsQuery = settlementsQuery.Where(e => e.ReferenceNo != refNo);
-            }
-
-            var settlements = await settlementsQuery.SumAsync(e => (decimal?)e.Amount) ?? 0m;
-
-            return Math.Max(0m, advances - settlements);
-        }
+        private Task<decimal> GetOutstandingAdvanceBalanceAsync(Guid? employeeId, Guid? ignoreSalaryExpenseId)
+            => _expenseService.GetOutstandingAdvanceBalanceAsync(employeeId, ignoreSalaryExpenseId);
 
         private async Task<ExpenseEntry?> GetLinkedSettlementAsync(Guid salaryExpenseId)
         {
@@ -652,98 +617,17 @@ namespace NewsApp2.Controllers
             }
         }
 
-        private async Task RemoveFinancialEntriesAsync(Guid expenseId)
-        {
-            var entries = await _context.Set<FinJournalEntry>()
-                .Where(e => e.SourceType == JournalSourceType && e.SourceId == expenseId)
-                .ToListAsync();
-
-            if (entries.Count > 0)
-                _context.Set<FinJournalEntry>().RemoveRange(entries);
-        }
+        private Task RemoveFinancialEntriesAsync(Guid expenseId)
+            => _expenseService.RemoveFinancialEntriesAsync(expenseId);
 
         private void AddFinancialEntriesForExpense(ExpenseEntry expense)
-        {
-            var amount = Round2(expense.Amount);
-            if (amount <= 0)
-                return;
-
-            if (string.Equals(expense.ExpenseKind, DeductionKind, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            var documentNo = !string.IsNullOrWhiteSpace(expense.ReferenceNo)
-                ? expense.ReferenceNo
-                : $"EX-{expense.ExpenseDate:yyyyMMdd}-{expense.Id.ToString("N")[..6].ToUpperInvariant()}";
-
-            var (debitCode, debitName) = ResolveExpenseDebitAccount(expense.ExpenseKind);
-            var (creditCode, creditName) = ResolveExpenseCreditAccount(expense.ExpenseKind, expense.PaymentMethod);
-
-            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
-            {
-                EntryDate = expense.ExpenseDate,
-                SourceType = JournalSourceType,
-                SourceId = expense.Id,
-                DocumentNo = documentNo,
-                AccountCode = debitCode,
-                AccountName = debitName,
-                Debit = amount,
-                Credit = 0m,
-                Note = expense.Note,
-                CreatedByUserId = expense.CreatedByUserId,
-                CreatedByUserName = expense.CreatedByUserName
-            });
-
-            _context.Set<FinJournalEntry>().Add(new FinJournalEntry
-            {
-                EntryDate = expense.ExpenseDate,
-                SourceType = JournalSourceType,
-                SourceId = expense.Id,
-                DocumentNo = documentNo,
-                AccountCode = creditCode,
-                AccountName = creditName,
-                Debit = 0m,
-                Credit = amount,
-                Note = expense.Note,
-                CreatedByUserId = expense.CreatedByUserId,
-                CreatedByUserName = expense.CreatedByUserName
-            });
-        }
-
-        private static (string Code, string Name) ResolveExpenseDebitAccount(string? expenseKind)
-        {
-            if (string.Equals(expenseKind, SalaryKind, StringComparison.OrdinalIgnoreCase))
-                return (AccountSalaryExpenseCode, AccountSalaryExpenseName);
-
-            if (string.Equals(expenseKind, AdvanceKind, StringComparison.OrdinalIgnoreCase))
-                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
-
-            if (string.Equals(expenseKind, CommissionWithdrawalKind, StringComparison.OrdinalIgnoreCase))
-                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
-
-            if (string.Equals(expenseKind, AdvanceSettlementKind, StringComparison.OrdinalIgnoreCase))
-                return (AccountPayrollClearingCode, AccountPayrollClearingName);
-
-            return (AccountGeneralExpenseCode, AccountGeneralExpenseName);
-        }
-
-        private static (string Code, string Name) ResolveExpenseCreditAccount(string? expenseKind, string? paymentMethod)
-        {
-            if (string.Equals(expenseKind, AdvanceSettlementKind, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(paymentMethod, "Internal", StringComparison.OrdinalIgnoreCase))
-                return (AccountEmployeeAdvanceCode, AccountEmployeeAdvanceName);
-
-            if (string.Equals(paymentMethod, "Card", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(paymentMethod, "Transfer", StringComparison.OrdinalIgnoreCase))
-                return (AccountBankCode, AccountBankName);
-
-            return (AccountCashCode, AccountCashName);
-        }
+            => _expenseService.AddFinancialEntriesForExpense(expense);
 
         private static string BuildSettlementRef(Guid salaryExpenseId)
-            => $"SAL:{salaryExpenseId:N}";
+            => ExpenseService.BuildSettlementRef(salaryExpenseId);
 
         private static decimal Round2(decimal value)
-            => Math.Round(value, 2, MidpointRounding.ToEven);
+            => ExpenseService.Round2(value);
 
         private IActionResult? DenyCashierAccess()
         {
@@ -755,17 +639,7 @@ namespace NewsApp2.Controllers
             return null;
         }
 
-        private async Task<Guid?> GetOpenShiftIdForCurrentUserAsync()
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrWhiteSpace(userId))
-                return null;
-
-            return await _context.Set<PosShift>()
-                .AsNoTracking()
-                .Where(s => s.OpenedByUserId == userId && s.Status == "Open")
-                .Select(s => (Guid?)s.Id)
-                .FirstOrDefaultAsync();
-        }
+        private Task<Guid?> GetOpenShiftIdForCurrentUserAsync()
+            => _expenseService.GetOpenShiftIdAsync(User.FindFirstValue(ClaimTypes.NameIdentifier));
     }
 }

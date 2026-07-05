@@ -4,20 +4,24 @@ using Microsoft.EntityFrameworkCore;
 using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
+using NewsApp2.Models.Services;
 using NewsApp2.ViewModels.ManagementReports;
 
 namespace NewsApp2.Controllers;
 
 [Authorize(Policy = "InventoryCreatePolicy")]
 [Authorize(Policy = "ApprovedUserPolicy")]
+[Authorize(Policy = "NotCashierPolicy")]
 [ViewLayout("_LayoutDashboard")]
 public class ManagementReportsController : Controller
 {
     private readonly AppDbContext _context;
+    private readonly AccountBalanceService _accountBalanceService;
 
-    public ManagementReportsController(AppDbContext context)
+    public ManagementReportsController(AppDbContext context, AccountBalanceService accountBalanceService)
     {
         _context = context;
+        _accountBalanceService = accountBalanceService;
     }
 
     public async Task<IActionResult> Reports(DateOnly? from, DateOnly? to)
@@ -100,15 +104,8 @@ public class ManagementReportsController : Controller
             .AsNoTracking()
             .SumAsync(s => s.QuantityOnHand * s.AverageCostLyd);
 
-        var customerDebts = await _context.Set<SalesInvoice>()
-            .AsNoTracking()
-            .Where(i => i.PaymentMethod == "Credit" && i.Status != "Cancelled")
-            .SumAsync(i => i.TotalDinar);
-
-        var supplierDebts = await _context.Set<PurchaseInvoice>()
-            .AsNoTracking()
-            .Where(i => i.PaymentMethod == "Credit" && i.Status != "Cancelled")
-            .SumAsync(i => i.TotalDinar);
+        var customerDebts = await _accountBalanceService.GetCustomerReceivablesTotalAsync();
+        var supplierDebts = await _accountBalanceService.GetSupplierPayablesTotalAsync();
 
         var topItems = saleLines
             .GroupBy(l => l.Item!.Name)

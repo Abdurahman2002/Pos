@@ -42,6 +42,9 @@ namespace NewsApp2.Controllers
         [ViewLayout("_LayoutTemplate")]
         public async Task<IActionResult> Index()
         {
+            if (User.IsInRole("Cashier"))
+                return RedirectToAction("Create", "SalesInvoices");
+
             return RedirectToAction("Index", "StockBalances");
 
             var sections = await _section.Repository.GetAll().ToListAsync();

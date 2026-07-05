@@ -9,6 +9,7 @@ namespace NewsApp2.Controllers
 {
     [Authorize(Policy = "InventoryEditPolicy")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class ItemBarcodesController : Controller
     {
         private readonly AppDbContext _context;

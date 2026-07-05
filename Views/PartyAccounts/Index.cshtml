@@ -1,0 +1,139 @@
+@model NewsApp2.Models.Services.PartyAccountsSummary
+@{
+    ViewData["Title"] = "لوحة الحسابات";
+    string Money(decimal value) => value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
+    string DateText(DateOnly? value) => value?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
+}
+
+<div class="container-fluid py-4" dir="rtl">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">لوحة الحسابات</h2>
+            <div class="text-muted">أرصدة العملاء والموردين بعد خصم التحصيلات والسداد.</div>
+        </div>
+        <form method="get" class="d-flex gap-2">
+            <input name="search" value="@Model.Search" class="form-control" placeholder="بحث عن عميل أو مورد" />
+            <button class="btn btn-primary px-4" type="submit">بحث</button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">ما لك عند العملاء</div>
+                    <div class="display-6 fw-bold text-success">@Money(Model.CustomerReceivables) د.ل</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">ما عليك للموردين</div>
+                    <div class="display-6 fw-bold text-danger">@Money(Model.SupplierPayables) د.ل</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted mb-2">الصافي</div>
+                    <div class="display-6 fw-bold @(Model.NetPosition >= 0 ? "text-primary" : "text-danger")">@Money(Model.NetPosition) د.ل</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>أكبر أرصدة العملاء</strong>
+                    <a asp-controller="Customers" asp-action="Debts" class="btn btn-sm btn-outline-primary">كل العملاء</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>العميل</th>
+                                <th>إجمالي الآجل</th>
+                                <th>التحصيلات</th>
+                                <th>الرصيد</th>
+                                <th>آخر حركة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!Model.TopCustomerBalances.Any())
+                            {
+                                <tr><td colspan="6" class="text-center text-muted py-4">لا توجد ذمم عملاء مفتوحة.</td></tr>
+                            }
+                            @foreach (var row in Model.TopCustomerBalances)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@row.PartyName</div>
+                                        <small class="text-muted">@row.Phone</small>
+                                    </td>
+                                    <td>@Money(row.InvoicedAmount)</td>
+                                    <td>@Money(row.PaidAmount)</td>
+                                    <td class="fw-bold text-success">@Money(row.BalanceAmount)</td>
+                                    <td>@DateText(row.LastPaymentDate ?? row.LastInvoiceDate)</td>
+                                    <td class="text-nowrap">
+                                        <a asp-controller="Customers" asp-action="Statement" asp-route-id="@row.PartyId" class="btn btn-sm btn-outline-primary">كشف / تحصيل</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>أكبر أرصدة الموردين</strong>
+                    <a asp-controller="Suppliers" asp-action="Debts" class="btn btn-sm btn-outline-primary">كل الموردين</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المورد</th>
+                                <th>إجمالي الآجل</th>
+                                <th>السداد</th>
+                                <th>الرصيد</th>
+                                <th>آخر حركة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!Model.TopSupplierBalances.Any())
+                            {
+                                <tr><td colspan="6" class="text-center text-muted py-4">لا توجد ذمم موردين مفتوحة.</td></tr>
+                            }
+                            @foreach (var row in Model.TopSupplierBalances)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@row.PartyName</div>
+                                        <small class="text-muted">@row.Phone</small>
+                                    </td>
+                                    <td>@Money(row.InvoicedAmount)</td>
+                                    <td>@Money(row.PaidAmount)</td>
+                                    <td class="fw-bold text-danger">@Money(row.BalanceAmount)</td>
+                                    <td>@DateText(row.LastPaymentDate ?? row.LastInvoiceDate)</td>
+                                    <td class="text-nowrap">
+                                        <a asp-controller="Suppliers" asp-action="Statement" asp-route-id="@row.PartyId" class="btn btn-sm btn-outline-primary">كشف</a>
+                                        <a asp-controller="Suppliers" asp-action="Pay" asp-route-supplierId="@row.PartyId" class="btn btn-sm btn-outline-success">سداد</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

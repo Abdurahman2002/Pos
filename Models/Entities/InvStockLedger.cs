@@ -28,6 +28,9 @@ namespace NewsApp2.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal UnitCostLyd { get; set; }
 
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal ValueChangeLyd { get; set; }
+
         [StringLength(500)]
         public string? Note { get; set; }
 

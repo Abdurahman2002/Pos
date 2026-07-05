@@ -25,7 +25,7 @@ namespace NewsApp2.Models.Services
 
             var businessDates = await BuildBusinessDateMapAsync(ledgerQuery);
             var ledgerRows = await ledgerQuery
-                .Select(l => new { l.Id, l.Created, l.ReferenceType, l.ReferenceId, l.QuantityChange, l.UnitCostLyd, l.BalanceAfter, l.Note })
+                .Select(l => new { l.Id, l.Created, l.ReferenceType, l.ReferenceId, l.QuantityChange, l.UnitCostLyd, l.ValueChangeLyd, l.BalanceAfter, l.Note })
                 .ToListAsync();
 
             var sortedRows = ledgerRows
@@ -50,7 +50,7 @@ namespace NewsApp2.Models.Services
                 .ToList();
 
             var openingQty = openingRows.Sum(r => r.QuantityChange);
-            var openingValue = openingRows.Sum(r => r.QuantityChange * r.UnitCostLyd);
+            var openingValue = openingRows.Sum(r => ResolveValueChange(r.QuantityChange, r.UnitCostLyd, r.ValueChangeLyd));
 
             var salesRefs = filteredRows
                 .Select(x => x.Row)
@@ -90,7 +90,7 @@ namespace NewsApp2.Models.Services
                 var qtyIn = r.QuantityChange > 0 ? r.QuantityChange : 0m;
                 var qtyOut = r.QuantityChange < 0 ? Math.Abs(r.QuantityChange) : 0m;
                 var unitCost = r.UnitCostLyd;
-                var lineValue = (qtyIn - qtyOut) * unitCost;
+                var lineValue = ResolveValueChange(r.QuantityChange, r.UnitCostLyd, r.ValueChangeLyd);
 
                 runningQty += qtyIn - qtyOut;
                 runningValue += lineValue;
@@ -129,6 +129,14 @@ namespace NewsApp2.Models.Services
             if (refType.Contains("Sales", StringComparison.OrdinalIgnoreCase)) return "Sale";
             if (refType.Contains("Adjustment", StringComparison.OrdinalIgnoreCase)) return "Adjustment";
             return refType;
+        }
+
+        private static decimal ResolveValueChange(decimal quantityChange, decimal unitCost, decimal storedValueChange)
+        {
+            if (storedValueChange != 0m || quantityChange == 0m)
+                return storedValueChange;
+
+            return quantityChange * unitCost;
         }
 
         private async Task<IReadOnlyDictionary<string, DateOnly>> BuildBusinessDateMapAsync(IQueryable<InvStockLedger> ledgerQuery)

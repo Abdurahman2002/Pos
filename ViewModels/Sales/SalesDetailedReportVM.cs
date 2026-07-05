@@ -29,6 +29,8 @@ namespace NewsApp2.ViewModels.Sales
         public DateOnly To { get; set; }
         public List<SalesSimpleReportItemVM> Items { get; set; } = new();
         public List<SalesSimpleReportExpenseVM> Expenses { get; set; } = new();
+        public List<SalesSimpleReportBankTransferVM> TransferSalesByBank { get; set; } = new();
+        public List<SalesSimpleReportCustomerCreditVM> CreditSalesByCustomer { get; set; } = new();
         public decimal GrossSalesLyd { get; set; }
         public decimal ReturnsLyd { get; set; }
         public decimal NetSalesLyd { get; set; }
@@ -49,6 +51,20 @@ namespace NewsApp2.ViewModels.Sales
         public decimal ItemsSalesTotalLyd => Items.Sum(x => x.NetDinar);
         public decimal ItemsGrossProfitLyd => Items.Sum(x => x.GrossProfitLyd);
         public decimal NetAfterExpensesLyd => NetSalesLyd - TotalExpensesLyd;
+    }
+
+    public class SalesSimpleReportBankTransferVM
+    {
+        public string BankName { get; set; } = string.Empty;
+        public int InvoiceCount { get; set; }
+        public decimal TotalLyd { get; set; }
+    }
+
+    public class SalesSimpleReportCustomerCreditVM
+    {
+        public string CustomerName { get; set; } = string.Empty;
+        public int InvoiceCount { get; set; }
+        public decimal TotalLyd { get; set; }
     }
 
     public class SalesSimpleReportItemVM

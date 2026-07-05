@@ -22,6 +22,7 @@ namespace NewsApp2.Controllers
         private const string PaymentCard = "Card";
         private const string PaymentTransfer = "Transfer";
         private const string PaymentCredit = "Credit";
+        private const int RestrictedSalesLookbackDays = 3;
         internal const string DailySalesCustomerName = "مبيعات يومية";
         private static readonly Guid DailySalesCustomerSeedId = Guid.Parse("7e2efb6c-0cb2-430f-92af-6e0ad720f105");
 
@@ -43,20 +44,30 @@ namespace NewsApp2.Controllers
             var userId = _userManager.GetUserId(User);
             var canViewAll = CanViewAllInvoices();
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var effectiveFrom = from;
+            var effectiveTo = to;
+            var wasScopeAdjusted = false;
 
             var query = _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.Status != "Cancelled");
 
-            if (!canViewAll)
+            if (canViewAll)
             {
-                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate == today);
+                if (from.HasValue)
+                    query = query.Where(i => i.InvoiceDate >= from.Value);
+                if (to.HasValue)
+                    query = query.Where(i => i.InvoiceDate <= to.Value);
+            }
+            else
+            {
+                var scope = NormalizeRestrictedSalesRange(from, to, today);
+                effectiveFrom = scope.From;
+                effectiveTo = scope.To;
+                wasScopeAdjusted = scope.WasAdjusted;
+                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate >= scope.From && i.InvoiceDate <= scope.To);
             }
 
-            if (from.HasValue)
-                query = query.Where(i => i.InvoiceDate >= from.Value);
-            if (to.HasValue)
-                query = query.Where(i => i.InvoiceDate <= to.Value);
             if (customerId.HasValue && customerId.Value != Guid.Empty)
                 query = query.Where(i => i.CustomerId == customerId.Value);
 
@@ -66,8 +77,13 @@ namespace NewsApp2.Controllers
                 .Take(200)
                 .ToListAsync();
 
-            await LoadCustomersAsync(customerId);
+            if (canViewAll)
+                await LoadCustomersAsync(customerId);
+
             ViewBag.CustomerId = customerId;
+            ViewBag.From = effectiveFrom;
+            ViewBag.To = effectiveTo;
+            ApplyRestrictedSalesScopeViewBag(canViewAll, today, wasScopeAdjusted);
             return View(list);
         }
 
@@ -83,7 +99,7 @@ namespace NewsApp2.Controllers
             if (invoice == null)
                 return View("NotFound");
 
-            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+            if (!CanAccessInvoiceInSalesScope(invoice))
                 return Forbid();
 
             var lines = await _context.Set<SalesLine>()
@@ -685,10 +701,13 @@ namespace NewsApp2.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Hold(SalesCreateVM vm)
+        public async Task<IActionResult> Hold(SalesCreateVM? vm)
         {
             try
             {
+                if (vm == null)
+                    return BadRequest(new { success = false, error = "تعذر قراءة بيانات الفاتورة المعلقة. افتح شاشة البيع من جديد ثم حاول مرة أخرى." });
+
                 // Old behavior kept in comment for traceability: InvoiceDate relied on posted value and could fail due client-side format differences.
                 vm.InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -777,7 +796,7 @@ namespace NewsApp2.Controllers
             if (invoice == null)
                 return View("NotFound");
 
-            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+            if (!CanAccessInvoiceInSalesScope(invoice))
                 return Forbid();
 
             var lines = await _context.Set<SalesLine>()
@@ -811,7 +830,7 @@ namespace NewsApp2.Controllers
             if (invoice == null)
                 return View("NotFound");
 
-            if (!CanViewAllInvoices() && invoice.CreatedByUserId != _userManager.GetUserId(User))
+            if (!CanAccessInvoiceInSalesScope(invoice))
                 return Forbid();
 
             var lines = await _context.Set<SalesLine>()
@@ -928,6 +947,9 @@ namespace NewsApp2.Controllers
             var userId = _userManager.GetUserId(User);
             var canViewAll = CanViewAllInvoices();
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var effectiveFrom = from;
+            var effectiveTo = to;
+            var wasScopeAdjusted = false;
 
             var query = _context.Set<SalesInvoice>()
                 .AsNoTracking()
@@ -942,7 +964,11 @@ namespace NewsApp2.Controllers
             }
             else
             {
-                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate == today);
+                var scope = NormalizeRestrictedSalesRange(from, to, today);
+                effectiveFrom = scope.From;
+                effectiveTo = scope.To;
+                wasScopeAdjusted = scope.WasAdjusted;
+                query = query.Where(i => i.CreatedByUserId == userId && i.InvoiceDate >= scope.From && i.InvoiceDate <= scope.To);
             }
             if (customerId.HasValue && customerId.Value != Guid.Empty)
                 query = query.Where(i => i.CustomerId == customerId.Value);
@@ -974,9 +1000,9 @@ namespace NewsApp2.Controllers
 
             var vm = new SalesReportVM
             {
-                From = from,
-                To = to,
-                CustomerId = customerId,
+                From = effectiveFrom,
+                To = effectiveTo,
+                CustomerId = canViewAll ? customerId : null,
                 PaymentMethod = normalizedPayment,
                 Rows = rows,
                 SumDinar = grossSales,
@@ -988,7 +1014,10 @@ namespace NewsApp2.Controllers
                 CreditSalesLyd = rows.Where(r => !r.IsReturn && r.PaymentMethod == "آجل").Sum(r => r.TotalDinar)
             };
 
-            await LoadCustomersAsync(customerId);
+            if (canViewAll)
+                await LoadCustomersAsync(customerId);
+
+            ApplyRestrictedSalesScopeViewBag(canViewAll, today, wasScopeAdjusted);
             ViewData["PaymentMethods"] = new SelectList(new[]
             {
                 new { Value = "All", Text = "كل الطرق" },
@@ -1004,14 +1033,23 @@ namespace NewsApp2.Controllers
         [HttpGet]
         public async Task<IActionResult> TodayReport(DateOnly? date)
         {
-            var reportDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var canViewAll = CanViewAllInvoices();
+            var reportDate = date ?? today;
+            var wasScopeAdjusted = false;
+            if (!canViewAll)
+            {
+                var scope = NormalizeRestrictedSalesDate(date, today);
+                reportDate = scope.Date;
+                wasScopeAdjusted = scope.WasAdjusted;
+            }
             var userId = _userManager.GetUserId(User);
 
             var rows = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.InvoiceDate == reportDate)
                 .Where(i => i.Status != "Cancelled")
-                .Where(i => CanViewAllInvoices() || i.CreatedByUserId == userId)
+                .Where(i => canViewAll || i.CreatedByUserId == userId)
                 .OrderByDescending(i => i.Created)
                 .Select(i => new SalesDailyInvoiceRowVM
                 {
@@ -1034,12 +1072,17 @@ namespace NewsApp2.Controllers
                 Rows = rows
             };
 
+            ApplyRestrictedSalesScopeViewBag(canViewAll, today, wasScopeAdjusted);
             return View(vm);
         }
 
         [HttpGet]
+        [Authorize(Roles = "Admin,Prog,SalesManager")]
         public async Task<IActionResult> DetailedReport(DateOnly? from, DateOnly? to)
         {
+            if (!CanViewAllInvoices())
+                return Forbid();
+
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var toDate = to ?? today;
             var fromDate = from ?? toDate.AddDays(-30);
@@ -1109,14 +1152,30 @@ namespace NewsApp2.Controllers
         public async Task<IActionResult> SimpleDailyReport(DateOnly? from, DateOnly? to)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var canViewAll = CanViewAllInvoices();
+            var userId = _userManager.GetUserId(User);
+            var wasScopeAdjusted = false;
             var toDate = to ?? today;
             var fromDate = from ?? toDate;
             if (fromDate > toDate) { var t = fromDate; fromDate = toDate; toDate = t; }
+            if (!canViewAll)
+            {
+                var scope = NormalizeRestrictedSalesRange(from, to, today);
+                fromDate = scope.From;
+                toDate = scope.To;
+                wasScopeAdjusted = scope.WasAdjusted;
+            }
 
-            var invoices = await _context.Set<SalesInvoice>()
+            var invoiceQuery = _context.Set<SalesInvoice>()
                 .AsNoTracking()
-                .Where(i => i.Status == "Posted" && i.InvoiceDate >= fromDate && i.InvoiceDate <= toDate)
-                .ToListAsync();
+                .Include(i => i.Bank)
+                .Include(i => i.Customer)
+                .Where(i => i.Status == "Posted" && i.InvoiceDate >= fromDate && i.InvoiceDate <= toDate);
+
+            if (!canViewAll)
+                invoiceQuery = invoiceQuery.Where(i => i.CreatedByUserId == userId);
+
+            var invoices = await invoiceQuery.ToListAsync();
 
             var salesInvoices = invoices.Where(i => i.TotalDinar > 0).ToList();
             var salesInvoiceIds = salesInvoices.Select(i => i.Id).ToList();
@@ -1139,8 +1198,8 @@ namespace NewsApp2.Controllers
                     GrossSalesDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
                     ReturnDinar = 0m,
                     NetDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
-                    TotalCostLyd = RoundMoney(g.Sum(l => l.LineCostDinar)),
-                    GrossProfitLyd = RoundMoney(g.Sum(l => l.LineTotalDinar - l.LineCostDinar))
+                    TotalCostLyd = canViewAll ? RoundMoney(g.Sum(l => l.LineCostDinar)) : 0m,
+                    GrossProfitLyd = canViewAll ? RoundMoney(g.Sum(l => l.LineTotalDinar - l.LineCostDinar)) : 0m
                 })
                 .OrderByDescending(x => x.NetDinar)
                 .ToList();
@@ -1151,20 +1210,49 @@ namespace NewsApp2.Controllers
             var cardSales = salesInvoices.Where(i => i.PaymentMethod == "Card").Sum(i => i.TotalDinar);
             var transferSales = salesInvoices.Where(i => i.PaymentMethod == "Transfer").Sum(i => i.TotalDinar);
             var creditSales = salesInvoices.Where(i => i.PaymentMethod == "Credit").Sum(i => i.TotalDinar);
-
-            var expenses = await _context.Set<ExpenseEntry>()
-                .AsNoTracking()
-                .Include(e => e.Employee)
-                .Where(e => e.ExpenseDate >= fromDate && e.ExpenseDate <= toDate)
-                .ToListAsync();
-
-            var reportExpenses = expenses
-                .Where(e =>
-                    string.Equals(e.ExpenseKind, "General", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(e.ExpenseKind, "Salary", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(e.ExpenseKind, "Advance", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(e.ExpenseKind, "CommissionWithdrawal", StringComparison.OrdinalIgnoreCase))
+            var transferSalesByBank = salesInvoices
+                .Where(i => i.PaymentMethod == "Transfer")
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.Bank?.Name) ? "بدون مصرف" : i.Bank!.Name)
+                .Select(g => new SalesSimpleReportBankTransferVM
+                {
+                    BankName = g.Key,
+                    InvoiceCount = g.Count(),
+                    TotalLyd = RoundMoney(g.Sum(i => i.TotalDinar))
+                })
+                .OrderByDescending(x => x.TotalLyd)
+                .ThenBy(x => x.BankName)
                 .ToList();
+
+            var creditSalesByCustomer = salesInvoices
+                .Where(i => i.PaymentMethod == "Credit")
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.Customer?.Name) ? "بدون عميل" : i.Customer!.Name)
+                .Select(g => new SalesSimpleReportCustomerCreditVM
+                {
+                    CustomerName = g.Key,
+                    InvoiceCount = g.Count(),
+                    TotalLyd = RoundMoney(g.Sum(i => i.TotalDinar))
+                })
+                .OrderByDescending(x => x.TotalLyd)
+                .ThenBy(x => x.CustomerName)
+                .ToList();
+
+            var reportExpenses = new List<ExpenseEntry>();
+            if (canViewAll)
+            {
+                var expenses = await _context.Set<ExpenseEntry>()
+                    .AsNoTracking()
+                    .Include(e => e.Employee)
+                    .Where(e => e.ExpenseDate >= fromDate && e.ExpenseDate <= toDate)
+                    .ToListAsync();
+
+                reportExpenses = expenses
+                    .Where(e =>
+                        string.Equals(e.ExpenseKind, "General", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(e.ExpenseKind, "Salary", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(e.ExpenseKind, "Advance", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(e.ExpenseKind, "CommissionWithdrawal", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
 
             var totalExpenses = reportExpenses.Sum(e => e.Amount);
             var cashExpenses = reportExpenses.Where(e => e.PaymentMethod == null || e.PaymentMethod == "Cash").Sum(e => e.Amount);
@@ -1177,6 +1265,8 @@ namespace NewsApp2.Controllers
                 From = fromDate,
                 To = toDate,
                 Items = items,
+                TransferSalesByBank = transferSalesByBank,
+                CreditSalesByCustomer = creditSalesByCustomer,
                 Expenses = reportExpenses
                     .OrderBy(e => e.ExpenseDate)
                     .ThenBy(e => e.Created)
@@ -1208,6 +1298,7 @@ namespace NewsApp2.Controllers
                 ReturnInvoiceCount = 0
             };
 
+            ApplyRestrictedSalesScopeViewBag(canViewAll, today, wasScopeAdjusted);
             return View(vm);
         }
 
@@ -1252,6 +1343,91 @@ namespace NewsApp2.Controllers
         private bool IsSimplePosMode()
         {
             return User.IsInRole("Cashier") || User.IsInRole("Employee") || User.IsInRole("SalesOfficer");
+        }
+
+        private bool CanAccessInvoiceInSalesScope(SalesInvoice invoice)
+        {
+            if (CanViewAllInvoices())
+                return true;
+
+            var userId = _userManager.GetUserId(User);
+            if (string.IsNullOrWhiteSpace(userId) || invoice.CreatedByUserId != userId)
+                return false;
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var minDate = GetRestrictedSalesMinDate(today);
+            return invoice.InvoiceDate >= minDate && invoice.InvoiceDate <= today;
+        }
+
+        private static DateOnly GetRestrictedSalesMinDate(DateOnly today)
+        {
+            return today.AddDays(-(RestrictedSalesLookbackDays - 1));
+        }
+
+        private static (DateOnly From, DateOnly To, bool WasAdjusted) NormalizeRestrictedSalesRange(DateOnly? from, DateOnly? to, DateOnly today)
+        {
+            var minDate = GetRestrictedSalesMinDate(today);
+            var requestedTo = to ?? today;
+            var requestedFrom = from ?? requestedTo;
+
+            if (requestedFrom > requestedTo)
+            {
+                var temp = requestedFrom;
+                requestedFrom = requestedTo;
+                requestedTo = temp;
+            }
+
+            var originalFrom = requestedFrom;
+            var originalTo = requestedTo;
+
+            if (requestedTo > today)
+                requestedTo = today;
+
+            if (requestedTo < minDate)
+                requestedTo = minDate;
+
+            if (requestedFrom < minDate)
+                requestedFrom = minDate;
+
+            if (requestedFrom > today)
+                requestedFrom = today;
+
+            if (requestedFrom > requestedTo)
+                requestedFrom = requestedTo;
+
+            var maxRangeStart = requestedTo.AddDays(-(RestrictedSalesLookbackDays - 1));
+            if (requestedFrom < maxRangeStart)
+                requestedFrom = maxRangeStart;
+
+            var wasAdjusted = originalFrom != requestedFrom || originalTo != requestedTo;
+            return (requestedFrom, requestedTo, wasAdjusted);
+        }
+
+        private static (DateOnly Date, bool WasAdjusted) NormalizeRestrictedSalesDate(DateOnly? date, DateOnly today)
+        {
+            var requestedDate = date ?? today;
+            var minDate = GetRestrictedSalesMinDate(today);
+            var adjustedDate = requestedDate < minDate || requestedDate > today
+                ? today
+                : requestedDate;
+
+            return (adjustedDate, adjustedDate != requestedDate);
+        }
+
+        private void ApplyRestrictedSalesScopeViewBag(bool canViewAll, DateOnly today, bool wasScopeAdjusted)
+        {
+            ViewBag.CanViewAllSalesInvoices = canViewAll;
+            ViewBag.RestrictedSalesLookbackDays = RestrictedSalesLookbackDays;
+            ViewBag.RestrictedSalesMinDate = GetRestrictedSalesMinDate(today);
+            ViewBag.RestrictedSalesMaxDate = today;
+            ViewBag.SalesScopeWasAdjusted = wasScopeAdjusted;
+
+            if (!canViewAll)
+            {
+                ViewBag.SalesScopeMessage = wasScopeAdjusted
+                    ? $"تم تقليل النطاق إلى آخر {RestrictedSalesLookbackDays} أيام، وتظهر فواتيرك أنت فقط."
+                    : $"تظهر فواتيرك أنت فقط ضمن آخر {RestrictedSalesLookbackDays} أيام.";
+            }
         }
 
         private async Task<bool> HasOpenShiftAsync()

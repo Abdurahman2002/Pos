@@ -145,6 +145,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ApprovedUserPolicy", policy =>
         policy.Requirements.Add(new ApprovedUserRequirement()));
 
+    options.AddPolicy("NotCashierPolicy", policy =>
+        policy.RequireAssertion(p =>
+            !p.User.IsInRole("Cashier") ||
+            p.User.IsInRole("Prog") ||
+            p.User.IsInRole("Admin") ||
+            p.User.IsInRole("SalesManager")));
+
         options.AddPolicy("InventoryCreatePolicy", policy =>
             policy.RequireAssertion(p =>
                 p.User.HasClaim("InventoryCreate", "true") ||
@@ -199,6 +206,8 @@ builder.Services.AddScoped<PurchaseService>();
 builder.Services.AddScoped<SalesService>();
 builder.Services.AddScoped<BarcodeScanService>();
 builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<AccountBalanceService>();
+builder.Services.AddScoped<ExpenseService>();
 
 //-----------------------------------------
 var app = builder.Build();
@@ -294,7 +303,7 @@ app.UseMiddleware<SiteStateMiddleware>();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=StockBalances}/{action=Index}/{id?}");
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 
 app.Run();

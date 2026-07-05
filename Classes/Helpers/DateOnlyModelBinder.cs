@@ -8,8 +8,7 @@ namespace NewsApp2.Classes.Helpers
         private static readonly string[] Formats =
         {
             "dd/MM/yyyy", "d/M/yyyy",
-            "yyyy-MM-dd", "yyyy/M/d", "yyyy/MM/dd",
-            "MM/dd/yyyy", "M/d/yyyy"
+            "yyyy-MM-dd", "yyyy/M/d", "yyyy/MM/dd"
         };
         private static readonly CultureInfo[] Cultures =
         {
@@ -41,8 +40,7 @@ namespace NewsApp2.Classes.Helpers
 
             foreach (var culture in Cultures)
             {
-                if (DateOnly.TryParseExact(rawValue, Formats, culture, DateTimeStyles.None, out var parsed)
-                    || DateOnly.TryParse(rawValue, culture, DateTimeStyles.None, out parsed))
+                if (DateOnly.TryParseExact(rawValue, Formats, culture, DateTimeStyles.None, out var parsed))
                 {
                     bindingContext.Result = ModelBindingResult.Success(parsed);
                     return Task.CompletedTask;

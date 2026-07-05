@@ -18,11 +18,11 @@
 <form method="get" class="row g-2 mb-3 no-print">
     <div class="col-md-3">
         <label class="form-label">من</label>
-        <input name="from" type="date" value="@Model.From.ToString("yyyy-MM-dd", culture)" class="form-control" />
+        <input name="from" type="text" value="@Model.From.ToString("dd/MM/yyyy", culture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-3">
         <label class="form-label">إلى</label>
-        <input name="to" type="date" value="@Model.To.ToString("yyyy-MM-dd", culture)" class="form-control" />
+        <input name="to" type="text" value="@Model.To.ToString("dd/MM/yyyy", culture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-4">
         <label class="form-label">الموظف / العامل</label>

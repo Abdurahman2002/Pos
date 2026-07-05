@@ -5,12 +5,14 @@ using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
 using NewsApp2.Models.Interfaces;
+using NewsApp2.Models.Services;
 using NewsApp2.ViewModels.Customers;
 
 namespace NewsApp2.Controllers
 {
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class CustomersController : Controller
     {
         private const string DailySalesCustomerName = "مبيعات يومية";
@@ -27,11 +29,13 @@ namespace NewsApp2.Controllers
 
         private readonly IUnitOfWork<Customer> _customers;
         private readonly AppDbContext _context;
+        private readonly AccountBalanceService _accountBalanceService;
 
-        public CustomersController(IUnitOfWork<Customer> customers, AppDbContext context)
+        public CustomersController(IUnitOfWork<Customer> customers, AppDbContext context, AccountBalanceService accountBalanceService)
         {
             _customers = customers;
             _context = context;
+            _accountBalanceService = accountBalanceService;
         }
 
         [HttpGet]
@@ -212,70 +216,17 @@ namespace NewsApp2.Controllers
         [Authorize(Policy = "InventoryCreatePolicy")]
         public async Task<IActionResult> Debts(string? search)
         {
-            var customersQuery = _context.Set<Customer>()
-                .AsNoTracking()
-                .Where(c => c.Id != DailySalesCustomerSeedId && c.Name != DailySalesCustomerName);
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var term = search.Trim();
-                customersQuery = customersQuery.Where(c => c.Name.Contains(term) || (c.Phone != null && c.Phone.Contains(term)));
-            }
-
-            var customers = await customersQuery
-                .OrderBy(c => c.Name)
-                .Select(c => new { c.Id, c.Name, c.Phone })
-                .ToListAsync();
-
-            var customerIds = customers.Select(c => c.Id).ToList();
-
-            var creditSales = await _context.Set<SalesInvoice>()
-                .AsNoTracking()
-                .Where(i => customerIds.Contains(i.CustomerId ?? Guid.Empty))
-                .Where(i => i.Status == "Posted")
-                .Where(i => i.PaymentMethod == "Credit")
-                .GroupBy(i => i.CustomerId!.Value)
-                .Select(g => new
+            var balances = await _accountBalanceService.GetCustomerBalancesAsync(search);
+            var rows = balances
+                .Select(r => new CustomerDebtRowVM
                 {
-                    CustomerId = g.Key,
-                    Sum = g.Sum(i => i.TotalDinar),
-                    LastDate = g.Max(i => i.InvoiceDate)
+                    CustomerId = r.PartyId,
+                    CustomerName = r.PartyName,
+                    Phone = r.Phone,
+                    DebtAmount = r.BalanceAmount,
+                    LastCreditSaleDate = r.LastInvoiceDate,
+                    LastPaymentDate = r.LastPaymentDate
                 })
-                .ToListAsync();
-
-            var payments = await _context.Set<CustomerReceipt>()
-                .AsNoTracking()
-                .Where(r => customerIds.Contains(r.CustomerId))
-                .GroupBy(r => r.CustomerId)
-                .Select(g => new
-                {
-                    CustomerId = g.Key,
-                    Sum = g.Sum(r => r.Amount),
-                    LastDate = g.Max(r => r.ReceiptDate)
-                })
-                .ToListAsync();
-
-            var salesByCustomer = creditSales.ToDictionary(x => x.CustomerId, x => (x.Sum, x.LastDate));
-            var paymentsByCustomer = payments.ToDictionary(x => x.CustomerId, x => (x.Sum, x.LastDate));
-
-            var rows = customers
-                .Select(c =>
-                {
-                    var sales = salesByCustomer.TryGetValue(c.Id, out var s) ? s.Sum : 0m;
-                    var paid = paymentsByCustomer.TryGetValue(c.Id, out var p) ? p.Sum : 0m;
-                    return new CustomerDebtRowVM
-                    {
-                        CustomerId = c.Id,
-                        CustomerName = c.Name,
-                        Phone = c.Phone,
-                        DebtAmount = Math.Max(0m, sales - paid),
-                        LastCreditSaleDate = salesByCustomer.TryGetValue(c.Id, out var sx) ? sx.LastDate : null,
-                        LastPaymentDate = paymentsByCustomer.TryGetValue(c.Id, out var px) ? px.LastDate : null
-                    };
-                })
-                .Where(r => r.DebtAmount > 0)
-                .OrderByDescending(r => r.DebtAmount)
-                .ThenBy(r => r.CustomerName)
                 .ToList();
 
             var vm = new CustomerDebtReportVM

@@ -20,6 +20,7 @@ namespace NewsApp2.Controllers
         private const string PaymentCard = "Card";
         private const string PaymentTransfer = "Transfer";
         private const string PaymentCredit = "Credit";
+        private const int RestrictedShiftLookbackDays = 3;
 
         private readonly AppDbContext _context;
 
@@ -47,6 +48,16 @@ namespace NewsApp2.Controllers
             var canViewAny = principal?.IsInRole("Admin") == true
                 || principal?.IsInRole("Prog") == true
                 || principal?.IsInRole("SalesManager") == true;
+
+            if (!canViewAny)
+            {
+                var scope = NormalizeRestrictedShiftRange(from, to, today);
+                fromDate = scope.From;
+                toDate = scope.To;
+                ViewBag.RestrictedShiftMessage = scope.WasAdjusted
+                    ? $"تم تقليل نطاق الورديات إلى آخر {RestrictedShiftLookbackDays} أيام."
+                    : $"تظهر وردياتك فقط ضمن آخر {RestrictedShiftLookbackDays} أيام.";
+            }
 
             var query = _context.Set<PosShift>()
                 .AsNoTracking()
@@ -178,10 +189,50 @@ namespace NewsApp2.Controllers
                 vm.TransferSalesLyd = await salesQuery
                     .Where(i => i.PaymentMethod == PaymentTransfer)
                     .SumAsync(i => i.TotalDinar);
+                var transferBankRows = await salesQuery
+                    .Where(i => i.PaymentMethod == PaymentTransfer)
+                    .Select(i => new
+                    {
+                        BankName = i.Bank != null ? i.Bank.Name : null,
+                        i.TotalDinar
+                    })
+                    .ToListAsync();
+                vm.TransferSalesByBank = transferBankRows
+                    .GroupBy(i => string.IsNullOrWhiteSpace(i.BankName) ? "بدون مصرف" : i.BankName)
+                    .Select(g => new PosShiftBankTransferVM
+                    {
+                        BankName = g.Key!,
+                        InvoiceCount = g.Count(),
+                        TotalLyd = g.Sum(i => i.TotalDinar)
+                    })
+                    .OrderByDescending(x => x.TotalLyd)
+                    .ThenBy(x => x.BankName)
+                    .ToList();
                 vm.CreditSalesLyd = await salesQuery
                     .Where(i => i.PaymentMethod == PaymentCredit)
                     .SumAsync(i => i.TotalDinar);
-                vm.ExpectedCashLyd = activeShift.OpeningCashLyd + vm.CashSalesLyd;
+
+                vm.CashReceiptsLyd = await _context.Set<CustomerReceipt>()
+                    .AsNoTracking()
+                    .Where(r => r.PosShiftId == activeShift.Id)
+                    .Where(r => r.PaymentMethod == null || r.PaymentMethod == PaymentCash)
+                    .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+
+                vm.CashExpensesLyd = await _context.Set<ExpenseEntry>()
+                    .AsNoTracking()
+                    .Where(e => e.PosShiftId == activeShift.Id)
+                    .Where(e => e.PaymentMethod == null || e.PaymentMethod == PaymentCash)
+                    .Where(e => e.ExpenseKind != "Deduction")
+                    .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+
+                vm.TotalExpensesLyd = await _context.Set<ExpenseEntry>()
+                    .AsNoTracking()
+                    .Where(e => e.PosShiftId == activeShift.Id)
+                    .Where(e => e.ExpenseKind != "Deduction")
+                    .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+
+                // متوقّع الصندوق = افتتاحي + مبيعات نقدية + تحصيلات نقدية − مصروفات نقدية (مطابق لمعادلة الإغلاق)
+                vm.ExpectedCashLyd = activeShift.OpeningCashLyd + vm.CashSalesLyd + vm.CashReceiptsLyd - vm.CashExpensesLyd;
 
                 if (activeShift.ClosingCashLyd.HasValue)
                     vm.CashDifferenceLyd = activeShift.ClosingCashLyd.Value - vm.ExpectedCashLyd;
@@ -317,9 +368,19 @@ namespace NewsApp2.Controllers
             if (!canViewAnyShift && shift.OpenedByUserId != userId)
                 return Forbid();
 
+            if (!canViewAnyShift)
+            {
+                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                var minDate = GetRestrictedShiftMinDate(today);
+                var openedDate = DateOnly.FromDateTime(shift.OpenedAtUtc);
+                if (openedDate < minDate || openedDate > today)
+                    return Forbid();
+            }
+
             var invoices = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Include(i => i.Customer)
+                .Include(i => i.Bank)
                 .Where(i => i.PosShiftId == shift.Id)
                 .Where(i => i.Status == "Posted")
                 .OrderBy(i => i.Created)
@@ -330,6 +391,7 @@ namespace NewsApp2.Controllers
                     CustomerName = i.Customer == null || i.Customer.Name == DailySalesCustomerName ? "-" : i.Customer.Name,
                     TotalLyd = i.TotalDinar,
                     PaymentMethod = NormalizePaymentMethod(i.PaymentMethod),
+                    BankName = i.Bank != null ? i.Bank.Name : null,
                     IsReturn = (i.Note != null && i.Note.Contains("[POS-RETURN]")) || i.TotalDinar < 0,
                     CreatedLocal = i.Created.ToLocalTime()
                 })
@@ -342,6 +404,18 @@ namespace NewsApp2.Controllers
             var cardSales = invoices.Where(i => !i.IsReturn && i.PaymentMethod == "بطاقة").Sum(i => i.TotalLyd);
             var transferSales = invoices.Where(i => !i.IsReturn && i.PaymentMethod == "تحويل").Sum(i => i.TotalLyd);
             var creditSales = invoices.Where(i => !i.IsReturn && i.PaymentMethod == "آجل").Sum(i => i.TotalLyd);
+            var transferSalesByBank = invoices
+                .Where(i => !i.IsReturn && i.PaymentMethod == "تحويل")
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.BankName) ? "بدون مصرف" : i.BankName)
+                .Select(g => new PosShiftBankTransferVM
+                {
+                    BankName = g.Key!,
+                    InvoiceCount = g.Count(),
+                    TotalLyd = g.Sum(i => i.TotalLyd)
+                })
+                .OrderByDescending(x => x.TotalLyd)
+                .ThenBy(x => x.BankName)
+                .ToList();
             var cashReceipts = await _context.Set<CustomerReceipt>()
                 .AsNoTracking()
                 .Where(r => r.PosShiftId == shift.Id)
@@ -398,7 +472,8 @@ namespace NewsApp2.Controllers
                 CashDifferenceLyd = diff,
                 InvoiceCount = invoices.Count,
                 Invoices = invoices,
-                Expenses = expenses
+                Expenses = expenses,
+                TransferSalesByBank = transferSalesByBank
             };
 
             return View(vm);
@@ -767,6 +842,49 @@ namespace NewsApp2.Controllers
             };
 
             return View(vm);
+        }
+
+        private static DateOnly GetRestrictedShiftMinDate(DateOnly today)
+        {
+            return today.AddDays(-(RestrictedShiftLookbackDays - 1));
+        }
+
+        private static (DateOnly From, DateOnly To, bool WasAdjusted) NormalizeRestrictedShiftRange(DateOnly? from, DateOnly? to, DateOnly today)
+        {
+            var minDate = GetRestrictedShiftMinDate(today);
+            var requestedTo = to ?? today;
+            var requestedFrom = from ?? requestedTo;
+
+            if (requestedFrom > requestedTo)
+            {
+                var temp = requestedFrom;
+                requestedFrom = requestedTo;
+                requestedTo = temp;
+            }
+
+            var originalFrom = requestedFrom;
+            var originalTo = requestedTo;
+
+            if (requestedTo > today)
+                requestedTo = today;
+
+            if (requestedTo < minDate)
+                requestedTo = minDate;
+
+            if (requestedFrom < minDate)
+                requestedFrom = minDate;
+
+            if (requestedFrom > today)
+                requestedFrom = today;
+
+            if (requestedFrom > requestedTo)
+                requestedFrom = requestedTo;
+
+            var maxRangeStart = requestedTo.AddDays(-(RestrictedShiftLookbackDays - 1));
+            if (requestedFrom < maxRangeStart)
+                requestedFrom = maxRangeStart;
+
+            return (requestedFrom, requestedTo, originalFrom != requestedFrom || originalTo != requestedTo);
         }
 
         private static string NormalizePaymentMethod(string? paymentMethod)

@@ -5,6 +5,10 @@
     ViewData["Title"] = "تفاصيل فاتورة الشراء";
     var lines = ViewBag.Lines as IEnumerable<PurchaseLine> ?? Enumerable.Empty<PurchaseLine>();
     var localizedStatus = string.IsNullOrWhiteSpace(Model.Status) ? "-" : L[Model.Status].Value;
+    var subtotalDinar = Model.SubtotalDinar > 0 || Model.DiscountDinar > 0 ? Model.SubtotalDinar : Model.TotalDinar;
+    var discountText = string.Equals(Model.DiscountType, "Percent", StringComparison.OrdinalIgnoreCase)
+        ? $"{Model.DiscountValue:0.##}%"
+        : $"{Model.DiscountValue:0.00} د.ل";
 }
 
 <h1>تفاصيل فاتورة الشراء</h1>
@@ -25,7 +29,9 @@
     <dt class="col-sm-3">طريقة الدفع</dt><dd class="col-sm-9">@(string.Equals(Model.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase) ? "آجل" : "نقدي")</dd>
     <dt class="col-sm-3">تاريخ الاستحقاق</dt><dd class="col-sm-9">@(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-")</dd>
     <dt class="col-sm-3">الحالة</dt><dd class="col-sm-9">@localizedStatus</dd>
-    <dt class="col-sm-3">الإجمالي</dt><dd class="col-sm-9">@Model.TotalDinar.ToString("0.00") دينار</dd>
+    <dt class="col-sm-3">الإجمالي قبل الخصم</dt><dd class="col-sm-9">@subtotalDinar.ToString("0.00") دينار</dd>
+    <dt class="col-sm-3">الخصم</dt><dd class="col-sm-9">@Model.DiscountDinar.ToString("0.00") دينار (@discountText)</dd>
+    <dt class="col-sm-3">الصافي</dt><dd class="col-sm-9 fw-bold">@Model.TotalDinar.ToString("0.00") دينار</dd>
 </dl>
 
 @if (string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) && (User.IsInRole("Admin") || User.IsInRole("Prog")))
@@ -44,7 +50,9 @@
                 <th>الصنف</th>
                 <th>الكمية</th>
                 <th>سعر الوحدة</th>
-                <th>إجمالي السطر</th>
+                <th>قبل الخصم</th>
+                <th>خصم السطر</th>
+                <th>الصافي</th>
             </tr>
         </thead>
         <tbody>
@@ -54,7 +62,9 @@
                 <td>@line.Item?.Name</td>
                 <td>@line.Qty.ToString("0")</td>
                 <td>@line.UnitPriceEur.ToString("0.00")</td>
-                <td>@line.LineTotalDinar.ToString("0.00")</td>
+                <td>@((line.Qty * line.UnitPriceEur).ToString("0.00"))</td>
+                <td>@line.DiscountAllocatedDinar.ToString("0.00")</td>
+                <td class="fw-bold">@line.LineTotalDinar.ToString("0.00")</td>
             </tr>
         }
         </tbody>

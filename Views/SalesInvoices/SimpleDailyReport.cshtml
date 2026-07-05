@@ -1,13 +1,19 @@
 @using System.Globalization
 @model NewsApp2.ViewModels.Sales.SalesSimpleReportVM
 @{
-    ViewData["Title"] = "تقرير المبيعات اليومي";
     var culture = CultureInfo.InvariantCulture;
     Func<decimal, string> money = value => value.ToString("N2", culture);
     Func<decimal, string> qty = value => value.ToString("0.##", culture);
     var periodText = Model.From == Model.To
         ? Model.From.ToString("dd/MM/yyyy", culture)
         : $"{Model.From.ToString("dd/MM/yyyy", culture)} - {Model.To.ToString("dd/MM/yyyy", culture)}";
+    var fileDatePart = Model.From == Model.To
+        ? Model.From.ToString("dd-MM-yyyy", culture)
+        : $"{Model.From.ToString("dd-MM-yyyy", culture)}_to_{Model.To.ToString("dd-MM-yyyy", culture)}";
+    var printFileTitle = $"تقرير_المبيعات_اليومي_{fileDatePart}";
+    var canViewAllSalesInvoices = ViewBag.CanViewAllSalesInvoices as bool? ?? true;
+    var salesScopeMessage = ViewBag.SalesScopeMessage as string;
+    ViewData["Title"] = printFileTitle;
 
     string PaymentText(string? value)
     {
@@ -123,6 +129,48 @@
         border-top: 1px solid #d0d7e2;
         padding-top: 7px;
         font-size: 12px;
+    }
+
+    .bank-breakdown {
+        margin: 3px 0 5px;
+        padding: 5px 7px;
+        border: 1px dashed #d0d7e2;
+        border-radius: 4px;
+        background: #f8fafc;
+    }
+
+    .bank-breakdown-title {
+        margin-bottom: 2px;
+        font-size: 10.5px;
+        font-weight: 800;
+        color: #344054;
+    }
+
+    .bank-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 7px;
+        padding: 2px 0;
+        border-bottom: 1px solid #e4e7ec;
+        font-size: 10.5px;
+    }
+
+    .bank-row:last-child {
+        border-bottom: 0;
+    }
+
+    .bank-name {
+        min-width: 0;
+        color: #475467;
+        font-weight: 700;
+        overflow-wrap: break-word;
+    }
+
+    .bank-count {
+        color: #667085;
+        font-size: 10px;
+        white-space: nowrap;
     }
 
     .amount-good {
@@ -310,19 +358,24 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="m-0">تقرير المبيعات اليومي</h2>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-primary" onclick="window.print()">طباعة / PDF</button>
+                <button type="button" class="btn btn-primary" onclick="document.title='@printFileTitle'; window.print()">طباعة / PDF</button>
                 <a asp-action="Report" class="btn btn-outline-secondary">رجوع</a>
             </div>
         </div>
 
+        @if (!string.IsNullOrWhiteSpace(salesScopeMessage))
+        {
+            <div class="alert alert-info">@salesScopeMessage</div>
+        }
+
         <form method="get" class="row g-2 mb-3">
             <div class="col-md-3">
                 <label class="form-label">من</label>
-                <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd", culture)" class="form-control" />
+                <input type="text" name="from" value="@Model.From.ToString("dd/MM/yyyy", culture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">إلى</label>
-                <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd", culture)" class="form-control" />
+                <input type="text" name="to" value="@Model.To.ToString("dd/MM/yyyy", culture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-success w-100">عرض</button>
@@ -350,9 +403,40 @@
                 <div class="summary-line"><span class="label">إجمالي المبيعات</span><strong class="num amount-good">@money(Model.GrossSalesLyd)</strong></div>
                 <div class="summary-line"><span class="label">نقدي</span><strong class="num">@money(Model.CashSalesLyd)</strong></div>
                 <div class="summary-line"><span class="label">بطاقة</span><strong class="num">@money(Model.CardSalesLyd)</strong></div>
-                <div class="summary-line"><span class="label">تحويل / آجل</span><strong class="num">@money(Model.TransferSalesLyd) / @money(Model.CreditSalesLyd)</strong></div>
+                <div class="summary-line"><span class="label">تحويل</span><strong class="num">@money(Model.TransferSalesLyd)</strong></div>
+                @if (Model.TransferSalesByBank.Any())
+                {
+                    <div class="bank-breakdown">
+                        <div class="bank-breakdown-title">تفصيل التحويلات</div>
+                        @foreach (var bank in Model.TransferSalesByBank)
+                        {
+                            <div class="bank-row">
+                                <span class="bank-name">@bank.BankName</span>
+                                <span class="bank-count">@bank.InvoiceCount فاتورة</span>
+                                <strong class="num">@money(bank.TotalLyd)</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="summary-line"><span class="label">آجل</span><strong class="num">@money(Model.CreditSalesLyd)</strong></div>
+                @if (Model.CreditSalesByCustomer.Any())
+                {
+                    <div class="bank-breakdown">
+                        <div class="bank-breakdown-title">تفصيل الآجل حسب العميل</div>
+                        @foreach (var customer in Model.CreditSalesByCustomer)
+                        {
+                            <div class="bank-row">
+                                <span class="bank-name">@customer.CustomerName</span>
+                                <span class="bank-count">@customer.InvoiceCount فاتورة</span>
+                                <strong class="num">@money(customer.TotalLyd)</strong>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
 
+            @if (canViewAllSalesInvoices)
+            {
             <div class="summary-block">
                 <h2>ملخص مالي</h2>
                 <div class="summary-line"><span class="label">تكلفة البضاعة</span><strong class="num">@money(Model.Items.Sum(x => x.TotalCostLyd))</strong></div>
@@ -360,6 +444,7 @@
                 <div class="summary-line"><span class="label">المصروفات</span><strong class="num amount-bad">@money(Model.TotalExpensesLyd)</strong></div>
                 <div class="summary-line"><span class="label">الصافي بعد المصروفات</span><strong class="num amount-strong">@money(Model.NetAfterExpensesLyd)</strong></div>
             </div>
+            }
         </div>
 
         <h2 class="section-title">تفاصيل الأصناف</h2>
@@ -369,8 +454,11 @@
                 <col style="width: 82mm;" />
                 <col style="width: 22mm;" />
                 <col style="width: 30mm;" />
+                @if (canViewAllSalesInvoices)
+                {
                 <col style="width: 26mm;" />
                 <col style="width: 26mm;" />
+                }
             </colgroup>
             <thead>
                 <tr>
@@ -378,14 +466,17 @@
                     <th>الصنف</th>
                     <th>الكمية</th>
                     <th>إجمالي المبيعات</th>
+                    @if (canViewAllSalesInvoices)
+                    {
                     <th>التكلفة</th>
                     <th>الربح</th>
+                    }
                 </tr>
             </thead>
             <tbody>
                 @if (!Model.Items.Any())
                 {
-                    <tr><td colspan="6" class="text-center empty-row">لا توجد مبيعات في هذه الفترة.</td></tr>
+                    <tr><td colspan="@(canViewAllSalesInvoices ? 6 : 4)" class="text-center empty-row">لا توجد مبيعات في هذه الفترة.</td></tr>
                 }
                 else
                 {
@@ -397,8 +488,11 @@
                             <td class="item-name">@item.ItemName</td>
                             <td class="text-center num">@qty(item.SoldQty)</td>
                             <td class="text-left num">@money(item.GrossSalesDinar)</td>
+                            @if (canViewAllSalesInvoices)
+                            {
                             <td class="text-left num">@money(item.TotalCostLyd)</td>
                             <td class="text-left num">@money(item.GrossProfitLyd)</td>
+                            }
                         </tr>
                         index++;
                     }
@@ -409,12 +503,17 @@
                     <td colspan="2">الإجمالي</td>
                     <td class="text-center num">@qty(Model.Items.Sum(x => x.SoldQty))</td>
                     <td class="text-left num">@money(Model.Items.Sum(x => x.GrossSalesDinar))</td>
+                    @if (canViewAllSalesInvoices)
+                    {
                     <td class="text-left num">@money(Model.Items.Sum(x => x.TotalCostLyd))</td>
                     <td class="text-left num">@money(Model.Items.Sum(x => x.GrossProfitLyd))</td>
+                    }
                 </tr>
             </tfoot>
         </table>
 
+        @if (canViewAllSalesInvoices)
+        {
         <h2 class="section-title">مصروفات الفترة</h2>
         <table class="report-table">
             <colgroup>
@@ -467,5 +566,6 @@
             <span>الصافي بعد المصروفات</span>
             <span class="num">@money(Model.NetAfterExpensesLyd) د.ل</span>
         </div>
+        }
     </section>
 </div>

@@ -652,6 +652,7 @@
             if (customerSelect && customerSelect.value) return true;
             if (bankSelect && bankSelect.value) return true;
             if (dueDateInput && dueDateInput.value) return true;
+            if (discountValueInput && discountValueInput.value && parseDecimal(discountValueInput.value) !== 0) return true;
             if (noteInput && noteInput.value && noteInput.value.trim()) return true;
             return false;
         }
@@ -685,6 +686,8 @@
                 customerId: customerSelect ? customerSelect.value : '',
                 bankId: bankSelect ? bankSelect.value : '',
                 dueDate: dueDateInput ? dueDateInput.value : '',
+                discountType: discountTypeInput ? discountTypeInput.value : '',
+                discountValue: discountValueInput ? discountValueInput.value : '',
                 note: noteInput ? noteInput.value : '',
                 lines: lines
             };
@@ -745,6 +748,12 @@
             }
             if (dueDateInput) {
                 dueDateInput.value = data.dueDate || '';
+            }
+            if (discountTypeInput && data.discountType) {
+                discountTypeInput.value = data.discountType;
+            }
+            if (discountValueInput) {
+                discountValueInput.value = data.discountValue || '';
             }
             if (noteInput) {
                 noteInput.value = data.note || '';

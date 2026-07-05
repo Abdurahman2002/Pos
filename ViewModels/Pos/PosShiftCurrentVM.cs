@@ -25,6 +25,14 @@ namespace NewsApp2.ViewModels.Pos
 
         public decimal CreditSalesLyd { get; set; }
 
+        public List<PosShiftBankTransferVM> TransferSalesByBank { get; set; } = new();
+
+        public decimal CashReceiptsLyd { get; set; }
+
+        public decimal CashExpensesLyd { get; set; }
+
+        public decimal TotalExpensesLyd { get; set; }
+
         public decimal ExpectedCashLyd { get; set; }
 
         public decimal CashDifferenceLyd { get; set; }

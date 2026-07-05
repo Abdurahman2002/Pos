@@ -10,7 +10,7 @@
 <div class="row g-3">
     <div class="col-md-3">
         <label asp-for="ExpenseDate" class="form-label"></label>
-        <input asp-for="ExpenseDate" type="date" class="form-control" asp-format="{0:yyyy-MM-dd}" />
+        <input asp-for="ExpenseDate" type="text" class="form-control date-input js-date" asp-format="{0:dd/MM/yyyy}" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
         <span asp-validation-for="ExpenseDate" class="text-danger"></span>
     </div>
     <div class="col-md-3">

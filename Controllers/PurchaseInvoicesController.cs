@@ -22,7 +22,6 @@ namespace NewsApp2.Controllers
         private const string PaymentCash = "Cash";
         private const string PaymentCredit = "Credit";
         private const string PaymentTransfer = "Transfer";
-        private const string DefaultCashSupplierName = "\u0645\u0648\u0631\u062f \u0646\u0642\u062f\u064a \u0627\u0641\u062a\u0631\u0627\u0636\u064a";
 
         private readonly AppDbContext _context;
         private readonly PurchaseService _purchaseService;
@@ -149,6 +148,8 @@ namespace NewsApp2.Controllers
                 EurToDinarRateSnapshot = 1m,
                 SupplierId = invoice.SupplierId,
                 PaymentMethod = NormalizePaymentMethod(invoice.PaymentMethod),
+                DiscountType = NormalizeDiscountType(invoice.DiscountType),
+                DiscountValue = invoice.DiscountValue,
                 DueDate = invoice.DueDate,
                 Note = invoice.Note,
                 Lines = lines.Select(l => new PurchaseEditLineVM
@@ -182,12 +183,13 @@ namespace NewsApp2.Controllers
             vm.CurrencyCode = "LYD";
             vm.EurToDinarRateSnapshot = 1m;
             vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+            vm.DiscountType = NormalizeDiscountType(vm.DiscountType);
+
+            if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد لفاتورة المشتريات.");
 
             if (string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
             {
-                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
-                    ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد عند الشراء الآجل.");
-
                 if (!vm.DueDate.HasValue)
                     ModelState.AddModelError(nameof(vm.DueDate), "حدد تاريخ الاستحقاق عند الشراء الآجل.");
 
@@ -197,8 +199,6 @@ namespace NewsApp2.Controllers
             else
             {
                 vm.DueDate = null;
-                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
-                    vm.SupplierId = await GetOrCreateDefaultSupplierIdAsync();
             }
 
             if (!vm.Lines.Any())
@@ -212,6 +212,8 @@ namespace NewsApp2.Controllers
 
             if (vm.Lines.Any(l => l.SellPriceLyd.HasValue && l.SellPriceLyd.Value < 0))
                 ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر البيع سالبا.");
+
+            ValidateDiscount(vm.DiscountType, vm.DiscountValue, nameof(vm.DiscountValue));
 
             if (!ModelState.IsValid)
             {
@@ -236,6 +238,8 @@ namespace NewsApp2.Controllers
                     vm.SupplierId,
                     vm.PaymentMethod,
                     vm.DueDate,
+                    vm.DiscountType,
+                    vm.DiscountValue,
                     lines,
                     User?.Identity?.Name);
 
@@ -259,7 +263,9 @@ namespace NewsApp2.Controllers
             {
                 CurrencyCode = "LYD",
                 EurToDinarRateSnapshot = 1m,
-                PaymentMethod = PaymentCash
+                PaymentMethod = PaymentCash,
+                DiscountType = "Amount",
+                DiscountValue = 0m
             };
             vm.Lines.Add(new PurchaseLineInputVM());
             return View(vm);
@@ -280,17 +286,18 @@ namespace NewsApp2.Controllers
             vm.CurrencyCode = "LYD";
             vm.EurToDinarRateSnapshot = 1m;
             vm.PaymentMethod = NormalizePaymentMethod(vm.PaymentMethod);
+            vm.DiscountType = NormalizeDiscountType(vm.DiscountType);
             var isTransferPayment = string.Equals(vm.PaymentMethod, PaymentTransfer, StringComparison.OrdinalIgnoreCase);
             if (isTransferPayment && (!vm.BankId.HasValue || vm.BankId == Guid.Empty))
                 ModelState.AddModelError(nameof(vm.BankId), "حدد المصرف عند الشراء بالتحويل.");
             if (!isTransferPayment)
                 vm.BankId = null;
 
+            if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
+                ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد لفاتورة المشتريات.");
+
             if (string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase))
             {
-                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
-                    ModelState.AddModelError(nameof(vm.SupplierId), "حدد المورد عند الشراء الآجل.");
-
                 if (!vm.DueDate.HasValue)
                     ModelState.AddModelError(nameof(vm.DueDate), "حدد تاريخ الاستحقاق عند الشراء الآجل.");
 
@@ -300,8 +307,6 @@ namespace NewsApp2.Controllers
             else
             {
                 vm.DueDate = null;
-                if (!vm.SupplierId.HasValue || vm.SupplierId == Guid.Empty)
-                    vm.SupplierId = await GetOrCreateDefaultSupplierIdAsync();
             }
 
             if (!vm.Lines.Any())
@@ -316,6 +321,8 @@ namespace NewsApp2.Controllers
             if (vm.Lines.Any(l => l.SellPriceLyd.HasValue && l.SellPriceLyd.Value < 0))
                 ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر البيع سالبا.");
 
+            ValidateDiscount(vm.DiscountType, vm.DiscountValue, nameof(vm.DiscountValue));
+
             if (!ModelState.IsValid)
             {
                 await LoadItemsAsync();
@@ -329,6 +336,8 @@ namespace NewsApp2.Controllers
                 EurToDinarRateSnapshot = vm.EurToDinarRateSnapshot!.Value,
                 SupplierId = vm.SupplierId,
                 PaymentMethod = vm.PaymentMethod,
+                DiscountType = vm.DiscountType,
+                DiscountValue = vm.DiscountValue,
                 BankId = vm.BankId,
                 DueDate = vm.DueDate,
                 Note = vm.Note,
@@ -500,24 +509,6 @@ namespace NewsApp2.Controllers
             ViewBag.ItemSalePricesJson = JsonSerializer.Serialize(salePriceByItem);
         }
 
-        private async Task<Guid> GetOrCreateDefaultSupplierIdAsync()
-        {
-            var supplier = await _context.Set<Supplier>()
-                .FirstOrDefaultAsync(s => s.Name == DefaultCashSupplierName);
-
-            if (supplier != null)
-                return supplier.Id;
-
-            supplier = new Supplier
-            {
-                Name = DefaultCashSupplierName
-            };
-
-            _context.Set<Supplier>().Add(supplier);
-            await _context.SaveChangesAsync();
-            return supplier.Id;
-        }
-
         private bool TryResolveInvoiceDateFromRequest(out DateOnly invoiceDate)
         {
             invoiceDate = default;
@@ -530,14 +521,10 @@ namespace NewsApp2.Controllers
             {
                 "yyyy-MM-dd",
                 "dd/MM/yyyy",
-                "d/M/yyyy",
-                "MM/dd/yyyy",
-                "M/d/yyyy"
+                "d/M/yyyy"
             };
 
-            return DateOnly.TryParseExact(rawDate, acceptedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out invoiceDate)
-                || DateOnly.TryParse(rawDate, CultureInfo.CurrentCulture, DateTimeStyles.None, out invoiceDate)
-                || DateOnly.TryParse(rawDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out invoiceDate);
+            return DateOnly.TryParseExact(rawDate, acceptedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out invoiceDate);
         }
 
         private string GetSecondaryCurrencyCode()
@@ -557,6 +544,25 @@ namespace NewsApp2.Controllers
                 return PaymentTransfer;
 
             return PaymentCash;
+        }
+
+        private static string NormalizeDiscountType(string? discountType)
+        {
+            return string.Equals(discountType, "Percent", StringComparison.OrdinalIgnoreCase)
+                ? "Percent"
+                : "Amount";
+        }
+
+        private void ValidateDiscount(string discountType, decimal discountValue, string fieldName)
+        {
+            if (discountValue < 0)
+            {
+                ModelState.AddModelError(fieldName, "لا يمكن أن يكون الخصم سالبا.");
+                return;
+            }
+
+            if (string.Equals(discountType, "Percent", StringComparison.OrdinalIgnoreCase) && discountValue > 100)
+                ModelState.AddModelError(fieldName, "نسبة الخصم لا يمكن أن تتجاوز 100%.");
         }
 
         private static string ToArabicPaymentMethod(string? paymentMethod)

@@ -6,12 +6,14 @@ using System.Security.Claims;
 using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
+using NewsApp2.Models.Services;
 using NewsApp2.ViewModels.Suppliers;
 
 namespace NewsApp2.Controllers
 {
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class SuppliersController : Controller
     {
         private const string JournalSourceType = "SupplierPayment";
@@ -23,10 +25,12 @@ namespace NewsApp2.Controllers
         private const string AccountSupplierName = "ذمم الموردين";
 
         private readonly AppDbContext _context;
+        private readonly AccountBalanceService _accountBalanceService;
 
-        public SuppliersController(AppDbContext context)
+        public SuppliersController(AppDbContext context, AccountBalanceService accountBalanceService)
         {
             _context = context;
+            _accountBalanceService = accountBalanceService;
         }
 
         [HttpGet]
@@ -180,67 +184,17 @@ namespace NewsApp2.Controllers
         [Authorize(Policy = "InventoryCreatePolicy")]
         public async Task<IActionResult> Debts(string? search)
         {
-            var suppliersQuery = _context.Set<Supplier>().AsNoTracking();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var term = search.Trim();
-                suppliersQuery = suppliersQuery.Where(s => s.Name.Contains(term) || (s.Phone != null && s.Phone.Contains(term)));
-            }
-
-            var suppliers = await suppliersQuery
-                .OrderBy(s => s.Name)
-                .Select(s => new { s.Id, s.Name, s.Phone })
-                .ToListAsync();
-
-            var supplierIds = suppliers.Select(s => s.Id).ToList();
-
-            var creditPurchases = await _context.Set<PurchaseInvoice>()
-                .AsNoTracking()
-                .Where(i => i.SupplierId.HasValue && supplierIds.Contains(i.SupplierId.Value))
-                .Where(i => i.Status == "Posted")
-                .Where(i => i.PaymentMethod == "Credit")
-                .GroupBy(i => i.SupplierId!.Value)
-                .Select(g => new
+            var balances = await _accountBalanceService.GetSupplierBalancesAsync(search);
+            var rows = balances
+                .Select(r => new SupplierDebtRowVM
                 {
-                    SupplierId = g.Key,
-                    Sum = g.Sum(i => i.TotalDinar),
-                    LastDate = g.Max(i => i.InvoiceDate)
+                    SupplierId = r.PartyId,
+                    SupplierName = r.PartyName,
+                    Phone = r.Phone,
+                    DebtAmount = r.BalanceAmount,
+                    LastCreditPurchaseDate = r.LastInvoiceDate,
+                    LastPaymentDate = r.LastPaymentDate
                 })
-                .ToListAsync();
-
-            var payments = await _context.Set<SupplierPayment>()
-                .AsNoTracking()
-                .Where(r => supplierIds.Contains(r.SupplierId))
-                .GroupBy(r => r.SupplierId)
-                .Select(g => new
-                {
-                    SupplierId = g.Key,
-                    Sum = g.Sum(r => r.Amount),
-                    LastDate = g.Max(r => r.PaymentDate)
-                })
-                .ToListAsync();
-
-            var purchasesBySupplier = creditPurchases.ToDictionary(x => x.SupplierId, x => (x.Sum, x.LastDate));
-            var paymentsBySupplier = payments.ToDictionary(x => x.SupplierId, x => (x.Sum, x.LastDate));
-
-            var rows = suppliers
-                .Select(s =>
-                {
-                    var purchases = purchasesBySupplier.TryGetValue(s.Id, out var p) ? p.Sum : 0m;
-                    var paid = paymentsBySupplier.TryGetValue(s.Id, out var r) ? r.Sum : 0m;
-                    return new SupplierDebtRowVM
-                    {
-                        SupplierId = s.Id,
-                        SupplierName = s.Name,
-                        Phone = s.Phone,
-                        DebtAmount = Math.Max(0m, purchases - paid),
-                        LastCreditPurchaseDate = purchasesBySupplier.TryGetValue(s.Id, out var px) ? px.LastDate : null,
-                        LastPaymentDate = paymentsBySupplier.TryGetValue(s.Id, out var rx) ? rx.LastDate : null
-                    };
-                })
-                .Where(r => r.DebtAmount > 0)
-                .OrderByDescending(r => r.DebtAmount)
-                .ThenBy(r => r.SupplierName)
                 .ToList();
 
             var vm = new SupplierDebtReportVM
@@ -486,14 +440,10 @@ namespace NewsApp2.Controllers
             {
                 "dd/MM/yyyy",
                 "d/M/yyyy",
-                "yyyy-MM-dd",
-                "MM/dd/yyyy",
-                "M/d/yyyy"
+                "yyyy-MM-dd"
             };
 
-            return DateOnly.TryParseExact(rawDate, acceptedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out paymentDate)
-                || DateOnly.TryParse(rawDate, CultureInfo.CurrentCulture, DateTimeStyles.None, out paymentDate)
-                || DateOnly.TryParse(rawDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out paymentDate);
+            return DateOnly.TryParseExact(rawDate, acceptedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out paymentDate);
         }
 
         private bool TryResolveAmountFromRequest(out decimal amount)

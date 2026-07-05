@@ -43,11 +43,11 @@ namespace NewsApp2.Models.Services
                 throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
 
             invoice.PaymentMethod = NormalizePaymentMethod(invoice.PaymentMethod);
+            if (!invoice.SupplierId.HasValue || invoice.SupplierId == Guid.Empty)
+                throw new InvalidOperationException("حدد المورد لفاتورة المشتريات.");
+
             if (string.Equals(invoice.PaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
             {
-                if (!invoice.SupplierId.HasValue || invoice.SupplierId == Guid.Empty)
-                    throw new InvalidOperationException("حدد المورد عند الشراء الآجل.");
-
                 if (!invoice.DueDate.HasValue)
                     throw new InvalidOperationException("حدد تاريخ الاستحقاق عند الشراء الآجل.");
 
@@ -82,17 +82,21 @@ namespace NewsApp2.Models.Services
                 _context.Set<PurchaseInvoice>().Add(invoice);
                 await _context.SaveChangesAsync();
 
-                decimal totalEur = 0;
-                decimal totalDinar = 0;
-
                 var itemIds = lineList.Select(l => l.ItemId).Distinct().ToList();
                 var itemById = await _context.Set<Item>()
                     .Where(i => itemIds.Contains(i.Id))
                     .ToDictionaryAsync(i => i.Id, i => i);
 
-                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+                var preparedTotals = PreparePurchaseTotals(
+                    lineList,
+                    invoice.CurrencyCode,
+                    invoice.EurToDinarRateSnapshot,
+                    invoice.DiscountType,
+                    invoice.DiscountValue);
+
+                for (var lineIndex = 0; lineIndex < preparedTotals.Lines.Count; lineIndex++)
                 {
-                    var line = lineList[lineIndex];
+                    var line = preparedTotals.Lines[lineIndex];
                     if (line.Qty <= 0)
                         throw new InvalidOperationException("يجب أن تكون الكمية أكبر من الصفر.");
 
@@ -108,12 +112,6 @@ namespace NewsApp2.Models.Services
                     if (line.SellPriceLyd.HasValue && line.SellPriceLyd.Value < 0)
                         throw new InvalidOperationException("لا يمكن أن يكون سعر البيع سالباً.");
 
-                    var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
-                    var lineTotalDinar = RoundMoney(lineTotalEur * invoice.EurToDinarRateSnapshot);
-
-                    totalEur += lineTotalEur;
-                    totalDinar += lineTotalDinar;
-
                     var purchaseLine = new PurchaseLine
                     {
                         PurchaseInvoiceId = invoice.Id,
@@ -121,12 +119,14 @@ namespace NewsApp2.Models.Services
                         Qty = line.Qty,
                         LineOrder = lineIndex,
                         UnitPriceEur = line.UnitPriceEur,
-                        LineTotalEur = lineTotalEur,
-                        LineTotalDinar = lineTotalDinar,
+                        LineTotalEur = line.LineTotalEur,
+                        LineTotalDinar = line.LineTotalDinar,
+                        DiscountAllocatedEur = line.DiscountAllocatedEur,
+                        DiscountAllocatedDinar = line.DiscountAllocatedDinar,
+                        UnitCostLyd = line.UnitCostLyd,
                         CurrencyCode = invoice.CurrencyCode,
                         ExchangeRateSnapshot = invoice.EurToDinarRateSnapshot
                     };
-                    purchaseLine.UnitCostLyd = line.Qty > 0 ? RoundMoney(lineTotalDinar / line.Qty) : 0m;
                     _context.Set<PurchaseLine>().Add(purchaseLine);
 
                     var stock = await _context.Set<InvStockBalance>()
@@ -164,7 +164,8 @@ namespace NewsApp2.Models.Services
                         ReferenceId = invoice.Id,
                         QuantityChange = line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
-                        Note = invoice.Note
+                        Note = invoice.Note,
+                        ValueChangeLyd = line.LineTotalDinar
                     };
                     ledger.UnitCostLyd = incomingUnitCost;
                     _context.Set<InvStockLedger>().Add(ledger);
@@ -183,8 +184,7 @@ namespace NewsApp2.Models.Services
                     item.DefaultSalePriceLyd = RoundMoney(update.Value);
                 }
 
-                invoice.TotalEur = RoundMoney(totalEur);
-                invoice.TotalDinar = RoundMoney(totalDinar);
+                ApplyTotalsToInvoice(invoice, preparedTotals);
 
                 await ReplaceFinancialEntriesAsync(invoice, invoice.CreatedByUserId, invoice.CreatedByUserName);
 
@@ -276,7 +276,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = -line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = $"Cancelled by {cancelledBy ?? "unknown"}",
-                        UnitCostLyd = line.UnitCostLyd
+                        UnitCostLyd = line.UnitCostLyd,
+                        ValueChangeLyd = -removedValue
                     });
                 }
 
@@ -307,6 +308,8 @@ namespace NewsApp2.Models.Services
             Guid? supplierId,
             string? paymentMethod,
             DateOnly? dueDate,
+            string? discountType,
+            decimal discountValue,
             IEnumerable<(Guid ItemId, decimal Qty, decimal UnitPriceEur, decimal? SellPriceLyd)> lines,
             string? editedBy)
         {
@@ -321,11 +324,11 @@ namespace NewsApp2.Models.Services
                 throw new InvalidOperationException("يجب أن يكون سعر الصرف أكبر من الصفر.");
 
             var normalizedPaymentMethod = NormalizePaymentMethod(paymentMethod);
+            if (!supplierId.HasValue || supplierId == Guid.Empty)
+                throw new InvalidOperationException("حدد المورد لفاتورة المشتريات.");
+
             if (string.Equals(normalizedPaymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
             {
-                if (!supplierId.HasValue || supplierId == Guid.Empty)
-                    throw new InvalidOperationException("حدد المورد عند الشراء الآجل.");
-
                 if (!dueDate.HasValue)
                     throw new InvalidOperationException("حدد تاريخ الاستحقاق عند الشراء الآجل.");
 
@@ -394,13 +397,30 @@ namespace NewsApp2.Models.Services
                         throw new InvalidOperationException("الصنف المحدد غير موجود.");
                 }
 
+                var invoiceCurrency = "LYD";
+                var effectiveRate = 1m;
+                var preparedTotals = PreparePurchaseTotals(
+                    lineList,
+                    invoiceCurrency,
+                    effectiveRate,
+                    discountType,
+                    discountValue);
+
                 var oldQtyByItem = (invoice.Lines ?? new List<PurchaseLine>())
                     .GroupBy(l => l.ItemId)
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
 
-                var newQtyByItem = lineList
+                var newQtyByItem = preparedTotals.Lines
                     .GroupBy(l => l.ItemId)
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+
+                var oldValueByItem = (invoice.Lines ?? new List<PurchaseLine>())
+                    .GroupBy(l => l.ItemId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.LineTotalDinar));
+
+                var newValueByItem = preparedTotals.Lines
+                    .GroupBy(l => l.ItemId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.LineTotalDinar));
 
                 var stockByItem = await _context.Set<InvStockBalance>()
                     .Where(s => itemIds.Contains(s.ItemId))
@@ -441,29 +461,27 @@ namespace NewsApp2.Models.Services
                     var oldQty = oldQtyByItem.TryGetValue(itemId, out var oldVal) ? oldVal : 0m;
                     var newQty = newQtyByItem.TryGetValue(itemId, out var newVal) ? newVal : 0m;
                     var delta = newQty - oldQty;
-                    if (delta == 0)
+                    var oldValue = oldValueByItem.TryGetValue(itemId, out var oldItemValue) ? oldItemValue : 0m;
+                    var newValue = newValueByItem.TryGetValue(itemId, out var newItemValue) ? newItemValue : 0m;
+                    var deltaValue = RoundMoney(newValue - oldValue);
+                    if (delta == 0 && deltaValue == 0)
                         continue;
 
                     var stock = stockByItem[itemId];
-                    var oldLines = (invoice.Lines ?? new List<PurchaseLine>()).Where(l => l.ItemId == itemId).ToList();
-                    var oldValue = oldLines.Sum(l => l.LineTotalDinar);
-                    var newLines = lineList.Where(l => l.ItemId == itemId).ToList();
-                    decimal newValue = 0m;
-                    foreach (var nl in newLines)
-                    {
-                        var lTotalEur = RoundMoney(nl.Qty * nl.UnitPriceEur);
-                        var lTotalDinar = RoundMoney(lTotalEur * rate);
-                        newValue += lTotalDinar;
-                    }
-
-                    var deltaValue = newValue - oldValue;
 
                     var currentQty = stock.QuantityOnHand;
                     var currentValue = currentQty * stock.AverageCostLyd;
                     var newStockQty = currentQty + delta;
                     if (newStockQty > 0)
                     {
-                        var newAvg = (currentValue + deltaValue) / newStockQty;
+                        var newStockValue = currentValue + deltaValue;
+                        if (newStockValue < 0)
+                        {
+                            var itemName = itemNames.TryGetValue(itemId, out var name) ? name : "Item";
+                            throw new InvalidOperationException($"Cannot reduce the purchase value below zero for {itemName}.");
+                        }
+
+                        var newAvg = newStockValue / newStockQty;
                         stock.AverageCostLyd = RoundMoney(newAvg);
                     }
                     else
@@ -473,7 +491,9 @@ namespace NewsApp2.Models.Services
 
                     stock.QuantityOnHand = newStockQty;
 
-                    var unitCostForLedger = delta != 0 ? RoundMoney(deltaValue / delta) : 0m;
+                    var unitCostForLedger = delta != 0
+                        ? RoundMoney(Math.Abs(deltaValue / delta))
+                        : stock.AverageCostLyd;
                     _context.Set<InvStockLedger>().Add(new InvStockLedger
                     {
                         ItemId = itemId,
@@ -483,25 +503,16 @@ namespace NewsApp2.Models.Services
                         QuantityChange = delta,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = $"Edited by {editedBy ?? "unknown"}",
-                        UnitCostLyd = unitCostForLedger
+                        UnitCostLyd = unitCostForLedger,
+                        ValueChangeLyd = deltaValue
                     });
                 }
 
                 _context.Set<PurchaseLine>().RemoveRange(invoice.Lines ?? new List<PurchaseLine>());
 
-                decimal totalEur = 0m;
-                decimal totalDinar = 0m;
-
-                for (var lineIndex = 0; lineIndex < lineList.Count; lineIndex++)
+                for (var lineIndex = 0; lineIndex < preparedTotals.Lines.Count; lineIndex++)
                 {
-                    var line = lineList[lineIndex];
-                    var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
-                    var lineTotalDinar = RoundMoney(lineTotalEur * rate);
-
-                    totalEur += lineTotalEur;
-                    totalDinar += lineTotalDinar;
-
-                    var unitCostLyd = line.Qty > 0 ? RoundMoney(lineTotalDinar / line.Qty) : 0m;
+                    var line = preparedTotals.Lines[lineIndex];
                     _context.Set<PurchaseLine>().Add(new PurchaseLine
                     {
                         PurchaseInvoiceId = invoice.Id,
@@ -509,11 +520,13 @@ namespace NewsApp2.Models.Services
                         Qty = line.Qty,
                         LineOrder = lineIndex,
                         UnitPriceEur = line.UnitPriceEur,
-                        LineTotalEur = lineTotalEur,
-                        LineTotalDinar = lineTotalDinar,
-                        UnitCostLyd = unitCostLyd,
-                        CurrencyCode = invoice.CurrencyCode,
-                        ExchangeRateSnapshot = rate
+                        LineTotalEur = line.LineTotalEur,
+                        LineTotalDinar = line.LineTotalDinar,
+                        DiscountAllocatedEur = line.DiscountAllocatedEur,
+                        DiscountAllocatedDinar = line.DiscountAllocatedDinar,
+                        UnitCostLyd = line.UnitCostLyd,
+                        CurrencyCode = invoiceCurrency,
+                        ExchangeRateSnapshot = effectiveRate
                     });
                 }
 
@@ -531,14 +544,13 @@ namespace NewsApp2.Models.Services
                 }
 
                 invoice.InvoiceDate = invoiceDate;
-                invoice.CurrencyCode = string.Equals(invoice.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase) ? "LYD" : "EUR";
-                invoice.EurToDinarRateSnapshot = string.Equals(invoice.CurrencyCode, "LYD", StringComparison.OrdinalIgnoreCase) ? 1m : rate;
+                invoice.CurrencyCode = invoiceCurrency;
+                invoice.EurToDinarRateSnapshot = effectiveRate;
                 invoice.Note = note;
                 invoice.SupplierId = supplierId;
                 invoice.PaymentMethod = normalizedPaymentMethod;
                 invoice.DueDate = dueDate;
-                invoice.TotalEur = RoundMoney(totalEur);
-                invoice.TotalDinar = RoundMoney(totalDinar);
+                ApplyTotalsToInvoice(invoice, preparedTotals);
 
                 await ReplaceFinancialEntriesAsync(invoice, null, editedBy);
 
@@ -556,6 +568,148 @@ namespace NewsApp2.Models.Services
                 await tx.CommitAsync();
                 _logger.LogInformation("Purchase invoice {Number} edited by {User}.", invoice.Number, editedBy);
             });
+        }
+
+        private sealed class PreparedPurchaseTotals
+        {
+            public List<PreparedPurchaseLine> Lines { get; set; } = new();
+            public decimal SubtotalEur { get; set; }
+            public decimal SubtotalDinar { get; set; }
+            public string DiscountType { get; set; } = "Amount";
+            public decimal DiscountValue { get; set; }
+            public decimal DiscountEur { get; set; }
+            public decimal DiscountDinar { get; set; }
+            public decimal TotalEur { get; set; }
+            public decimal TotalDinar { get; set; }
+        }
+
+        private sealed class PreparedPurchaseLine
+        {
+            public Guid ItemId { get; set; }
+            public decimal Qty { get; set; }
+            public decimal UnitPriceEur { get; set; }
+            public decimal GrossLineTotalEur { get; set; }
+            public decimal GrossLineTotalDinar { get; set; }
+            public decimal DiscountAllocatedEur { get; set; }
+            public decimal DiscountAllocatedDinar { get; set; }
+            public decimal LineTotalEur { get; set; }
+            public decimal LineTotalDinar { get; set; }
+            public decimal UnitCostLyd { get; set; }
+            public decimal? SellPriceLyd { get; set; }
+        }
+
+        private static PreparedPurchaseTotals PreparePurchaseTotals(
+            IReadOnlyList<(Guid ItemId, decimal Qty, decimal UnitPriceEur, decimal? SellPriceLyd)> lines,
+            string currencyCode,
+            decimal rate,
+            string? discountType,
+            decimal discountValue)
+        {
+            var normalizedDiscountType = NormalizeDiscountType(discountType);
+            if (discountValue < 0)
+                throw new InvalidOperationException("Purchase discount cannot be negative.");
+
+            if (normalizedDiscountType == "Percent" && discountValue > 100)
+                throw new InvalidOperationException("Purchase discount percent cannot exceed 100%.");
+
+            var result = new PreparedPurchaseTotals
+            {
+                DiscountType = normalizedDiscountType,
+                DiscountValue = RoundMoney(discountValue)
+            };
+
+            foreach (var line in lines)
+            {
+                var lineTotalEur = RoundMoney(line.Qty * line.UnitPriceEur);
+                var lineTotalDinar = RoundMoney(lineTotalEur * rate);
+
+                result.Lines.Add(new PreparedPurchaseLine
+                {
+                    ItemId = line.ItemId,
+                    Qty = line.Qty,
+                    UnitPriceEur = line.UnitPriceEur,
+                    GrossLineTotalEur = lineTotalEur,
+                    GrossLineTotalDinar = lineTotalDinar,
+                    SellPriceLyd = line.SellPriceLyd
+                });
+            }
+
+            result.SubtotalEur = RoundMoney(result.Lines.Sum(l => l.GrossLineTotalEur));
+            result.SubtotalDinar = RoundMoney(result.Lines.Sum(l => l.GrossLineTotalDinar));
+
+            var discountEur = normalizedDiscountType == "Percent"
+                ? RoundMoney(result.SubtotalEur * (discountValue / 100m))
+                : RoundMoney(discountValue);
+
+            if (discountEur > result.SubtotalEur)
+                throw new InvalidOperationException("Purchase discount cannot exceed the invoice subtotal.");
+
+            result.DiscountEur = discountEur;
+            result.DiscountDinar = normalizedDiscountType == "Percent"
+                ? RoundMoney(result.SubtotalDinar * (discountValue / 100m))
+                : RoundMoney(discountEur * rate);
+
+            if (result.DiscountDinar > result.SubtotalDinar)
+                result.DiscountDinar = result.SubtotalDinar;
+
+            decimal allocatedEur = 0m;
+            decimal allocatedDinar = 0m;
+
+            for (var index = 0; index < result.Lines.Count; index++)
+            {
+                var line = result.Lines[index];
+                var isLast = index == result.Lines.Count - 1;
+
+                var lineDiscountEur = 0m;
+                if (result.SubtotalEur > 0)
+                {
+                    lineDiscountEur = isLast
+                        ? result.DiscountEur - allocatedEur
+                        : RoundMoney(result.DiscountEur * (line.GrossLineTotalEur / result.SubtotalEur));
+                }
+
+                var lineDiscountDinar = 0m;
+                if (result.SubtotalDinar > 0)
+                {
+                    lineDiscountDinar = isLast
+                        ? result.DiscountDinar - allocatedDinar
+                        : RoundMoney(result.DiscountDinar * (line.GrossLineTotalDinar / result.SubtotalDinar));
+                }
+
+                line.DiscountAllocatedEur = RoundMoney(Math.Min(line.GrossLineTotalEur, Math.Max(0m, lineDiscountEur)));
+                line.DiscountAllocatedDinar = RoundMoney(Math.Min(line.GrossLineTotalDinar, Math.Max(0m, lineDiscountDinar)));
+                line.LineTotalEur = RoundMoney(line.GrossLineTotalEur - line.DiscountAllocatedEur);
+                line.LineTotalDinar = RoundMoney(line.GrossLineTotalDinar - line.DiscountAllocatedDinar);
+                line.UnitCostLyd = line.Qty > 0 ? RoundMoney(line.LineTotalDinar / line.Qty) : 0m;
+
+                allocatedEur += line.DiscountAllocatedEur;
+                allocatedDinar += line.DiscountAllocatedDinar;
+            }
+
+            result.TotalEur = RoundMoney(result.Lines.Sum(l => l.LineTotalEur));
+            result.TotalDinar = RoundMoney(result.Lines.Sum(l => l.LineTotalDinar));
+            result.DiscountEur = RoundMoney(result.SubtotalEur - result.TotalEur);
+            result.DiscountDinar = RoundMoney(result.SubtotalDinar - result.TotalDinar);
+            return result;
+        }
+
+        private static void ApplyTotalsToInvoice(PurchaseInvoice invoice, PreparedPurchaseTotals totals)
+        {
+            invoice.SubtotalEur = totals.SubtotalEur;
+            invoice.SubtotalDinar = totals.SubtotalDinar;
+            invoice.DiscountType = totals.DiscountType;
+            invoice.DiscountValue = totals.DiscountValue;
+            invoice.DiscountEur = totals.DiscountEur;
+            invoice.DiscountDinar = totals.DiscountDinar;
+            invoice.TotalEur = totals.TotalEur;
+            invoice.TotalDinar = totals.TotalDinar;
+        }
+
+        private static string NormalizeDiscountType(string? discountType)
+        {
+            return string.Equals(discountType, "Percent", StringComparison.OrdinalIgnoreCase)
+                ? "Percent"
+                : "Amount";
         }
 
         private async Task<string> GenerateNumberAsync(DateOnly invoiceDate)

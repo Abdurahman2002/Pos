@@ -2,6 +2,10 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
 @{
     ViewData["Title"] = "فواتير البيع";
+    var canViewAllSalesInvoices = ViewBag.CanViewAllSalesInvoices as bool? ?? true;
+    var salesScopeMessage = ViewBag.SalesScopeMessage as string;
+    DateOnly? fromValue = ViewBag.From is DateOnly indexFrom ? indexFrom : null;
+    DateOnly? toValue = ViewBag.To is DateOnly indexTo ? indexTo : null;
 }
 
 <h1>فواتير البيع</h1>
@@ -12,21 +16,29 @@
     <a class="btn btn-outline-dark" asp-action="SimpleDailyReport">تقرير المبيعات اليومي</a>
 </p>
 
+@if (!string.IsNullOrWhiteSpace(salesScopeMessage))
+{
+    <div class="alert alert-info">@salesScopeMessage</div>
+}
+
 <form method="get" class="row g-3 mb-3">
     <div class="col-md-3">
         <label class="form-label">@L["From"]</label>
-        <input type="text" name="from" value="@(Context.Request.Query["from"] )" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="from" value="@(fromValue?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-3">
         <label class="form-label">@L["To"]</label>
-        <input type="text" name="to" value="@(Context.Request.Query["to"] )" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="to" value="@(toValue?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
+    @if (canViewAllSalesInvoices)
+    {
     <div class="col-md-4">
         <label class="form-label">@L["Customer"]</label>
         <select name="customerId" asp-items="@(ViewData["Customers"] as SelectList)" class="form-select">
             <option value="">@L["All customers"]</option>
         </select>
     </div>
+    }
     <div class="col-md-2 align-self-end">
         <button type="submit" class="btn btn-primary w-100">تصفية</button>
     </div>

@@ -60,6 +60,30 @@
         <div><span>كل المصروفات</span><strong class="num negative">@money(Model.TotalExpensesLyd)</strong></div>
     </div>
 
+    @if (Model.TransferSalesByBank.Any())
+    {
+    <h2 class="section-title">تحويلات حسب المصرف</h2>
+    <table class="shift-table">
+        <thead>
+            <tr>
+                <th>المصرف</th>
+                <th>عدد الفواتير</th>
+                <th>الإجمالي</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var bank in Model.TransferSalesByBank)
+            {
+                <tr>
+                    <td>@bank.BankName</td>
+                    <td class="text-center num">@bank.InvoiceCount</td>
+                    <td class="text-end num">@money(bank.TotalLyd)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    }
+
     <h2 class="section-title">فواتير الوردية</h2>
     <table class="shift-table">
         <thead>
@@ -69,6 +93,7 @@
                 <th>التاريخ</th>
                 <th>العميل</th>
                 <th>الدفع</th>
+                <th>المصرف</th>
                 <th>النوع</th>
                 <th>الإجمالي</th>
                 <th>وقت الإنشاء</th>
@@ -77,7 +102,7 @@
         <tbody>
             @if (!Model.Invoices.Any())
             {
-                <tr><td colspan="8" class="text-center text-muted">لا توجد فواتير في هذه الوردية.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted">لا توجد فواتير في هذه الوردية.</td></tr>
             }
             else
             {
@@ -90,6 +115,7 @@
                         <td class="text-center num">@row.InvoiceDate.ToString("dd/MM/yyyy", culture)</td>
                         <td>@row.CustomerName</td>
                         <td>@row.PaymentMethod</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
                         <td>@(row.IsReturn ? "مرتجع" : "بيع")</td>
                         <td class="text-end num">@money(row.TotalLyd)</td>
                         <td class="text-center num">@row.CreatedLocal.ToString("HH:mm", culture)</td>

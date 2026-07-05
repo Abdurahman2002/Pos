@@ -10,6 +10,7 @@ namespace NewsApp2.Controllers
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "InventoryEditPolicy")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class CategoriesController : Controller
     {
         private readonly IUnitOfWork<Category> _categories;

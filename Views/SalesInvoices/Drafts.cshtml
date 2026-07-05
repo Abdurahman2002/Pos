@@ -22,11 +22,11 @@
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["From"]</label>
-        <input type="text" name="from" value="@(ViewBag.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="from" value="@(ViewBag.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-2">
         <label class="form-label">@L["To"]</label>
-        <input type="text" name="to" value="@(ViewBag.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control" placeholder="dd/MM/yyyy" />
+        <input type="text" name="to" value="@(ViewBag.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-2 d-flex align-items-end">
         <div class="form-check">

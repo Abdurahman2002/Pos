@@ -15,6 +15,7 @@ namespace NewsApp2.Controllers
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "InventoryEditPolicy")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class ItemsController : Controller
     {
         private readonly IUnitOfWork<Item> _items;

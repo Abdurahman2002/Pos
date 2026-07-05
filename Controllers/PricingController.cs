@@ -10,7 +10,7 @@ namespace NewsApp2.Controllers
 {
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "ApprovedUserPolicy")]
-    [Authorize(Roles = "Admin,Prog,SalesManager,Cashier")]
+    [Authorize(Roles = "Admin,Prog,SalesManager")]
     public class PricingController : Controller
     {
         private readonly AppDbContext _context;

@@ -59,9 +59,37 @@ else
             <div class="col-md-3"><strong>مبيعات بطاقة:</strong> @Model.CardSalesLyd.ToString("0.00")</div>
             <div class="col-md-3"><strong>مبيعات تحويل:</strong> @Model.TransferSalesLyd.ToString("0.00")</div>
             <div class="col-md-3"><strong>مبيعات آجلة:</strong> @Model.CreditSalesLyd.ToString("0.00")</div>
+            @if (Model.TransferSalesByBank.Any())
+            {
+                <div class="col-12">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المصرف</th>
+                                    <th class="text-center">عدد الفواتير</th>
+                                    <th class="text-end">الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var bank in Model.TransferSalesByBank)
+                                {
+                                    <tr>
+                                        <td>@bank.BankName</td>
+                                        <td class="text-center">@bank.InvoiceCount</td>
+                                        <td class="text-end">@bank.TotalLyd.ToString("0.00")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            <div class="col-md-3"><strong>تحصيلات نقدية:</strong> @Model.CashReceiptsLyd.ToString("0.00")</div>
+            <div class="col-md-3"><strong>مصروفات/سلف نقدية:</strong> <span class="text-danger">@Model.CashExpensesLyd.ToString("0.00")</span></div>
             <div class="col-md-6"><strong>النقد المتوقع:</strong> @Model.ExpectedCashLyd.ToString("0.00") دينار</div>
             <div class="col-md-6"><strong>فرق النقد:</strong> <span class="@(Model.CashDifferenceLyd == 0 ? "text-success" : "text-danger")">@Model.CashDifferenceLyd.ToString("0.00")</span></div>
-            <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي فقط.</small></div>
+            <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي + التحصيلات النقدية − المصروفات/السلف النقدية.</small></div>
         </div>
     </div>
 

@@ -11,6 +11,7 @@
     var statusAr = string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) ? "مرحلة"
                  : string.Equals(Model.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ? "ملغاة"
                  : Model.Status;
+    var subtotalDinar = Model.SubtotalDinar > 0 || Model.DiscountDinar > 0 ? Model.SubtotalDinar : Model.TotalDinar;
     int rowNum = 0;
 }
 <!DOCTYPE html>
@@ -269,7 +270,15 @@
             </div>
         }
         <div class="total-box">
-            <div class="t-label">الإجمالي (دينار ليبي)</div>
+            <div class="t-label">الإجمالي قبل الخصم</div>
+            <div class="t-value">@subtotalDinar.ToString("0.00") د.ل</div>
+        </div>
+        <div class="total-box">
+            <div class="t-label">الخصم</div>
+            <div class="t-value">@Model.DiscountDinar.ToString("0.00") د.ل</div>
+        </div>
+        <div class="total-box">
+            <div class="t-label">الصافي</div>
             <div class="t-value">@Model.TotalDinar.ToString("0.00") د.ل</div>
         </div>
     </div>

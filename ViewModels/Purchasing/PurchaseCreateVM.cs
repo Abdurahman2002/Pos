@@ -35,10 +35,18 @@ namespace NewsApp2.ViewModels.Purchasing
         [StringLength(500)]
         public string? Note { get; set; }
 
+        [Required(ErrorMessage = "حدد المورد لفاتورة المشتريات.")]
         public Guid? SupplierId { get; set; }
 
         [StringLength(20)]
         public string PaymentMethod { get; set; } = "Cash";
+
+        [StringLength(20)]
+        public string DiscountType { get; set; } = "Amount";
+
+        [Range(typeof(decimal), "0", "9999999999999")]
+        public decimal DiscountValue { get; set; }
+
         public Guid? BankId { get; set; }
 
         [DataType(DataType.Date)]

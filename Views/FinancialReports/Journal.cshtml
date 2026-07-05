@@ -8,11 +8,11 @@
 <form method="get" class="row g-2 mb-3">
     <div class="col-md-2">
         <label class="form-label">من</label>
-        <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" class="form-control" />
+        <input type="text" name="from" value="@Model.From.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-2">
         <label class="form-label">إلى</label>
-        <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" class="form-control" />
+        <input type="text" name="to" value="@Model.To.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-2">
         <label class="form-label">الحساب</label>
@@ -59,8 +59,8 @@
 
 <div class="mb-3">
     <a asp-action="ExportJournalExcel"
-    asp-route-from="@Model.From.ToString("yyyy-MM-dd")"
-    asp-route-to="@Model.To.ToString("yyyy-MM-dd")"
+    asp-route-from="@Model.From.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)"
+    asp-route-to="@Model.To.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)"
        asp-route-accountCode="@Model.AccountCode"
        asp-route-sourceType="@Model.SourceType"
        asp-route-search="@Model.Search"

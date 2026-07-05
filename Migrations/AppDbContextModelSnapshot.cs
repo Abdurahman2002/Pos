@@ -867,6 +867,9 @@ namespace NewsApp2.Migrations
                     b.Property<decimal>("UnitCostLyd")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("ValueChangeLyd")
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ItemId");
@@ -1114,6 +1117,20 @@ namespace NewsApp2.Migrations
                     b.Property<DateOnly?>("DueDate")
                         .HasColumnType("date");
 
+                    b.Property<decimal>("DiscountDinar")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DiscountEur")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("EurToDinarRateSnapshot")
                         .HasColumnType("decimal(18,6)");
 
@@ -1141,6 +1158,12 @@ namespace NewsApp2.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("SubtotalDinar")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("SubtotalEur")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uniqueidentifier");
@@ -1177,6 +1200,12 @@ namespace NewsApp2.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
+
+                    b.Property<decimal>("DiscountAllocatedDinar")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DiscountAllocatedEur")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("ExchangeRateSnapshot")
                         .HasColumnType("decimal(18,6)");

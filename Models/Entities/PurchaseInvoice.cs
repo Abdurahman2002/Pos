@@ -19,6 +19,25 @@ namespace NewsApp2.Models.Entities
         public decimal EurToDinarRateSnapshot { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]
+        public decimal SubtotalEur { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal SubtotalDinar { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string DiscountType { get; set; } = "Amount";
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountValue { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountEur { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountDinar { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal TotalEur { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]

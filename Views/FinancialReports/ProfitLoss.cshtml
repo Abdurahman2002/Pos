@@ -16,14 +16,14 @@
                 <label class="form-label text-muted fw-bold">الفترة من</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light"><i class="mdi mdi-calendar"></i></span>
-                    <input type="date" name="from" value="@(Model.From?.ToString("yyyy-MM-dd"))" class="form-control" />
+                    <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
                 </div>
             </div>
             <div class="col-md-4">
                 <label class="form-label text-muted fw-bold">الفترة إلى</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light"><i class="mdi mdi-calendar"></i></span>
-                    <input type="date" name="to" value="@(Model.To?.ToString("yyyy-MM-dd"))" class="form-control" />
+                    <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
                 </div>
             </div>
             <div class="col-md-4 d-flex gap-2">

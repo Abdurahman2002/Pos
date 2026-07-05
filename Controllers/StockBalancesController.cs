@@ -14,6 +14,7 @@ namespace NewsApp2.Controllers
     [ViewLayout("_LayoutDashboard")]
     [Authorize(Policy = "InventoryEditPolicy")]
     [Authorize(Policy = "ApprovedUserPolicy")]
+    [Authorize(Policy = "NotCashierPolicy")]
     public class StockBalancesController : Controller
     {
         private readonly IUnitOfWork<InvStockBalance> _balances;
@@ -191,6 +192,7 @@ namespace NewsApp2.Controllers
                     l.ReferenceId,
                     l.QuantityChange,
                     l.UnitCostLyd,
+                    l.ValueChangeLyd,
                     l.Created
                 })
                 .ToListAsync();
@@ -237,7 +239,7 @@ namespace NewsApp2.Controllers
 
                 var closingValue = allLedgers
                     .Where(l => l.ItemId == item.Id && ResolveBusinessDate(l.ReferenceType, l.ReferenceId, l.Created, businessDateMap) <= targetDate)
-                    .Sum(l => l.QuantityChange * l.UnitCostLyd);
+                    .Sum(l => ResolveValueChange(l.QuantityChange, l.UnitCostLyd, l.ValueChangeLyd));
 
                 if (opening == 0 && closing == 0 && received == 0 && sold == 0 && returns == 0)
                     continue;
@@ -312,6 +314,14 @@ namespace NewsApp2.Controllers
 
         private static string BuildBusinessDateKey(string referenceType, Guid referenceId)
             => $"{referenceType}:{referenceId}";
+
+        private static decimal ResolveValueChange(decimal quantityChange, decimal unitCost, decimal storedValueChange)
+        {
+            if (storedValueChange != 0m || quantityChange == 0m)
+                return storedValueChange;
+
+            return quantityChange * unitCost;
+        }
 
         private static DateOnly ResolveBusinessDate(string referenceType, Guid referenceId, DateTime createdUtc, IReadOnlyDictionary<string, DateOnly> businessDateMap)
         {

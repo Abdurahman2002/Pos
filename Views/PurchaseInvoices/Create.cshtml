@@ -244,7 +244,7 @@
                     <button type="button" class="btn btn-primary" id="barcode-add-btn">إضافة</button>
                     <button type="button" class="btn btn-dark" id="barcode-camera-btn"><i class="mdi mdi-camera"></i> مسح ضوئي</button>
                     @if (canCreateItem) {
-                        <a href="@createItemUrl" class="btn btn-success" target="_blank"><i class="mdi mdi-plus-thick"></i> صنف جديد</a>
+                        <a href="@createItemUrl" class="btn btn-success" target="_blank"><i class="mdi mdi-plus-circle"></i> صنف جديد</a>
                     }
                 </div>
                 
@@ -288,7 +288,7 @@
                                 <th style="width: 16%;" class="text-center">سعر الشراء</th>
                                 <th style="width: 16%;" class="text-center">سعر البيع</th>
                                 <th style="width: 16%;" class="text-center">إجمالي السطر</th>
-                                <th style="width: 5%;" class="text-center"><i class="mdi mdi-cog"></i></th>
+                                <th style="width: 5%;" class="text-center"><i class="mdi mdi-settings"></i></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -325,7 +325,7 @@
                     </table>
                 </div>
                 <div class="p-3 border-top" style="background:#f8fafc;">
-                    <button type="button" class="btn btn-primary fw-bold px-4 py-2 rounded-pill shadow-sm" id="add-line"><i class="mdi mdi-plus-thick"></i> إضافة صنف يدوياً (F4)</button>
+                    <button type="button" class="btn btn-primary fw-bold px-4 py-2 rounded-pill shadow-sm" id="add-line"><i class="mdi mdi-plus-circle"></i> إضافة صنف يدوياً (F4)</button>
                 </div>
             </div>
 
@@ -336,15 +336,23 @@
             
             <!-- Summary Block -->
             <div class="summary-card shadow-lg position-relative">
-                <div class="text-uppercase tracking-wider mb-2" style="color: #94a3b8; font-size: 0.95rem; font-weight: 800;"><i class="mdi mdi-calculator"></i> إجمالي فاتورة المورد</div>
-                <div class="d-flex align-items-baseline gap-2 mb-4">
-                    <span id="live-total-eur" class="summary-val">0.00</span> 
-                    <span class="fs-4 text-white fw-bold">د.ل</span>
+                <div class="text-uppercase tracking-wider mb-2" style="color: #94a3b8; font-size: 0.95rem; font-weight: 800;"><i class="mdi mdi-calculator"></i> ملخص فاتورة المورد</div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-light fw-bold">الإجمالي قبل الخصم</span>
+                    <span><span id="live-total-eur" class="fs-4 fw-bold text-white">0.00</span> <span class="text-white fw-bold">د.ل</span></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-light fw-bold">الخصم</span>
+                    <span><span id="live-discount-eur" class="fs-4 fw-bold text-warning">0.00</span> <span class="text-white fw-bold">د.ل</span></span>
                 </div>
                 <div class="pt-3 border-top border-secondary">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-light fw-bold fs-5">الصافي للدفع:</span>
-                        <span id="live-total-secondary" class="summary-secondary-val">0.00</span>
+                        <span class="text-light fw-bold fs-5">الصافي للدفع</span>
+                        <span>
+                            <span id="live-total-secondary" class="summary-secondary-val">0.00</span>
+                            <span class="fs-4 text-white fw-bold">د.ل</span>
+                            <span id="live-net-eur" class="d-none">0.00</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -365,7 +373,7 @@
                         </div> *@
                         <div class="input-group shadow-sm">
                             <span class="input-group-text bg-white text-primary"><i class="mdi mdi-calendar-clock mdi-24px"></i></span>
-                            <input asp-for="InvoiceDate" type="date" class="form-control invoice-date-input" value="@Model!.InvoiceDate.ToString("yyyy-MM-dd")" />
+                            <input asp-for="InvoiceDate" type="text" class="form-control invoice-date-input date-input js-date" value="@Model!.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
                         </div>
                         <span asp-validation-for="InvoiceDate" class="text-danger fw-bold mt-1 d-block"></span>
                     </div>
@@ -405,9 +413,25 @@
 
                     <div class="mb-4" id="due-date-wrapper">
                         <label asp-for="DueDate" class="form-label fw-bold text-dark fs-6">تاريخ الاستحقاق</label>
-                        <input asp-for="DueDate" type="date" class="form-control form-control-lg shadow-sm invoice-date-input" value="@(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("yyyy-MM-dd") : string.Empty)" />
+                        <input asp-for="DueDate" type="text" class="form-control form-control-lg shadow-sm invoice-date-input date-input js-date" value="@(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : string.Empty)" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
                         <small class="text-muted d-block mt-1">تاريخ الاستحقاق يعني آخر موعد سداد الفاتورة في حالة الشراء الآجل.</small>
                         <span asp-validation-for="DueDate" class="text-danger fw-bold mt-1 d-block"></span>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-5">
+                            <label asp-for="DiscountType" class="form-label fw-bold text-dark fs-6">نوع الخصم</label>
+                            <select asp-for="DiscountType" class="form-select form-select-lg shadow-sm" id="discount-type">
+                                <option value="Amount">قيمة</option>
+                                <option value="Percent">نسبة %</option>
+                            </select>
+                            <span asp-validation-for="DiscountType" class="text-danger fw-bold mt-1 d-block"></span>
+                        </div>
+                        <div class="col-7">
+                            <label asp-for="DiscountValue" class="form-label fw-bold text-dark fs-6">قيمة الخصم</label>
+                            <input asp-for="DiscountValue" class="form-control form-control-lg shadow-sm" id="discount-value" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+                            <span asp-validation-for="DiscountValue" class="text-danger fw-bold mt-1 d-block"></span>
+                        </div>
                     </div>
                     
                     <input asp-for="CurrencyCode" type="hidden" value="LYD" />      
@@ -578,14 +602,13 @@
             const refresh = () => {
                 const isCredit = (paymentMethod.value || '').toLowerCase() === 'credit';
                 const isTransfer = (paymentMethod.value || '').toLowerCase() === 'transfer';
-                supplierWrapper.classList.toggle('d-none', !isCredit);
+                supplierWrapper.classList.remove('d-none');
                 bankWrapper.classList.toggle('d-none', !isTransfer);
                 dueDateWrapper.classList.toggle('d-none', !isCredit);
                 dueDateInput.required = isCredit;
-                supplierInput.required = isCredit;
+                supplierInput.required = true;
                 bankInput.required = isTransfer;
                 if (!isCredit) {
-                    supplierInput.value = '';
                     dueDateInput.value = '';
                 }
                 if (!isTransfer) {

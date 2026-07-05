@@ -137,7 +137,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = -line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = invoice.Note,
-                        UnitCostLyd = unitCost
+                        UnitCostLyd = unitCost,
+                        ValueChangeLyd = -salesLine.LineCostDinar
                     };
                     _context.Set<InvStockLedger>().Add(ledger);
                 }
@@ -271,7 +272,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = invoice.Note,
-                        UnitCostLyd = unitCost
+                        UnitCostLyd = unitCost,
+                        ValueChangeLyd = RoundMoney(unitCost * line.Qty)
                     });
                 }
 
@@ -376,7 +378,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = $"Cancelled by {cancelledBy ?? "unknown"}",
-                        UnitCostLyd = line.UnitCostLyd
+                        UnitCostLyd = line.UnitCostLyd,
+                        ValueChangeLyd = line.LineCostDinar
                     });
                 }
 
@@ -583,7 +586,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = -line.Qty,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = invoice.Note,
-                        UnitCostLyd = unitCost
+                        UnitCostLyd = unitCost,
+                        ValueChangeLyd = -line.LineCostDinar
                     });
                 }
 
@@ -754,7 +758,8 @@ namespace NewsApp2.Models.Services
                         QuantityChange = deltaStock,
                         BalanceAfter = stock.QuantityOnHand,
                         Note = $"Edited by {editedBy ?? "unknown"}",
-                        UnitCostLyd = stock.AverageCostLyd
+                        UnitCostLyd = stock.AverageCostLyd,
+                        ValueChangeLyd = RoundMoney(deltaStock * stock.AverageCostLyd)
                     });
                 }
 
@@ -916,9 +921,36 @@ namespace NewsApp2.Models.Services
 
         private async Task AddCogsEntryAsync(SalesInvoice invoice, bool isSale, string? userId, string? userName)
         {
-            var lines = await _context.Set<SalesLine>()
+            var trackedEntries = _context.ChangeTracker.Entries<SalesLine>()
+                .Where(e => e.Entity.SalesInvoiceId == invoice.Id)
+                .ToList();
+
+            var deletedTrackedIds = trackedEntries
+                .Where(e => e.State == EntityState.Deleted)
+                .Select(e => e.Entity.Id)
+                .Where(id => id != Guid.Empty)
+                .ToHashSet();
+
+            var activeTrackedLines = trackedEntries
+                .Where(e => e.State != EntityState.Deleted)
+                .Select(e => e.Entity)
+                .ToList();
+
+            var activeTrackedIds = activeTrackedLines
+                .Select(l => l.Id)
+                .Where(id => id != Guid.Empty)
+                .ToHashSet();
+
+            var persistedLines = await _context.Set<SalesLine>()
+                .AsNoTracking()
                 .Where(l => l.SalesInvoiceId == invoice.Id)
                 .ToListAsync();
+
+            var lines = persistedLines
+                .Where(l => !deletedTrackedIds.Contains(l.Id))
+                .Where(l => !activeTrackedIds.Contains(l.Id))
+                .Concat(activeTrackedLines)
+                .ToList();
 
             var totalCost = RoundMoney(lines.Sum(l => Math.Abs(l.LineCostDinar)));
             if (totalCost == 0m)

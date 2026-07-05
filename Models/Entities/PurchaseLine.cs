@@ -26,6 +26,12 @@ namespace NewsApp2.Models.Entities
         public decimal LineTotalDinar { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountAllocatedEur { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountAllocatedDinar { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal UnitCostLyd { get; set; }
 
         [Required]

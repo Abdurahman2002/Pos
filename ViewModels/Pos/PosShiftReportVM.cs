@@ -45,6 +45,7 @@ namespace NewsApp2.ViewModels.Pos
 
         public List<PosShiftInvoiceRowVM> Invoices { get; set; } = new();
         public List<PosShiftExpenseRowVM> Expenses { get; set; } = new();
+        public List<PosShiftBankTransferVM> TransferSalesByBank { get; set; } = new();
     }
 
     public class PosShiftInvoiceRowVM
@@ -54,8 +55,16 @@ namespace NewsApp2.ViewModels.Pos
         public string CustomerName { get; set; } = "-";
         public decimal TotalLyd { get; set; }
         public string PaymentMethod { get; set; } = "Cash";
+        public string? BankName { get; set; }
         public bool IsReturn { get; set; }
         public DateTime CreatedLocal { get; set; }
+    }
+
+    public class PosShiftBankTransferVM
+    {
+        public string BankName { get; set; } = string.Empty;
+        public int InvoiceCount { get; set; }
+        public decimal TotalLyd { get; set; }
     }
 
     public class PosShiftExpenseRowVM

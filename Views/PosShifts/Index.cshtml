@@ -3,25 +3,35 @@
     ViewData["Title"] = "سجل الورديات";
     var from = (DateOnly?)ViewBag.From;
     var to = (DateOnly?)ViewBag.To;
+    var restrictedShiftMessage = ViewBag.RestrictedShiftMessage as string;
+    var canViewCashierPerformance = User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="m-0">سجل الورديات</h2>
     <div class="d-flex gap-2">
         <a asp-action="Current" class="btn btn-primary"><i class="mdi mdi-cash-register me-1"></i>الوردية الحالية</a>
+        @if (canViewCashierPerformance)
+        {
         <a asp-action="CashierPerformance" class="btn btn-info"><i class="mdi mdi-chart-line me-1"></i>أداء الكاشير</a>
+        }
     </div>
 
 </div>
 
+@if (!string.IsNullOrWhiteSpace(restrictedShiftMessage))
+{
+    <div class="alert alert-info">@restrictedShiftMessage</div>
+}
+
 <form method="get" class="row g-2 mb-3">
     <div class="col-md-3">
         <label class="form-label">من</label>
-        <input type="date" name="from" value="@from?.ToString("yyyy-MM-dd")" class="form-control" />
+        <input type="text" name="from" value="@from?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-3">
         <label class="form-label">إلى</label>
-        <input type="date" name="to" value="@to?.ToString("yyyy-MM-dd")" class="form-control" />
+        <input type="text" name="to" value="@to?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-2 d-flex align-items-end">
         <button type="submit" class="btn btn-secondary w-100">تصفية</button>

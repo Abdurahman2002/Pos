@@ -91,7 +91,7 @@
                 
                 <!-- Held Drafts Button Trigger for Offcanvas -->
                 <button type="button" class="btn btn-info text-white fw-bold d-flex align-items-center position-relative shadow-sm" data-bs-toggle="offcanvas" data-bs-target="#draftsOffcanvas" aria-controls="draftsOffcanvas" title="عرض الفواتير المعلقة (F9)">
-                    <i class="mdi mdi-list-status fs-5 me-1"></i> المعلقة
+                    <i class="mdi mdi-playlist-check fs-5 me-1"></i> المعلقة
                     @if (heldDrafts.Any())
                     {
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
@@ -137,7 +137,7 @@
                     <i class="mdi mdi-plus-box fs-5 me-1"></i> جديد
                 </a>
                 <a asp-action="Drafts" class="btn btn-info text-white fw-bold d-flex align-items-center shadow-sm position-relative">
-                     <i class="mdi mdi-list-status fs-5 me-1"></i> المعلقات
+                     <i class="mdi mdi-playlist-check fs-5 me-1"></i> المعلقات
                      @if (heldDrafts.Any())
                     {
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">@heldDrafts.Count()</span>
@@ -146,6 +146,9 @@
                 <a asp-controller="PosShifts" asp-action="Current" asp-route-returnUrl="@shiftReturnUrl" class="btn btn-secondary fw-bold d-flex align-items-center shadow-sm">
                     <i class="mdi mdi-cash-register fs-5 me-1"></i> الوردية
                 </a>
+                <button type="button" class="btn btn-danger fw-bold d-flex align-items-center shadow-sm" data-bs-toggle="modal" data-bs-target="#pos-expense-modal" title="تسجيل مصروف أو سلفة">
+                    <i class="mdi mdi-cash-minus fs-5 me-1"></i> مصروف / سلفة
+                </button>
                 @if (canManagePricing)
                 {
                     <a asp-controller="Pricing" asp-action="Index" class="btn btn-outline-dark fw-bold d-flex align-items-center shadow-sm">سياسة التسعير</a>
@@ -261,8 +264,8 @@
                     </table>
                 </div>
                 <div class="card-footer bg-white p-2 text-center text-md-start">
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="add-line" title="إضافة صنف يدوياً من القائمة">
-                        <i class="mdi mdi-plus-box-outline"></i> إضافة صنف يدوياً
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="add-line" title="إضافة سطر واختيار صنف موجود من القائمة">
+                        <i class="mdi mdi-plus-box-outline"></i> إضافة سطر / اختيار صنف
                     </button>
                 </div>
             </div>
@@ -402,6 +405,77 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                 <button type="button" class="btn btn-primary" id="quick-customer-save">حفظ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تسجيل مصروف / سلفة للكاشير -->
+<div class="modal fade" id="pos-expense-modal" tabindex="-1" aria-hidden="true"
+     data-lookups-url="@Url.Action("Lookups", "PosExpenses")"
+     data-shift-url="@Url.Action("Shift", "PosExpenses")"
+     data-create-url="@Url.Action("Create", "PosExpenses")"
+     data-delete-url="@Url.Action("Delete", "PosExpenses")">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="mdi mdi-cash-minus me-1"></i> تسجيل مصروف / سلفة</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="pos-expense-form" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div id="pos-expense-error" class="alert alert-danger d-none col-12 mb-0"></div>
+                    <div id="pos-expense-success" class="alert alert-success d-none col-12 mb-0"></div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold">نوع الحركة</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="kind" id="pos-exp-kind-general" value="General" checked>
+                            <label class="btn btn-outline-danger fw-bold" for="pos-exp-kind-general"><i class="mdi mdi-wallet me-1"></i> مصروف عام</label>
+                            <input type="radio" class="btn-check" name="kind" id="pos-exp-kind-advance" value="Advance">
+                            <label class="btn btn-outline-warning fw-bold" for="pos-exp-kind-advance"><i class="mdi mdi-account-cash me-1"></i> سلفة</label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">المبلغ (نقداً من الصندوق)</label>
+                        <input type="number" step="0.01" min="0.01" name="amount" id="pos-exp-amount" class="form-control form-control-lg" placeholder="0.00" required>
+                    </div>
+
+                    <div class="col-md-6" id="pos-exp-employee-row" style="display:none;">
+                        <label class="form-label fw-bold">الموظف المستفيد من السلفة</label>
+                        <select name="employeeId" id="pos-exp-employee" class="form-select form-select-lg" data-no-ts>
+                            <option value="">— اختر الموظف —</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">الوصف / التصنيف</label>
+                        <input type="text" name="category" id="pos-exp-category" class="form-control" maxlength="100" placeholder="مثال: مواد تنظيف">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold">ملاحظة (اختياري)</label>
+                        <textarea name="note" id="pos-exp-note" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+
+                    <div class="col-12 d-grid">
+                        <button type="submit" class="btn btn-danger btn-lg fw-bold" id="pos-exp-save">
+                            <i class="mdi mdi-content-save me-1"></i> حفظ الحركة
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-3" />
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-secondary m-0"><i class="mdi mdi-format-list-bulleted me-1"></i> حركات هذه الوردية</h6>
+                    <span class="badge bg-danger fs-6" id="pos-exp-total">0.00 د.ل</span>
+                </div>
+                <div id="pos-expense-list" class="list-group small">
+                    <div class="text-center text-muted py-3">جارٍ التحميل…</div>
+                </div>
             </div>
         </div>
     </div>
@@ -560,6 +634,168 @@
             } else {
                 refresh();
             }
+        })();
+    </script>
+
+    <script>
+        // ===== نافذة مصروف / سلفة للكاشير =====
+        (function posExpense() {
+            var modalEl = document.getElementById('pos-expense-modal');
+            if (!modalEl) return;
+
+            var urls = {
+                lookups: modalEl.dataset.lookupsUrl,
+                shift: modalEl.dataset.shiftUrl,
+                create: modalEl.dataset.createUrl,
+                delete: modalEl.dataset.deleteUrl
+            };
+
+            var form = document.getElementById('pos-expense-form');
+            var errorBox = document.getElementById('pos-expense-error');
+            var successBox = document.getElementById('pos-expense-success');
+            var employeeRow = document.getElementById('pos-exp-employee-row');
+            var employeeSelect = document.getElementById('pos-exp-employee');
+            var amountInput = document.getElementById('pos-exp-amount');
+            var categoryInput = document.getElementById('pos-exp-category');
+            var noteInput = document.getElementById('pos-exp-note');
+            var listEl = document.getElementById('pos-expense-list');
+            var totalEl = document.getElementById('pos-exp-total');
+            var saveBtn = document.getElementById('pos-exp-save');
+            var lookupsLoaded = false;
+
+            function token() {
+                var el = form.querySelector('input[name="__RequestVerificationToken"]');
+                return el ? el.value : '';
+            }
+            function money(n) { return (Number(n) || 0).toFixed(2) + ' د.ل'; }
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+            function hideMsgs() { errorBox.classList.add('d-none'); successBox.classList.add('d-none'); }
+            function showError(m) { errorBox.textContent = m; errorBox.classList.remove('d-none'); successBox.classList.add('d-none'); }
+            function showSuccess(m) { successBox.textContent = m; successBox.classList.remove('d-none'); errorBox.classList.add('d-none'); }
+
+            function currentKind() {
+                var checked = form.querySelector('input[name="kind"]:checked');
+                return checked ? checked.value : 'General';
+            }
+            function toggleEmployee() {
+                employeeRow.style.display = currentKind() === 'Advance' ? '' : 'none';
+            }
+            form.querySelectorAll('input[name="kind"]').forEach(function (r) {
+                r.addEventListener('change', toggleEmployee);
+            });
+
+            async function loadLookups() {
+                if (lookupsLoaded) return;
+                try {
+                    var res = await fetch(urls.lookups, { headers: { 'Accept': 'application/json' } });
+                    var data = await res.json();
+                    if (!data.success) return;
+                    var opts = ['<option value="">— اختر الموظف —</option>'];
+                    (data.employees || []).forEach(function (e) {
+                        var selected = (data.selfEmployeeId && e.id === data.selfEmployeeId) ? ' selected' : '';
+                        opts.push('<option value="' + e.id + '"' + selected + '>' + esc(e.name) + '</option>');
+                    });
+                    employeeSelect.innerHTML = opts.join('');
+                    lookupsLoaded = true;
+                } catch (err) { /* تجاهل — تظهر رسالة عند الحفظ */ }
+            }
+
+            async function loadShift() {
+                listEl.innerHTML = '<div class="text-center text-muted py-3">جارٍ التحميل…</div>';
+                try {
+                    var res = await fetch(urls.shift, { headers: { 'Accept': 'application/json' } });
+                    var data = await res.json();
+                    if (!data.success) { listEl.innerHTML = ''; return; }
+                    if (!data.hasShift) {
+                        listEl.innerHTML = '<div class="alert alert-warning mb-0 py-2">لا توجد وردية مفتوحة. افتح وردية أولاً لتسجيل المصروفات.</div>';
+                        totalEl.textContent = money(0);
+                        return;
+                    }
+                    totalEl.textContent = money(data.total);
+                    if (!data.entries || !data.entries.length) {
+                        listEl.innerHTML = '<div class="text-center text-muted py-3">لم تُسجّل أي حركة في هذه الوردية بعد.</div>';
+                        return;
+                    }
+                    listEl.innerHTML = data.entries.map(function (e) {
+                        var isAdvance = e.kind === 'Advance';
+                        var badge = isAdvance
+                            ? '<span class="badge bg-warning text-dark">سلفة</span>'
+                            : '<span class="badge bg-secondary">مصروف</span>';
+                        var emp = e.employeeName ? ' — <span class="text-muted">' + esc(e.employeeName) + '</span>' : '';
+                        var note = e.note ? '<div class="small text-muted">' + esc(e.note) + '</div>' : '';
+                        return '<div class="list-group-item d-flex justify-content-between align-items-center gap-2">' +
+                            '<div>' + badge + ' <strong>' + esc(e.category) + '</strong>' + emp + note + '</div>' +
+                            '<div class="d-flex align-items-center gap-2">' +
+                            '<span class="fw-bold text-danger">' + money(e.amount) + '</span>' +
+                            '<button type="button" class="btn btn-sm btn-outline-danger" data-del-id="' + e.id + '" title="حذف"><i class="bi bi-trash"></i></button>' +
+                            '</div></div>';
+                    }).join('');
+                } catch (err) {
+                    listEl.innerHTML = '<div class="alert alert-danger mb-0 py-2">تعذّر تحميل الحركات.</div>';
+                }
+            }
+
+            modalEl.addEventListener('show.bs.modal', function () {
+                hideMsgs();
+                toggleEmployee();
+                loadLookups();
+                loadShift();
+            });
+
+            form.addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                hideMsgs();
+                if (!(Number(amountInput.value) > 0)) { showError('أدخل مبلغاً صحيحاً أكبر من صفر.'); return; }
+                if (currentKind() === 'Advance' && !employeeSelect.value) { showError('اختر الموظف المستفيد من السلفة.'); return; }
+
+                saveBtn.disabled = true;
+                try {
+                    var res = await fetch(urls.create, { method: 'POST', body: new FormData(form) });
+                    var data = await res.json();
+                    if (data.success) {
+                        showSuccess('تم تسجيل الحركة بنجاح.');
+                        amountInput.value = '';
+                        categoryInput.value = '';
+                        noteInput.value = '';
+                        await loadShift();
+                    } else {
+                        showError(data.error || 'تعذّر حفظ الحركة.');
+                    }
+                } catch (err) {
+                    showError('حدث خطأ في الاتصال. حاول مرة أخرى.');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            });
+
+            listEl.addEventListener('click', async function (ev) {
+                var btn = ev.target.closest('[data-del-id]');
+                if (!btn) return;
+                if (!confirm('هل تريد حذف هذه الحركة؟ سيتم عكس أثرها المحاسبي.')) return;
+
+                hideMsgs();
+                btn.disabled = true;
+                var fd = new FormData();
+                fd.append('id', btn.getAttribute('data-del-id'));
+                fd.append('__RequestVerificationToken', token());
+                try {
+                    var res = await fetch(urls.delete, { method: 'POST', body: fd });
+                    var data = await res.json();
+                    if (data.success) {
+                        await loadShift();
+                    } else {
+                        showError(data.error || 'تعذّر حذف الحركة.');
+                        btn.disabled = false;
+                    }
+                } catch (err) {
+                    showError('حدث خطأ في الاتصال. حاول مرة أخرى.');
+                    btn.disabled = false;
+                }
+            });
         })();
     </script>
 }

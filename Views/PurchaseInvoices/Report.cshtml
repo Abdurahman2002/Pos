@@ -190,11 +190,11 @@
         <form method="get" class="filter-form">
             <div>
                 <label class="form-label">@L["From"]</label>
-                <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
+                    <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <div>
                 <label class="form-label">@L["To"]</label>
-                <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control" placeholder="dd/MM/yyyy" />
+                    <input type="text" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <button type="submit" class="btn btn-primary">تصفية</button>
             <a asp-action="Report" class="btn btn-outline-secondary">إعادة تعيين</a>
@@ -238,7 +238,7 @@
                     <th style="width: 11%;">الحالة</th>
                     <th style="width: 12%;">طريقة الدفع</th>
                     <th style="width: 15%;">المصرف</th>
-                    <th style="width: 14%;">الإجمالي</th>
+                    <th style="width: 14%;">الصافي</th>
                 </tr>
             </thead>
             <tbody>

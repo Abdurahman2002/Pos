@@ -11,7 +11,7 @@
 <form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
     <div class="col-md-4">
         <label class="form-label small fw-bold">التاريخ</label>
-        <input type="text" name="date" value="@Model.ReportDate?.ToString("dd/MM/yyyy")" class="form-control form-control-sm" placeholder="dd/MM/yyyy" />
+        <input type="text" name="date" value="@Model.ReportDate?.ToString("dd/MM/yyyy")" class="form-control form-control-sm date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
     </div>
     <div class="col-md-4 d-flex align-items-end gap-2">
         <button type="submit" class="btn btn-primary btn-sm">عرض</button>

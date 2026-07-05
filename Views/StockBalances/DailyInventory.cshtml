@@ -17,7 +17,7 @@
                 <label class="form-label text-muted small fw-bold">تاريخ الجرد</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light"><i class="mdi mdi-calendar"></i></span>
-                    <input type="text" name="date" class="form-control" value="@Model.ReportDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" />
+        <input type="text" name="date" class="form-control date-input js-date" value="@Model.ReportDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">

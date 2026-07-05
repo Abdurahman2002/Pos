@@ -17,11 +17,11 @@
         <form method="get" class="row g-2 align-items-end">
             <div class="col-md-2">
                 <label class="form-label">من</label>
-                <input type="text" class="form-control" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" />
+        <input type="text" class="form-control date-input js-date" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <div class="col-md-2">
                 <label class="form-label">إلى</label>
-                <input type="text" class="form-control" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" />
+        <input type="text" class="form-control date-input js-date" name="to" value="@(Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
             </div>
             <div class="col-md-2">
                 <label class="form-label">النوع</label>

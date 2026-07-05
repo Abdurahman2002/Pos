@@ -36,7 +36,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(string? search, Guid? categoryId)
+        public async Task<IActionResult> Index(string? search, Guid? categoryId, int page = 1)
         {
             IQueryable<Item> query = _items.Repository.GetAll()
                 .Include(i => i.Category);
@@ -52,7 +52,15 @@ namespace NewsApp2.Controllers
                 query = query.Where(i => i.CategoryId == categoryId.Value);
             }
 
-            var list = await query.OrderBy(i => i.Name).ToListAsync();
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var totalCount = await query.CountAsync();
+            var list = await query
+                .OrderBy(i => i.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = totalCount };
             ViewBag.Search = search;
             ViewBag.CategoryId = categoryId;
             await LoadCategories(categoryId);

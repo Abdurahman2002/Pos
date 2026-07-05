@@ -35,7 +35,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to)
+        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, int page = 1)
         {
             var query = _context.Set<PurchaseInvoice>()
                 .AsNoTracking()
@@ -46,7 +46,15 @@ namespace NewsApp2.Controllers
             if (to.HasValue)
                 query = query.Where(i => i.InvoiceDate <= to.Value);
 
-            var list = await query.OrderByDescending(i => i.Created).Take(200).ToListAsync();
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var totalCount = await query.CountAsync();
+            var list = await query
+                .OrderByDescending(i => i.Created)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = totalCount };
             return View(list);
         }
 

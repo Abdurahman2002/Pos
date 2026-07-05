@@ -89,18 +89,20 @@ else
             </tbody>
             <tfoot class="table-light fw-bold">
                 <tr>
-                    <td colspan="3" class="text-center">الإجمالي</td>
-                    <td>@Model.Sum(x => x.OpeningCashLyd).ToString("0.00")</td>
-                    <td>@Model.Sum(x => x.GrossSalesLyd).ToString("0.00")</td>
-                    <td>@Model.Sum(x => x.ReturnsLyd).ToString("0.00")</td>
-                    <td>@Model.Sum(x => x.NetSalesLyd).ToString("0.00")</td>
-                    <td>@Model.Sum(x => x.ExpectedCashLyd).ToString("0.00")</td>
-                    <td>@(Model.Sum(x => x.ActualCashLyd ?? 0m).ToString("0.00"))</td>
-                    <td>@Model.Sum(x => x.CashDifferenceLyd).ToString("0.00")</td>
-                    <td>@Model.Sum(x => x.InvoiceCount)</td>
+                    <td colspan="3" class="text-center">إجمالي الفترة</td>
+                    <td>@(((decimal)ViewBag.TotOpening).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotGross).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotReturns).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotNet).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotExpected).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotActual).ToString("0.00"))</td>
+                    <td>@(((decimal)ViewBag.TotDiff).ToString("0.00"))</td>
+                    <td>@(((int)ViewBag.TotInvoices))</td>
                     <td></td>
                 </tr>
             </tfoot>
         </table>
     </div>
+
+    <partial name="Partial/_Pagination" model="@(ViewBag.Pagination as NewsApp2.ViewModels.Common.PaginationVM)" />
 }

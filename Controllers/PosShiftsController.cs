@@ -30,7 +30,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to)
+        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, int page = 1)
         {
             var userId = User?.Identity?.IsAuthenticated == true
                 ? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -132,10 +132,25 @@ namespace NewsApp2.Controllers
                 };
             }).ToList();
 
+            // Footer totals reflect the FULL filtered period; the table renders one page only.
+            ViewBag.TotOpening = rows.Sum(x => x.OpeningCashLyd);
+            ViewBag.TotGross = rows.Sum(x => x.GrossSalesLyd);
+            ViewBag.TotReturns = rows.Sum(x => x.ReturnsLyd);
+            ViewBag.TotNet = rows.Sum(x => x.NetSalesLyd);
+            ViewBag.TotExpected = rows.Sum(x => x.ExpectedCashLyd);
+            ViewBag.TotActual = rows.Sum(x => x.ActualCashLyd ?? 0m);
+            ViewBag.TotDiff = rows.Sum(x => x.CashDifferenceLyd);
+            ViewBag.TotInvoices = rows.Sum(x => x.InvoiceCount);
+
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var pageRows = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = rows.Count };
+
             ViewBag.From = fromDate;
             ViewBag.To = toDate;
 
-            return View(rows);
+            return View(pageRows);
         }
 
         [HttpGet]

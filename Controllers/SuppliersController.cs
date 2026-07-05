@@ -35,7 +35,7 @@ namespace NewsApp2.Controllers
 
         [HttpGet]
         [Authorize(Policy = "InventoryCreatePolicy")]
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1)
         {
             var query = _context.Set<Supplier>().AsNoTracking();
             if (!string.IsNullOrWhiteSpace(search))
@@ -45,7 +45,15 @@ namespace NewsApp2.Controllers
             }
 
             ViewBag.Search = search;
-            var suppliers = await query.OrderBy(s => s.Name).ToListAsync();
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var totalCount = await query.CountAsync();
+            var suppliers = await query
+                .OrderBy(s => s.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = totalCount };
             return View(suppliers);
         }
 

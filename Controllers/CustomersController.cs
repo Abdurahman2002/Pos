@@ -40,7 +40,7 @@ namespace NewsApp2.Controllers
 
         [HttpGet]
         [Authorize(Policy = "InventoryCreatePolicy")]
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1)
         {
             var query = _customers.Repository.GetAll()
                 .Where(c => c.Id != DailySalesCustomerSeedId && c.Name != DailySalesCustomerName);
@@ -50,7 +50,15 @@ namespace NewsApp2.Controllers
                 query = query.Where(c => c.Name.Contains(term) || (c.Phone != null && c.Phone.Contains(term)));
             }
 
-            var list = await query.OrderBy(c => c.Name).ToListAsync();
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var totalCount = await query.CountAsync();
+            var list = await query
+                .OrderBy(c => c.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = totalCount };
             ViewBag.Search = search;
             return View(list);
         }

@@ -38,7 +38,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(string? search, Guid? categoryId, bool lowOnly = false, decimal? lowThreshold = null)
+        public async Task<IActionResult> Index(string? search, Guid? categoryId, bool lowOnly = false, decimal? lowThreshold = null, int page = 1)
         {
             var threshold = lowThreshold ?? 5m;
 
@@ -82,9 +82,15 @@ namespace NewsApp2.Controllers
             ViewBag.LowOnly = lowOnly;
             ViewBag.CategoryId = categoryId;
 
+            // Summary cards (ViewBag counts above) reflect the full filtered set; the table renders one page.
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var pageItems = list.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = list.Count };
+
             await LoadLookups(categoryId);
 
-            return View(list);
+            return View(pageItems);
         }
 
         [HttpGet]

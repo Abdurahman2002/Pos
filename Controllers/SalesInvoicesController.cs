@@ -38,7 +38,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, Guid? customerId)
+        public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, Guid? customerId, int page = 1)
         {
             ViewBag.SecondaryCurrencyCode = GetSecondaryCurrencyCode();
             var userId = _userManager.GetUserId(User);
@@ -71,15 +71,21 @@ namespace NewsApp2.Controllers
             if (customerId.HasValue && customerId.Value != Guid.Empty)
                 query = query.Where(i => i.CustomerId == customerId.Value);
 
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            var totalCount = await query.CountAsync();
+
             var list = await query
                 .Include(i => i.Customer)
                 .OrderByDescending(i => i.Created)
-                .Take(200)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             if (canViewAll)
                 await LoadCustomersAsync(customerId);
 
+            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = totalCount };
             ViewBag.CustomerId = customerId;
             ViewBag.From = effectiveFrom;
             ViewBag.To = effectiveTo;

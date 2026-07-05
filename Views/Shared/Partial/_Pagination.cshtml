@@ -1,0 +1,74 @@
+@model NewsApp2.ViewModels.Common.PaginationVM
+@*
+    Shared server-side pagination control.
+    Usage in a list view (after the table):
+        <partial name="Partial/_Pagination" model="@(ViewBag.Pagination as NewsApp2.ViewModels.Common.PaginationVM)" />
+    Page links preserve all current query-string filters and only change "page".
+*@
+@if (Model != null && Model.TotalCount > 0)
+{
+    var req = Context.Request;
+
+    string BuildUrl(int p)
+    {
+        var parts = new List<string>();
+        foreach (var kv in req.Query)
+        {
+            if (string.Equals(kv.Key, "page", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            foreach (var v in kv.Value)
+            {
+                parts.Add(Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(v ?? string.Empty));
+            }
+        }
+        parts.Add("page=" + p);
+        return req.Path + "?" + string.Join("&", parts);
+    }
+
+    var totalPages = Model.TotalPages;
+    var start = Math.Max(1, Model.Page - 2);
+    var end = Math.Min(totalPages, Model.Page + 2);
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 no-print">
+        <div class="text-muted small">
+            عرض <span dir="ltr">@Model.FirstItem–@Model.LastItem</span> من <span dir="ltr">@Model.TotalCount</span>
+        </div>
+        @if (totalPages > 1)
+        {
+            <nav aria-label="ترقيم الصفحات">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.HasPrevious ? string.Empty : "disabled")">
+                        <a class="page-link" href="@(Model.HasPrevious ? BuildUrl(Model.Page - 1) : "#")" tabindex="@(Model.HasPrevious ? "0" : "-1")">السابق</a>
+                    </li>
+                    @if (start > 1)
+                    {
+                        <li class="page-item"><a class="page-link" href="@BuildUrl(1)">1</a></li>
+                        @if (start > 2)
+                        {
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        }
+                    }
+                    @for (var p = start; p <= end; p++)
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
+                            <a class="page-link" href="@BuildUrl(p)">@p</a>
+                        </li>
+                    }
+                    @if (end < totalPages)
+                    {
+                        @if (end < totalPages - 1)
+                        {
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        }
+                        <li class="page-item"><a class="page-link" href="@BuildUrl(totalPages)">@totalPages</a></li>
+                    }
+                    <li class="page-item @(Model.HasNext ? string.Empty : "disabled")">
+                        <a class="page-link" href="@(Model.HasNext ? BuildUrl(Model.Page + 1) : "#")" tabindex="@(Model.HasNext ? "0" : "-1")">التالي</a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+}

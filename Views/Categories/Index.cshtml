@@ -20,6 +20,10 @@
             </tr>
         </thead>
         <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="3" class="text-center text-muted py-3">لا توجد نتائج مطابقة.</td></tr>
+        }
         @foreach (var item in Model)
         {
             <tr>

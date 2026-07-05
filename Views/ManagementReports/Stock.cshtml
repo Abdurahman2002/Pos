@@ -4,11 +4,14 @@
     ViewData["Title"] = "المخزون";
 }
 
+<partial name="Partial/_ReportPrint" />
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">المخزون</h1>
+    <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
 </div>
 
-<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
+<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm no-print">
     <div class="col-md-5">
         <label class="form-label small fw-bold">بحث</label>
         <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="اسم الصنف أو الباركود..." />

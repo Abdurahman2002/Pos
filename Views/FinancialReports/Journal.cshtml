@@ -3,9 +3,25 @@
     ViewData["Title"] = "دفتر القيود";
 }
 
+@functions {
+    string SourceTypeText(string? v) {
+        switch ((v ?? "").Trim()) {
+            case "SalesInvoice": return "فاتورة مبيعات";
+            case "PurchaseInvoice": return "فاتورة مشتريات";
+            case "ExpenseEntry": return "مصروف";
+            case "Expense": return "مصروف";
+            case "CustomerReceipt": return "تحصيل عميل";
+            case "SupplierPayment": return "دفعة مورد";
+            default: return string.IsNullOrWhiteSpace(v) ? "-" : v;
+        }
+    }
+}
+
+<partial name="Partial/_ReportPrint" />
+
 <h1>دفتر القيود</h1>
 
-<form method="get" class="row g-2 mb-3">
+<form method="get" class="row g-2 mb-3 no-print">
     <div class="col-md-2">
         <label class="form-label">من</label>
         <input type="text" name="from" value="@Model.From.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
@@ -39,11 +55,11 @@
             {
                 if (string.Equals(Model.SourceType, source, StringComparison.Ordinal))
                 {
-                    <option value="@source" selected>@source</option>
+                    <option value="@source" selected>@SourceTypeText(source)</option>
                 }
                 else
                 {
-                    <option value="@source">@source</option>
+                    <option value="@source">@SourceTypeText(source)</option>
                 }
             }
         </select>
@@ -57,7 +73,7 @@
     </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 no-print">
     <a asp-action="ExportJournalExcel"
     asp-route-from="@Model.From.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)"
     asp-route-to="@Model.To.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)"
@@ -67,6 +83,7 @@
        class="btn btn-success">
         تصدير Excel
     </a>
+    <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
 </div>
 
 <div class="row mb-3">
@@ -102,7 +119,7 @@
         {
             <tr>
                 <td><span dir="ltr">@row.EntryDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
-                <td>@row.SourceType</td>
+                <td>@SourceTypeText(row.SourceType)</td>
                 <td>@row.DocumentNo</td>
                 <td>@row.AccountCode</td>
                 <td>@row.AccountName</td>

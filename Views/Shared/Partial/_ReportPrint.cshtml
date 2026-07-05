@@ -1,0 +1,89 @@
+@*
+    Shared print styles for reports rendered inside the dashboard layout.
+    Usage:
+      1. Include once near the top of the report view:  <partial name="Partial/_ReportPrint" />
+      2. Wrap on-screen-only controls (filter forms, buttons) in elements with class "no-print".
+      3. Add a print button:
+         <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()">
+             <i class="mdi mdi-printer me-1"></i> طباعة
+         </button>
+    Print-only: does not affect the on-screen appearance.
+*@
+<style>
+    @@media print {
+        @@page {
+            size: A4;
+            margin: 10mm;
+        }
+
+        .no-print,
+        .sidebar,
+        .navbar,
+        .navbar-brand-wrapper,
+        .navbar-menu-wrapper,
+        .footer {
+            display: none !important;
+        }
+
+        .page-body-wrapper,
+        .main-panel,
+        .content-wrapper,
+        .container,
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        html, body {
+            background: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .card {
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 11px;
+        }
+
+            table th,
+            table td {
+                border: 1px solid #999 !important;
+                padding: 4px 6px !important;
+            }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-row-group;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .table-dark,
+        .table-dark th,
+        .table-dark td {
+            color: #000 !important;
+            background-color: #e9ecef !important;
+        }
+
+        .badge {
+            border: 1px solid #ccc !important;
+            color: #000 !important;
+            background: transparent !important;
+        }
+    }
+</style>

@@ -6,6 +6,21 @@
     var salesScopeMessage = ViewBag.SalesScopeMessage as string;
 }
 
+@functions {
+    string PaymentText(string? v) {
+        switch ((v ?? "").Trim()) {
+            case "Cash": return "نقدي";
+            case "Card": return "بطاقة";
+            case "Transfer": return "تحويل";
+            case "Credit": return "آجل";
+            case "Internal": return "داخلي";
+            default: return string.IsNullOrWhiteSpace(v) ? "-" : v;
+        }
+    }
+}
+
+<partial name="Partial/_ReportPrint" />
+
 <h1>تقرير المبيعات</h1>
 
 @if (!string.IsNullOrWhiteSpace(salesScopeMessage))
@@ -13,7 +28,7 @@
     <div class="alert alert-info">@salesScopeMessage</div>
 }
 
-<form method="get" class="row g-3 mb-3">
+<form method="get" class="row g-3 mb-3 no-print">
     <div class="col-md-3">
         <label class="form-label">@L["From"]</label>
         <input type="text" name="from" value="@(Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))" class="form-control date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />
@@ -43,6 +58,7 @@
             <a asp-action="DetailedReport" asp-route-from="@Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" asp-route-to="@Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="btn btn-info">تقرير تفصيلي</a>
         }
         <a asp-action="SimpleDailyReport" asp-route-from="@Model.From?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" asp-route-to="@Model.To?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)" class="btn btn-warning">تقرير يومي</a>
+        <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
     </div>
 </form>
 
@@ -75,7 +91,7 @@
                 <td><span dir="ltr" style="direction:ltr; unicode-bidi:isolate; white-space:nowrap; font-variant-numeric:tabular-nums;">@row.InvoiceDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
                 <td>@row.CustomerName</td>
                 <td>@localizedStatus</td>
-                <td>@row.PaymentMethod</td>
+                <td>@PaymentText(row.PaymentMethod)</td>
                 <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
                 <td>
                     <span class="badge @(row.IsReturn ? "bg-warning text-dark" : "bg-success")">

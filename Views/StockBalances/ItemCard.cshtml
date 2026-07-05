@@ -5,6 +5,21 @@
     var openingQty = ViewBag.OpeningQty as decimal? ?? 0m;
     var closingQty = ViewBag.ClosingQty as decimal? ?? 0m;
     var closingValue = ViewBag.ClosingValue as decimal? ?? 0m;
+
+    string TransactionTypeText(string? v)
+    {
+        switch ((v ?? "").Trim())
+        {
+            case "In": return "وارد";
+            case "Out": return "منصرف";
+            case "Purchase": return "شراء";
+            case "Sale": return "بيع";
+            case "Opening": return "رصيد افتتاحي";
+            case "Return": return "مرتجع";
+            case "Adjustment": return "تسوية";
+            default: return string.IsNullOrWhiteSpace(v) ? "-" : v;
+        }
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -81,7 +96,7 @@ else
                                     : null;
                             <tr class="@rowClass">
                                 <td><span dir="ltr">@r.Date.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</span></td>
-                                <td>@r.TransactionType</td>
+                                <td>@TransactionTypeText(r.TransactionType)</td>
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(referenceUrl))
                                     {

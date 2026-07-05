@@ -87,9 +87,13 @@ else
             }
             <div class="col-md-3"><strong>تحصيلات نقدية:</strong> @Model.CashReceiptsLyd.ToString("0.00")</div>
             <div class="col-md-3"><strong>مصروفات/سلف نقدية:</strong> <span class="text-danger">@Model.CashExpensesLyd.ToString("0.00")</span></div>
-            <div class="col-md-6"><strong>النقد المتوقع:</strong> @Model.ExpectedCashLyd.ToString("0.00") دينار</div>
-            <div class="col-md-6"><strong>فرق النقد:</strong> <span class="@(Model.CashDifferenceLyd == 0 ? "text-success" : "text-danger")">@Model.CashDifferenceLyd.ToString("0.00")</span></div>
-            <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي + التحصيلات النقدية − المصروفات/السلف النقدية.</small></div>
+            <div class="col-12">
+                <div class="p-2 rounded bg-light border d-inline-block">
+                    <strong>النقد المتوقع:</strong>
+                    <span class="fs-4 fw-bold text-primary">@Model.ExpectedCashLyd.ToString("0.00")</span> دينار
+                </div>
+            </div>
+            <div class="col-12"><small class="text-muted">النقد المتوقع = رصيد البداية + مبيعات النقدي + التحصيلات النقدية − المصروفات/السلف النقدية. يُحتسب الفرق تلقائياً عند إدخال النقد المعدود في خانة الإغلاق أدناه.</small></div>
         </div>
     </div>
 
@@ -100,8 +104,15 @@ else
                 @Html.AntiForgeryToken()
                 <div class="col-md-4">
                     <label asp-for="ClosingCashLyd" class="form-label">النقد عند الإغلاق (دينار)</label>
-                    <input asp-for="ClosingCashLyd" class="form-control" type="number" step="0.01" min="0" />
+                    <input asp-for="ClosingCashLyd" class="form-control" type="number" step="0.01" min="0"
+                           id="closing-cash-input"
+                           data-expected="@Model.ExpectedCashLyd.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" />
                     <span asp-validation-for="ClosingCashLyd" class="text-danger"></span>
+                </div>
+                <div class="col-md-5 align-self-center">
+                    <div class="p-2 rounded border bg-white">
+                        <strong>الفرق:</strong> <span id="close-diff-val" class="fw-bold">— أدخل النقد المعدود</span>
+                    </div>
                 </div>
                 <div class="col-12">
                     <button type="submit" class="btn btn-danger" onclick="return confirm('هل تريد إغلاق الوردية الحالية الآن؟');">إغلاق الوردية</button>
@@ -113,4 +124,27 @@ else
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var input = document.getElementById('closing-cash-input');
+            var out = document.getElementById('close-diff-val');
+            if (!input || !out) return;
+            var expected = parseFloat(input.getAttribute('data-expected')) || 0;
+            function fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+            function update() {
+                var raw = input.value;
+                if (raw === '' || raw === null || isNaN(parseFloat(raw))) {
+                    out.textContent = '— أدخل النقد المعدود';
+                    out.className = 'fw-bold text-muted';
+                    return;
+                }
+                var diff = Math.round((parseFloat(raw) - expected) * 100) / 100;
+                var label = diff === 0 ? ' (مطابق)' : (diff > 0 ? ' (زيادة)' : ' (عجز)');
+                out.textContent = (diff > 0 ? '+' : '') + fmt(diff) + ' دينار' + label;
+                out.className = 'fw-bold ' + (diff === 0 ? 'text-success' : (diff > 0 ? 'text-warning' : 'text-danger'));
+            }
+            input.addEventListener('input', update);
+            update();
+        })();
+    </script>
 }

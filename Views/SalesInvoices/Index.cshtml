@@ -58,6 +58,10 @@
             </tr>
         </thead>
         <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="7" class="text-center text-muted py-3">لا توجد فواتير في هذه الفترة.</td></tr>
+        }
         @foreach (var row in Model)
         {
             var localizedStatus = string.IsNullOrWhiteSpace(row.Status) ? "-" : L[row.Status].Value;

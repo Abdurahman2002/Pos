@@ -625,6 +625,36 @@
             submitPosBtn.classList.toggle('btn-primary', !isReturn);
         }
 
+        // Guard against accidental double-submit of the sale/return (avoids duplicate
+        // invoices on slow/touch POS) and show visible "saving…" feedback.
+        var posSubmitting = false;
+        form.addEventListener('submit', function (e) {
+            if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                return; // let validation surface errors; keep the button usable
+            }
+            if (posSubmitting) { e.preventDefault(); return; }
+            posSubmitting = true;
+            if (submitPosBtn) {
+                if (!submitPosBtn.dataset.originalHtml) {
+                    submitPosBtn.dataset.originalHtml = submitPosBtn.innerHTML;
+                }
+                submitPosBtn.disabled = true;
+                submitPosBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>'
+                    + (submitPosBtn.dataset.savingText || 'جارٍ الترحيل…');
+            }
+            // Safety net: if we're still on the page later (e.g. server-side validation
+            // returned the form), re-enable so the cashier is never locked out.
+            setTimeout(function () {
+                posSubmitting = false;
+                if (submitPosBtn) {
+                    submitPosBtn.disabled = false;
+                    if (submitPosBtn.dataset.originalHtml) {
+                        submitPosBtn.innerHTML = submitPosBtn.dataset.originalHtml;
+                    }
+                }
+            }, 12000);
+        });
+
         function resetToNewSale() {
             window.location.href = newUrl || window.location.pathname;
         }

@@ -5,6 +5,19 @@
     var culture = CultureInfo.InvariantCulture;
     Func<decimal, string> money = value => value.ToString("N2", culture);
 
+    string PaymentText(string? value)
+    {
+        switch ((value ?? string.Empty).Trim())
+        {
+            case "Cash": return "نقدي";
+            case "Card": return "بطاقة";
+            case "Transfer": return "تحويل";
+            case "Credit": return "آجل";
+            case "Internal": return "داخلي";
+            default: return value ?? string.Empty;
+        }
+    }
+
     string ExpenseKindText(string? value)
     {
         var normalized = (value ?? string.Empty).Trim();
@@ -114,7 +127,7 @@
                         <td>@row.Number</td>
                         <td class="text-center num">@row.InvoiceDate.ToString("dd/MM/yyyy", culture)</td>
                         <td>@row.CustomerName</td>
-                        <td>@row.PaymentMethod</td>
+                        <td>@PaymentText(row.PaymentMethod)</td>
                         <td>@(string.IsNullOrWhiteSpace(row.BankName) ? "-" : row.BankName)</td>
                         <td>@(row.IsReturn ? "مرتجع" : "بيع")</td>
                         <td class="text-end num">@money(row.TotalLyd)</td>

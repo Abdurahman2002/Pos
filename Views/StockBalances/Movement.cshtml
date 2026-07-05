@@ -4,9 +4,15 @@
     ViewData["Title"] = L["Stock Movement"];
 }
 
+<partial name="Partial/_ReportPrint" />
+
 <h2>@L["Stock Movement Report"]</h2>
 
-<form method="get" class="row g-3 mb-3">
+<div class="mb-3 no-print">
+    <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
+</div>
+
+<form method="get" class="row g-3 mb-3 no-print">
     <div class="col-md-3">
         <label class="form-label">@L["From"]</label>
         @Html.EditorFor(m => m.From)

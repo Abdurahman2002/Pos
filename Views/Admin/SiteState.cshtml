@@ -1,10 +1,10 @@
 ﻿@model SiteState
 
 @{
-    ViewData["Title"] = "Site State";
+    ViewData["Title"] = "حالة الموقع";
 }
 
-<h4>Site State</h4>
+<h4>حالة الموقع</h4>
 <hr />
 <div class="container" style="min-height:67vh;">
 
@@ -13,29 +13,30 @@
             @if (@Model.State == true)
             {
                 <div class="alert alert-success" style="text-align:center">
-                    <p>The site is active now</p>
+                    <p>الموقع مُفعّل الآن</p>
                 </div>
             }
             else
             {
                 <div class="alert alert-danger" style="text-align:center">
-                    <p>The site is closed</p>
+                    <p>الموقع مغلق حالياً</p>
                 </div>
             }
             <form asp-action="SiteState">
             
 
                 <div class="form-group mt-3">
-                    <input type="submit" name="Save" value="Activating Site" class="btn btn-success" />
-                    <input type="submit" name="Save" value="Deactivate Site" class="btn btn-danger" />
+                    <button type="submit" name="Save" value="Activating Site" class="btn btn-success">تفعيل الموقع</button>
+                    <button type="submit" name="Save" value="Deactivate Site" class="btn btn-danger"
+                            onclick="return confirm('سيؤدي هذا إلى إغلاق الموقع أمام المستخدمين. هل أنت متأكد؟');">إيقاف الموقع</button>
                 </div>
 
                 <div class="form-group mt-5">
-                    <label asp-for="ClosingMessage" class="control-label"></label>
+                    <label asp-for="ClosingMessage" class="control-label">رسالة الإغلاق</label>
                     <textarea type="text" asp-for="ClosingMessage" rows="4" class="form-control"></textarea>
                 </div>
                 <div class="form-group mt-3">
-                    <input type="submit" name="Save" value="Update colsing message" class="btn btn-primary" />
+                    <button type="submit" name="Save" value="Update colsing message" class="btn btn-primary">تحديث رسالة الإغلاق</button>
                 </div>
 
                 @* <input type="submit" name="Save" asp-action="SiteState" value="Update colsing message" class="btn btn-primary" /> *@
@@ -49,13 +50,12 @@
 
                 <div class="alert alert-info mt-3" role="alert" style="width:max-content;">
                     <p>
-                        <b>@Html.DisplayNameFor(model => model.Created):</b>
+                        <b>تاريخ الإنشاء:</b>
                         @Html.DisplayFor(model => model.Created)
                         @Html.HiddenFor(model => model.Created)
-                        @* <input type="hidden" asp-for="Created" /> *@
                     </p>
                     <p>
-                        <b>@Html.DisplayNameFor(model => model.Modified):</b>
+                        <b>تاريخ التعديل:</b>
                         @Html.DisplayFor(model => model.Modified)
                     </p>
                 </div>

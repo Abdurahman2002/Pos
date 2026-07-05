@@ -4,11 +4,14 @@
     ViewData["Title"] = "الجرد اليومي";
 }
 
+<partial name="Partial/_ReportPrint" />
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">الجرد اليومي للمخزون</h1>
+    <button type="button" class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
 </div>
 
-<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm">
+<form method="get" class="row g-2 mb-4 bg-light p-3 rounded border shadow-sm no-print">
     <div class="col-md-4">
         <label class="form-label small fw-bold">التاريخ</label>
         <input type="text" name="date" value="@Model.ReportDate?.ToString("dd/MM/yyyy")" class="form-control form-control-sm date-input js-date" placeholder="dd/MM/yyyy" dir="ltr" lang="en-GB" autocomplete="off" />

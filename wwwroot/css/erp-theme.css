@@ -61,3 +61,29 @@
     }
 }
 
+/* --- Sticky sidebar: keep the navigation menu in view while page content scrolls.
+       The template sets .container-scroller{overflow:hidden}, which would scope
+       position:sticky to that (non-scrolling) box; on desktop we let the page body be
+       the scroll context so the sidebar can stick to the viewport. This keeps the flex
+       layout intact (no overlap / no reserved-margin math). Desktop only (>=992px);
+       smaller screens keep the offcanvas overlay behaviour. --- */
+@media (min-width: 992px) {
+    .container-scroller {
+        overflow: visible;
+    }
+
+    .page-body-wrapper > .sidebar {
+        position: sticky;
+        top: 64px; /* height of the fixed top navbar */
+        align-self: flex-start; /* stop the flex row from stretching it to full content height */
+        height: calc(100vh - 64px);
+    }
+
+    /* Internal scroll only in the expanded sidebar; icon-only mode needs visible
+       overflow so its hover fly-out submenus are not clipped. */
+    body:not(.sidebar-icon-only) .page-body-wrapper > .sidebar {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+}
+

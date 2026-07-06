@@ -1,0 +1,128 @@
+@model NewsApp2.ViewModels.Dashboard.DashboardVM
+@{
+    ViewData["Title"] = "لوحة المؤشرات";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    Func<decimal, string> money = v => v.ToString("N2", culture);
+
+    string PaymentText(string? v)
+    {
+        switch ((v ?? string.Empty).Trim())
+        {
+            case "Card": return "بطاقة";
+            case "Transfer": return "تحويل";
+            case "Credit": return "آجل";
+            case "Internal": return "داخلي";
+            default: return "نقدي";
+        }
+    }
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h2 class="m-0"><i class="mdi mdi-view-dashboard text-primary me-1"></i> لوحة المؤشرات</h2>
+        <div class="text-muted small">اليوم: <span dir="ltr">@Model.Today.ToString("dd/MM/yyyy", culture)</span></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="SalesInvoices" asp-action="Create" class="btn btn-primary"><i class="mdi mdi-plus-box me-1"></i> بيع جديد</a>
+        <a asp-controller="SalesInvoices" asp-action="SimpleDailyReport" class="btn btn-outline-secondary"><i class="mdi mdi-file-chart me-1"></i> تقرير اليوم</a>
+        <a asp-controller="PosShifts" asp-action="Index" class="btn btn-outline-secondary"><i class="mdi mdi-cash-register me-1"></i> الورديات</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-2">
+    @{
+        var cards = new[]
+        {
+            new { Title = "صافي مبيعات اليوم", Value = money(Model.NetSalesTodayLyd) + " د.ل", Icon = "mdi-cash-multiple", Cls = "text-success", Sub = (string?)null },
+            new { Title = "نقد اليوم", Value = money(Model.CashSalesTodayLyd) + " د.ل", Icon = "mdi-cash", Cls = "text-primary", Sub = (string?)null },
+            new { Title = "عدد فواتير اليوم", Value = Model.InvoiceCountToday.ToString(), Icon = "mdi-receipt", Cls = "text-info", Sub = (string?)null },
+            new { Title = "ورديات مفتوحة", Value = Model.OpenShiftCount.ToString(), Icon = "mdi-cash-register", Cls = "text-warning", Sub = (string?)("رصيد بداية: " + money(Model.OpenShiftOpeningCashLyd)) },
+            new { Title = "أصناف تحت حد الطلب", Value = Model.LowStockCount.ToString(), Icon = "mdi-alert", Cls = "text-danger", Sub = (string?)("نافد: " + Model.OutOfStockCount) },
+            new { Title = "ديون العملاء (آجل)", Value = money(Model.ReceivablesLyd) + " د.ل", Icon = "mdi-account-cash", Cls = "text-danger", Sub = (string?)null },
+            new { Title = "مستحقات الموردين", Value = money(Model.PayablesLyd) + " د.ل", Icon = "mdi-truck", Cls = "text-secondary", Sub = (string?)null },
+        };
+    }
+    @foreach (var c in cards)
+    {
+        <div class="col-6 col-md-4 col-xl-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small">@c.Title</div>
+                        <div class="fs-4 fw-bold @c.Cls"><span dir="ltr">@c.Value</span></div>
+                        @if (!string.IsNullOrEmpty(c.Sub))
+                        {
+                            <div class="text-muted small">@c.Sub</div>
+                        }
+                    </div>
+                    <i class="mdi @c.Icon fs-2 @c.Cls opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="mdi mdi-alert text-danger me-1"></i> أصناف تحتاج إعادة طلب</span>
+                <a asp-controller="StockBalances" asp-action="Index" asp-route-lowOnly="true" class="btn btn-sm btn-outline-danger">عرض الكل</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>الصنف</th><th class="text-end">المتوفر</th><th class="text-end">حد الطلب</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.LowStockItems.Any())
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-3">لا توجد أصناف تحت حد الطلب. 👍</td></tr>
+                        }
+                        @foreach (var s in Model.LowStockItems)
+                        {
+                            <tr>
+                                <td><a asp-controller="StockBalances" asp-action="ItemCard" asp-route-id="@s.ItemId" class="text-decoration-none">@s.ItemName</a></td>
+                                <td class="text-end fw-bold @(s.Qty <= 0 ? "text-danger" : "text-warning")"><span dir="ltr">@s.Qty.ToString("0.##", culture)</span></td>
+                                <td class="text-end text-muted"><span dir="ltr">@(s.Reorder > 0 ? s.Reorder.ToString("0.##", culture) : "-")</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="mdi mdi-receipt text-info me-1"></i> آخر فواتير اليوم</span>
+                <a asp-controller="SalesInvoices" asp-action="Index" class="btn btn-sm btn-outline-secondary">كل الفواتير</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>الرقم</th><th>الوقت</th><th>العميل</th><th>الدفع</th><th class="text-end">الإجمالي</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.RecentInvoices.Any())
+                        {
+                            <tr><td colspan="5" class="text-center text-muted py-3">لا توجد فواتير اليوم بعد.</td></tr>
+                        }
+                        @foreach (var inv in Model.RecentInvoices)
+                        {
+                            var cust = string.Equals(inv.CustomerName, "مبيعات يومية", StringComparison.Ordinal) ? "-" : (inv.CustomerName ?? "-");
+                            <tr>
+                                <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@inv.Id" class="text-decoration-none">@inv.Number</a></td>
+                                <td dir="ltr">@inv.CreatedUtc.ToLocalTime().ToString("HH:mm")</td>
+                                <td>@cust</td>
+                                <td>@PaymentText(inv.PaymentMethod)</td>
+                                <td class="text-end fw-bold"><span dir="ltr">@money(inv.TotalDinar)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

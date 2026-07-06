@@ -1,0 +1,122 @@
+@model NewsApp2.ViewModels.Search.SearchResultsVM
+@{
+    ViewData["Title"] = "نتائج البحث";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="m-0"><i class="mdi mdi-magnify text-primary me-1"></i> بحث</h2>
+</div>
+
+<form method="get" asp-action="Index" class="mb-3">
+    <div class="input-group" style="max-width: 640px;">
+        <span class="input-group-text bg-white"><i class="mdi mdi-magnify"></i></span>
+        <input type="search" name="q" value="@Model.Query" class="form-control" placeholder="صنف / باركود / عميل / مورد / رقم فاتورة" autofocus />
+        <button class="btn btn-primary" type="submit">بحث</button>
+    </div>
+</form>
+
+@if (Model.Query.Length < 2)
+{
+    <div class="alert alert-info">اكتب حرفين على الأقل للبحث.</div>
+}
+else if (Model.TotalResults == 0)
+{
+    <div class="alert alert-warning">لا توجد نتائج مطابقة لـ «@Model.Query».</div>
+}
+else
+{
+    <div class="text-muted small mb-2">عدد النتائج: @Model.TotalResults</div>
+
+    @if (Model.Items.Any())
+    {
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-package-variant text-primary me-1"></i> الأصناف (@Model.Items.Count)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light"><tr><th>الصنف</th><th>الباركود</th><th>التصنيف</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var it in Model.Items)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@it.Name</td>
+                                <td dir="ltr">@(string.IsNullOrWhiteSpace(it.Barcode) ? "-" : it.Barcode)</td>
+                                <td>@(it.Category ?? "-")</td>
+                                <td class="text-end"><a asp-controller="Items" asp-action="Details" asp-route-id="@it.Id" class="btn btn-sm btn-outline-primary">فتح</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (Model.Customers.Any())
+    {
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-account-multiple text-success me-1"></i> العملاء (@Model.Customers.Count)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light"><tr><th>الاسم</th><th>الهاتف</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var c in Model.Customers)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@c.Name</td>
+                                <td dir="ltr">@(string.IsNullOrWhiteSpace(c.Phone) ? "-" : c.Phone)</td>
+                                <td class="text-end"><a asp-controller="Customers" asp-action="Statement" asp-route-id="@c.Id" class="btn btn-sm btn-outline-success">كشف الحساب</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (Model.Suppliers.Any())
+    {
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-truck text-secondary me-1"></i> الموردون (@Model.Suppliers.Count)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light"><tr><th>الاسم</th><th>الهاتف</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var s in Model.Suppliers)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@s.Name</td>
+                                <td dir="ltr">@(string.IsNullOrWhiteSpace(s.Phone) ? "-" : s.Phone)</td>
+                                <td class="text-end"><a asp-controller="Suppliers" asp-action="Statement" asp-route-id="@s.Id" class="btn btn-sm btn-outline-secondary">كشف الحساب</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (Model.CanSearchInvoices && Model.Invoices.Any())
+    {
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-receipt text-info me-1"></i> فواتير البيع (@Model.Invoices.Count)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light"><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th class="text-end">الإجمالي</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var inv in Model.Invoices)
+                        {
+                            var cust = string.Equals(inv.CustomerName, "مبيعات يومية", StringComparison.Ordinal) ? "-" : (inv.CustomerName ?? "-");
+                            <tr>
+                                <td class="fw-semibold">@inv.Number</td>
+                                <td dir="ltr">@inv.InvoiceDate.ToString("dd/MM/yyyy", culture)</td>
+                                <td>@cust</td>
+                                <td class="text-end"><span dir="ltr">@inv.TotalDinar.ToString("N2", culture)</span></td>
+                                <td class="text-end"><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@inv.Id" class="btn btn-sm btn-outline-info">فتح</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}

@@ -5,7 +5,8 @@
 @using System.Globalization
 @{
     var isCashier = User.IsInRole("Cashier");
-    var homeController = isCashier ? "SalesInvoices" : "StockBalances";
+    var canDashboard = User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
+    var homeController = isCashier ? "SalesInvoices" : (canDashboard ? "Dashboard" : "StockBalances");
     var homeAction = isCashier ? "Create" : "Index";
 }
 
@@ -85,6 +86,13 @@
                     <span class="mdi mdi-menu"></span>
                 </a>
 
+                <form class="d-none d-md-flex align-items-center ms-3 flex-grow-1" method="get" asp-controller="Search" asp-action="Index" role="search" style="max-width: 460px;">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="mdi mdi-magnify"></i></span>
+                        <input type="search" name="q" value="@(Context.Request.Query["q"])" class="form-control border-start-0" placeholder="بحث: صنف / باركود / عميل / رقم فاتورة" aria-label="بحث" autocomplete="off" />
+                    </div>
+                </form>
+
                 <div class="d-none d-md-flex align-items-center ms-3 me-2">
                     <partial name="Partial/_LanguageSwitcher"></partial>
                 </div>
@@ -139,7 +147,7 @@
                     <li class="nav-item">
                         <a href="@Url.Action(homeAction, homeController)" class="nav-link ajax-link">
                             <span class="icon-bg"><i class="mdi @(isCashier ? "mdi-point-of-sale" : "mdi-view-dashboard") menu-icon"></i></span>
-                            <span class="menu-title">@(isCashier ? "نقطة البيع (POS)" : L["InventoryDashboard"].Value)</span>
+                            <span class="menu-title">@(isCashier ? "نقطة البيع (POS)" : (canDashboard ? "لوحة المؤشرات" : L["InventoryDashboard"].Value))</span>
                         </a>
                     </li>
 

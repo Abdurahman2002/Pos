@@ -187,7 +187,7 @@ namespace NewsApp2.Controllers
 
                 if (await _userManager.IsInRoleAsync(user, "Admin"))
                 {
-                    return RedirectToAction("Index", "StockBalances");
+                    return RedirectToAction("Index", "Dashboard");
                 }
 
                 if (await _userManager.IsInRoleAsync(user, "Prog"))
@@ -205,8 +205,13 @@ namespace NewsApp2.Controllers
                         }
                     }
                     //----------------------------------------------------------------
-                    return RedirectToAction("Index", "StockBalances");
+                    return RedirectToAction("Index", "Dashboard");
 
+                }
+
+                if (await _userManager.IsInRoleAsync(user, "SalesManager"))
+                {
+                    return RedirectToAction("Index", "Dashboard");
                 }
 
                 if (await _userManager.IsInRoleAsync(user, "Cashier"))

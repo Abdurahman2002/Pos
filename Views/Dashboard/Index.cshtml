@@ -3,6 +3,8 @@
     ViewData["Title"] = "لوحة المؤشرات";
     var culture = System.Globalization.CultureInfo.InvariantCulture;
     Func<decimal, string> money = v => v.ToString("N2", culture);
+    Func<decimal, string> qty = v => v.ToString("0.##", culture);
+    var max = Model.Last7DaysMax;
 
     string PaymentText(string? v)
     {
@@ -25,23 +27,25 @@
     <div class="d-flex flex-wrap gap-2">
         <a asp-controller="SalesInvoices" asp-action="Create" class="btn btn-primary"><i class="mdi mdi-plus-box me-1"></i> بيع جديد</a>
         <a asp-controller="SalesInvoices" asp-action="SimpleDailyReport" class="btn btn-outline-secondary"><i class="mdi mdi-file-chart me-1"></i> تقرير اليوم</a>
+        <a asp-controller="StockBalances" asp-action="Index" class="btn btn-outline-secondary"><i class="mdi mdi-warehouse me-1"></i> المخزون</a>
         <a asp-controller="PosShifts" asp-action="Index" class="btn btn-outline-secondary"><i class="mdi mdi-cash-register me-1"></i> الورديات</a>
     </div>
 </div>
 
-<div class="row g-3 mb-2">
-    @{
-        var cards = new[]
-        {
-            new { Title = "صافي مبيعات اليوم", Value = money(Model.NetSalesTodayLyd) + " د.ل", Icon = "mdi-cash-multiple", Cls = "text-success", Sub = (string?)null },
-            new { Title = "نقد اليوم", Value = money(Model.CashSalesTodayLyd) + " د.ل", Icon = "mdi-cash", Cls = "text-primary", Sub = (string?)null },
-            new { Title = "عدد فواتير اليوم", Value = Model.InvoiceCountToday.ToString(), Icon = "mdi-receipt", Cls = "text-info", Sub = (string?)null },
-            new { Title = "ورديات مفتوحة", Value = Model.OpenShiftCount.ToString(), Icon = "mdi-cash-register", Cls = "text-warning", Sub = (string?)("رصيد بداية: " + money(Model.OpenShiftOpeningCashLyd)) },
-            new { Title = "أصناف تحت حد الطلب", Value = Model.LowStockCount.ToString(), Icon = "mdi-alert", Cls = "text-danger", Sub = (string?)("نافد: " + Model.OutOfStockCount) },
-            new { Title = "ديون العملاء (آجل)", Value = money(Model.ReceivablesLyd) + " د.ل", Icon = "mdi-account-cash", Cls = "text-danger", Sub = (string?)null },
-            new { Title = "مستحقات الموردين", Value = money(Model.PayablesLyd) + " د.ل", Icon = "mdi-truck", Cls = "text-secondary", Sub = (string?)null },
-        };
-    }
+@{
+    var cards = new[]
+    {
+        new { Title = "مبيعات اليوم", Value = money(Model.SalesTodayLyd), Unit = "د.ل", Icon = "mdi-cash-multiple", Cls = "success", Sub = (string?)($"{Model.InvoiceCountToday} فاتورة") },
+        new { Title = "مبيعات هذا الشهر", Value = money(Model.SalesMonthLyd), Unit = "د.ل", Icon = "mdi-calendar-month", Cls = "primary", Sub = (string?)($"{Model.InvoiceCountMonth} فاتورة") },
+        new { Title = "مجمل ربح الشهر", Value = money(Model.GrossProfitMonthLyd), Unit = "د.ل", Icon = "mdi-trending-up", Cls = "success", Sub = (string?)null },
+        new { Title = "نقد اليوم", Value = money(Model.CashTodayLyd), Unit = "د.ل", Icon = "mdi-cash", Cls = "info", Sub = (string?)($"ورديات مفتوحة: {Model.OpenShiftCount}") },
+        new { Title = "قيمة المخزون", Value = money(Model.StockValueLyd), Unit = "د.ل", Icon = "mdi-warehouse", Cls = "secondary", Sub = (string?)($"{Model.ItemCount} صنف") },
+        new { Title = "أصناف تحت حد الطلب", Value = Model.LowStockCount.ToString(culture), Unit = "", Icon = "mdi-alert", Cls = "danger", Sub = (string?)($"نافد: {Model.OutOfStockCount}") },
+        new { Title = "ديون العملاء (آجل)", Value = money(Model.ReceivablesLyd), Unit = "د.ل", Icon = "mdi-account-cash", Cls = "warning", Sub = (string?)null },
+        new { Title = "مستحقات الموردين", Value = money(Model.PayablesLyd), Unit = "د.ل", Icon = "mdi-truck", Cls = "dark", Sub = (string?)null },
+    };
+}
+<div class="row g-3 mb-1">
     @foreach (var c in cards)
     {
         <div class="col-6 col-md-4 col-xl-3">
@@ -49,20 +53,71 @@
                 <div class="card-body d-flex justify-content-between align-items-start">
                     <div>
                         <div class="text-muted small">@c.Title</div>
-                        <div class="fs-4 fw-bold @c.Cls"><span dir="ltr">@c.Value</span></div>
+                        <div class="fs-4 fw-bold text-@c.Cls"><span dir="ltr">@c.Value</span> <span class="fs-6 text-muted">@c.Unit</span></div>
                         @if (!string.IsNullOrEmpty(c.Sub))
                         {
                             <div class="text-muted small">@c.Sub</div>
                         }
                     </div>
-                    <i class="mdi @c.Icon fs-2 @c.Cls opacity-50"></i>
+                    <span class="rounded-circle d-inline-flex align-items-center justify-content-center bg-@c.Cls bg-opacity-10" style="width:44px;height:44px;">
+                        <i class="mdi @c.Icon fs-4 text-@c.Cls"></i>
+                    </span>
                 </div>
             </div>
         </div>
     }
 </div>
 
-<div class="row g-3">
+<div class="row g-3 mt-1">
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-chart-bar text-primary me-1"></i> مبيعات آخر ٧ أيام</div>
+            <div class="card-body">
+                <div class="d-flex align-items-end justify-content-between gap-2" style="height: 180px;">
+                    @foreach (var day in Model.Last7Days)
+                    {
+                        var pct = max > 0 ? (double)(day.NetSalesLyd / max) * 100.0 : 0.0;
+                        if (pct < 2 && day.NetSalesLyd > 0) { pct = 2; }
+                        <div class="d-flex flex-column align-items-center flex-fill" style="min-width:0;">
+                            <div class="small fw-bold text-primary mb-1" style="white-space:nowrap;"><span dir="ltr">@money(day.NetSalesLyd)</span></div>
+                            <div class="w-100 d-flex align-items-end" style="height:120px;">
+                                <div class="w-100 rounded-top" style="height:@(pct.ToString("0.#", culture))%; min-height:2px; background:linear-gradient(180deg,#4e73df,#224abe);" title="@money(day.NetSalesLyd) د.ل"></div>
+                            </div>
+                            <div class="small text-muted mt-1" dir="ltr">@day.Date.ToString("dd/MM", culture)</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white fw-bold"><i class="mdi mdi-star text-warning me-1"></i> أفضل ٥ أصناف مبيعاً (هذا الشهر)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead class="table-light"><tr><th>الصنف</th><th class="text-end">الكمية</th><th class="text-end">المبيعات</th></tr></thead>
+                    <tbody>
+                        @if (!Model.TopItems.Any())
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-3">لا توجد مبيعات هذا الشهر بعد.</td></tr>
+                        }
+                        @foreach (var t in Model.TopItems)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@t.ItemName</td>
+                                <td class="text-end"><span dir="ltr">@qty(t.Qty)</span></td>
+                                <td class="text-end fw-bold"><span dir="ltr">@money(t.SalesLyd)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
     <div class="col-lg-6">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -71,9 +126,7 @@
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle mb-0">
-                    <thead class="table-light">
-                        <tr><th>الصنف</th><th class="text-end">المتوفر</th><th class="text-end">حد الطلب</th></tr>
-                    </thead>
+                    <thead class="table-light"><tr><th>الصنف</th><th class="text-end">المتوفر</th><th class="text-end">حد الطلب</th></tr></thead>
                     <tbody>
                         @if (!Model.LowStockItems.Any())
                         {
@@ -83,8 +136,8 @@
                         {
                             <tr>
                                 <td><a asp-controller="StockBalances" asp-action="ItemCard" asp-route-id="@s.ItemId" class="text-decoration-none">@s.ItemName</a></td>
-                                <td class="text-end fw-bold @(s.Qty <= 0 ? "text-danger" : "text-warning")"><span dir="ltr">@s.Qty.ToString("0.##", culture)</span></td>
-                                <td class="text-end text-muted"><span dir="ltr">@(s.Reorder > 0 ? s.Reorder.ToString("0.##", culture) : "-")</span></td>
+                                <td class="text-end fw-bold @(s.Qty <= 0 ? "text-danger" : "text-warning")"><span dir="ltr">@qty(s.Qty)</span></td>
+                                <td class="text-end text-muted"><span dir="ltr">@(s.Reorder > 0 ? qty(s.Reorder) : "-")</span></td>
                             </tr>
                         }
                     </tbody>
@@ -101,9 +154,7 @@
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle mb-0">
-                    <thead class="table-light">
-                        <tr><th>الرقم</th><th>الوقت</th><th>العميل</th><th>الدفع</th><th class="text-end">الإجمالي</th></tr>
-                    </thead>
+                    <thead class="table-light"><tr><th>الرقم</th><th>الوقت</th><th>العميل</th><th>الدفع</th><th class="text-end">الإجمالي</th></tr></thead>
                     <tbody>
                         @if (!Model.RecentInvoices.Any())
                         {

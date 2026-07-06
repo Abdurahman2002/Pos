@@ -251,8 +251,13 @@
                         <div class="collapse" id="inventoryMenu">
                             <ul class="nav flex-column sub-menu">
                                 <li class="nav-item">
+                                    <a href="@Url.Action("Index", "StockBalances")" class="nav-link ajax-link">
+                                        <i class="mdi mdi-warehouse"></i> نظرة عامة على المخزون
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a href="@Url.Action("Index", "Categories")" class="nav-link ajax-link">
-                                        <i class="mdi mdi-tag"></i> @L["Categories"]    
+                                        <i class="mdi mdi-tag"></i> @L["Categories"]
                                     </a>
                                 </li>
                                 <li class="nav-item">

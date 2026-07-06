@@ -24,62 +24,97 @@ namespace NewsApp2.Controllers
             _balances = balances;
         }
 
+        private static bool IsReturn(decimal total, string? note)
+            => total < 0m || (note != null && note.Contains("[POS-RETURN]"));
+
         [HttpGet]
         public async Task<IActionResult> Index()
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var monthStart = new DateOnly(today.Year, today.Month, 1);
+            var weekStart = today.AddDays(-6);
 
-            // --- Today's sales (read-only) ---
+            // ---- Today's sales ----
             var todayRows = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Where(i => i.Status == "Posted" && i.InvoiceDate == today)
                 .Select(i => new { i.TotalDinar, i.PaymentMethod, i.Note })
                 .ToListAsync();
+            var todaySales = todayRows.Where(r => !IsReturn(r.TotalDinar, r.Note)).ToList();
+            var salesToday = todaySales.Sum(r => r.TotalDinar) - todayRows.Where(r => IsReturn(r.TotalDinar, r.Note)).Sum(r => Math.Abs(r.TotalDinar));
+            var cashToday = todaySales.Where(r => r.PaymentMethod == null || r.PaymentMethod == "Cash").Sum(r => r.TotalDinar);
 
-            static bool IsReturn(decimal total, string? note)
-                => total < 0m || (note != null && note.Contains("[POS-RETURN]"));
-
-            var sales = todayRows.Where(r => !IsReturn(r.TotalDinar, r.Note)).ToList();
-            var grossToday = sales.Sum(r => r.TotalDinar);
-            var returnsToday = todayRows.Where(r => IsReturn(r.TotalDinar, r.Note)).Sum(r => Math.Abs(r.TotalDinar));
-            var cashToday = sales.Where(r => r.PaymentMethod == null || r.PaymentMethod == "Cash").Sum(r => r.TotalDinar);
-
-            // --- Open shifts ---
-            var openShiftOpening = await _context.Set<PosShift>()
+            // ---- This month sales (net + count) ----
+            var monthRows = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
-                .Where(s => s.Status == "Open")
-                .Select(s => s.OpeningCashLyd)
+                .Where(i => i.Status == "Posted" && i.InvoiceDate >= monthStart && i.InvoiceDate <= today)
+                .Select(i => new { i.TotalDinar, i.Note })
                 .ToListAsync();
+            var monthSales = monthRows.Where(r => !IsReturn(r.TotalDinar, r.Note)).ToList();
+            var salesMonth = monthSales.Sum(r => r.TotalDinar) - monthRows.Where(r => IsReturn(r.TotalDinar, r.Note)).Sum(r => Math.Abs(r.TotalDinar));
 
-            // --- Inventory (low / out of stock) ---
+            // ---- Month lines: gross profit + top items (same methodology as the daily report) ----
+            var monthLines = await _context.Set<SalesLine>()
+                .AsNoTracking()
+                .Where(l => l.Qty > 0 && l.LineTotalDinar > 0
+                    && l.SalesInvoice != null
+                    && l.SalesInvoice.Status == "Posted"
+                    && l.SalesInvoice.InvoiceDate >= monthStart
+                    && l.SalesInvoice.InvoiceDate <= today)
+                .Select(l => new { l.Qty, l.LineTotalDinar, l.LineCostDinar, ItemName = l.Item != null ? l.Item.Name : "-" })
+                .ToListAsync();
+            var grossProfitMonth = monthLines.Sum(l => l.LineTotalDinar - l.LineCostDinar);
+            var topItems = monthLines
+                .GroupBy(l => l.ItemName)
+                .Select(g => new DashboardTopItemRow { ItemName = g.Key, Qty = g.Sum(x => x.Qty), SalesLyd = g.Sum(x => x.LineTotalDinar) })
+                .OrderByDescending(x => x.SalesLyd)
+                .Take(5)
+                .ToList();
+
+            // ---- Last 7 days trend ----
+            var weekRows = await _context.Set<SalesInvoice>()
+                .AsNoTracking()
+                .Where(i => i.Status == "Posted" && i.InvoiceDate >= weekStart && i.InvoiceDate <= today)
+                .Select(i => new { i.InvoiceDate, i.TotalDinar, i.Note })
+                .ToListAsync();
+            var last7 = new List<DashboardDayRow>();
+            for (var d = 0; d < 7; d++)
+            {
+                var date = weekStart.AddDays(d);
+                var dayRows = weekRows.Where(r => r.InvoiceDate == date).ToList();
+                var net = dayRows.Where(r => !IsReturn(r.TotalDinar, r.Note)).Sum(r => r.TotalDinar)
+                        - dayRows.Where(r => IsReturn(r.TotalDinar, r.Note)).Sum(r => Math.Abs(r.TotalDinar));
+                last7.Add(new DashboardDayRow { Date = date, NetSalesLyd = net });
+            }
+
+            // ---- Open shifts ----
+            var openShiftCount = await _context.Set<PosShift>().AsNoTracking().CountAsync(s => s.Status == "Open");
+
+            // ---- Inventory ----
             var balanceRows = await _context.Set<InvStockBalance>()
                 .AsNoTracking()
                 .Where(b => b.Item != null)
-                .Select(b => new { b.ItemId, ItemName = b.Item!.Name, b.QuantityOnHand, Reorder = b.Item.ReorderLevel })
+                .Select(b => new { b.ItemId, ItemName = b.Item!.Name, b.QuantityOnHand, Reorder = b.Item.ReorderLevel, b.AverageCostLyd })
                 .ToListAsync();
 
             decimal Limit(decimal? reorder) => (reorder.HasValue && reorder.Value > 0) ? reorder.Value : DefaultLowThreshold;
 
+            var itemCount = await _context.Set<Item>().AsNoTracking().CountAsync();
+            var stockValue = balanceRows.Sum(b => b.QuantityOnHand * b.AverageCostLyd);
             var lowItems = balanceRows
                 .Where(b => b.QuantityOnHand <= Limit(b.Reorder))
                 .OrderBy(b => b.QuantityOnHand)
-                .Take(10)
-                .Select(b => new DashboardStockRow
-                {
-                    ItemId = b.ItemId,
-                    ItemName = b.ItemName,
-                    Qty = b.QuantityOnHand,
-                    Reorder = b.Reorder ?? 0m
-                })
+                .Take(8)
+                .Select(b => new DashboardStockRow { ItemId = b.ItemId, ItemName = b.ItemName, Qty = b.QuantityOnHand, Reorder = b.Reorder ?? 0m })
                 .ToList();
 
-            // --- Recent invoices today ---
+            // ---- Recent invoices today ----
             var recent = await _context.Set<SalesInvoice>()
                 .AsNoTracking()
                 .Include(i => i.Customer)
                 .Where(i => i.Status == "Posted" && i.InvoiceDate == today)
                 .OrderByDescending(i => i.Created)
-                .Take(10)
+                .Take(8)
                 .Select(i => new DashboardInvoiceRow
                 {
                     Id = i.Id,
@@ -91,7 +126,7 @@ namespace NewsApp2.Controllers
                 })
                 .ToListAsync();
 
-            // --- Party balances (read-only; guarded so the dashboard never fails on these) ---
+            // ---- Party balances (guarded; never fail the dashboard) ----
             decimal receivables = 0m, payables = 0m;
             try { receivables = await _balances.GetCustomerReceivablesTotalAsync(); } catch { /* non-fatal */ }
             try { payables = await _balances.GetSupplierPayablesTotalAsync(); } catch { /* non-fatal */ }
@@ -99,15 +134,22 @@ namespace NewsApp2.Controllers
             var vm = new DashboardVM
             {
                 Today = today,
-                NetSalesTodayLyd = grossToday - returnsToday,
-                CashSalesTodayLyd = cashToday,
-                InvoiceCountToday = sales.Count,
-                OpenShiftCount = openShiftOpening.Count,
-                OpenShiftOpeningCashLyd = openShiftOpening.Sum(),
+                MonthStart = monthStart,
+                SalesTodayLyd = salesToday,
+                InvoiceCountToday = todaySales.Count,
+                CashTodayLyd = cashToday,
+                SalesMonthLyd = salesMonth,
+                InvoiceCountMonth = monthSales.Count,
+                GrossProfitMonthLyd = grossProfitMonth,
+                OpenShiftCount = openShiftCount,
+                ItemCount = itemCount,
                 LowStockCount = balanceRows.Count(b => b.QuantityOnHand <= Limit(b.Reorder)),
                 OutOfStockCount = balanceRows.Count(b => b.QuantityOnHand <= 0),
+                StockValueLyd = stockValue,
                 ReceivablesLyd = receivables,
                 PayablesLyd = payables,
+                Last7Days = last7,
+                TopItems = topItems,
                 LowStockItems = lowItems,
                 RecentInvoices = recent
             };

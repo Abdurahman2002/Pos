@@ -50,7 +50,6 @@ namespace NewsApp2.Controllers
 
 
         [HttpGet]
-        [Route("Dashboard")]
         [Authorize(Roles = "Prog,Admin,Employee")]
         public async Task<IActionResult> Index()
         {

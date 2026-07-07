@@ -61,21 +61,25 @@
     }
 }
 
-/* --- Sticky sidebar: keep the navigation menu in view while page content scrolls.
-       The template sets .container-scroller{overflow:hidden}, which would scope
-       position:sticky to that (non-scrolling) box; on desktop we let the page body be
-       the scroll context so the sidebar can stick to the viewport. This keeps the flex
-       layout intact (no overlap / no reserved-margin math). Desktop only (>=992px);
-       smaller screens keep the offcanvas overlay behaviour. --- */
+/* --- Fixed-viewport dashboard (desktop >=992px): the page itself does not scroll;
+       the content column (.main-panel) scrolls internally, so the sidebar and top navbar
+       always stay in view. This is box-model based and does NOT depend on position:sticky
+       or overflow-ancestor quirks, so it works reliably. Smaller screens keep the normal
+       offcanvas/scroll behaviour. --- */
 @media (min-width: 992px) {
-    .container-scroller {
-        overflow: visible;
+    .page-body-wrapper {
+        height: 100vh;
+        overflow: hidden;
+        box-sizing: border-box; /* the 64px top padding is counted inside 100vh */
+    }
+
+    .page-body-wrapper > .main-panel {
+        height: calc(100vh - 64px);
+        overflow-y: auto;
+        overflow-x: hidden;
     }
 
     .page-body-wrapper > .sidebar {
-        position: sticky;
-        top: 64px; /* height of the fixed top navbar */
-        align-self: flex-start; /* stop the flex row from stretching it to full content height */
         height: calc(100vh - 64px);
     }
 
@@ -84,6 +88,16 @@
     body:not(.sidebar-icon-only) .page-body-wrapper > .sidebar {
         overflow-y: auto;
         overflow-x: hidden;
+    }
+}
+
+/* Never clip content when printing — reports must print in full, not a single screen. */
+@media print {
+    .page-body-wrapper,
+    .page-body-wrapper > .main-panel,
+    .page-body-wrapper > .sidebar {
+        height: auto !important;
+        overflow: visible !important;
     }
 }
 

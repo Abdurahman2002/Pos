@@ -187,7 +187,7 @@ namespace NewsApp2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Movement(DateOnly? from, DateOnly? to, Guid? itemId, string? referenceType)
+        public async Task<IActionResult> Movement(DateOnly? from, DateOnly? to, Guid? itemId, string? referenceType, int page = 1)
         {
             if (User.IsInRole("Cashier"))
                 return Forbid();
@@ -249,16 +249,21 @@ namespace NewsApp2.Controllers
                 })
                 .ToList();
 
+            // Totals reflect the full filtered period; the table renders one page.
             var vm = new StockMovementReportVM
             {
                 From = from,
                 To = to,
                 ItemId = itemId,
                 ReferenceType = referenceType,
-                Rows = rows,
                 TotalIn = rows.Where(r => r.QuantityChange > 0).Sum(r => r.QuantityChange),
                 TotalOut = rows.Where(r => r.QuantityChange < 0).Sum(r => Math.Abs(r.QuantityChange))
             };
+
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            vm.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = rows.Count };
+            vm.Rows = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             var items = await _items.Repository.GetAll().OrderBy(i => i.Name).ToListAsync();
             var refTypes = await _context.Set<InvStockLedger>()

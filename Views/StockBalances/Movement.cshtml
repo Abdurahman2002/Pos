@@ -59,6 +59,10 @@
             </tr>
         </thead>
         <tbody>
+        @if (!Model.Rows.Any())
+        {
+            <tr><td colspan="7" class="text-center text-muted py-3">لا توجد حركة مخزون في هذه الفترة.</td></tr>
+        }
         @foreach (var row in Model.Rows)
         {
             var localizedMovementType = string.IsNullOrWhiteSpace(row.MovementType) ? "-" : L[row.MovementType].Value;
@@ -76,4 +80,6 @@
         </tbody>
     </table>
 </div>
+
+<partial name="Partial/_Pagination" model="Model.Pagination" />
 

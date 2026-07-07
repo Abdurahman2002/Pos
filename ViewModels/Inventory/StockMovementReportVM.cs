@@ -1,3 +1,5 @@
+using NewsApp2.ViewModels.Common;
+
 namespace NewsApp2.ViewModels.Inventory
 {
     public class StockMovementRowVM
@@ -22,5 +24,6 @@ namespace NewsApp2.ViewModels.Inventory
         public decimal TotalIn { get; set; }
         public decimal TotalOut { get; set; }
         public List<StockMovementRowVM> Rows { get; set; } = new();
+        public PaginationVM? Pagination { get; set; }
     }
 }

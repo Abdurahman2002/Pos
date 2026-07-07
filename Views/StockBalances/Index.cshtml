@@ -1,114 +1,163 @@
-﻿@model IEnumerable<NewsApp2.Models.Entities.InvStockBalance>
+@model NewsApp2.ViewModels.Inventory.StockOverviewVM
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewsApp2.SharedViewResource> L
 @{
-    var lowThreshold = ViewBag.LowThreshold != null ? (decimal)ViewBag.LowThreshold : 5m;
+    ViewData["Title"] = "المخزون";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    Func<decimal, string> money = v => v.ToString("N2", culture);
+    Func<decimal, string> qty = v => v.ToString("0.##", culture);
+    var fin = Model.CanViewFinancials;
+    var colCount = fin ? 11 : 6;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h2>@L["Stock Overview"]</h2>
-    <div class="d-flex gap-2">
-        <a asp-action="Movement" class="btn btn-outline-secondary">@L["Movement Report"]</a>
-        <a asp-controller="FinancialReports" asp-action="ProfitLoss" class="btn btn-outline-primary">@L["Financial Report"]</a>
+<partial name="Partial/_ReportPrint" />
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="m-0"><i class="mdi mdi-warehouse text-primary me-1"></i> المخزون</h2>
+    <div class="d-flex flex-wrap gap-2 no-print">
+        <a asp-action="ExportStockExcel" asp-route-search="@Model.Search" asp-route-categoryId="@Model.CategoryId" asp-route-lowOnly="@Model.LowOnly" asp-route-lowThreshold="@Model.LowThreshold" class="btn btn-success">
+            <i class="mdi mdi-file-excel me-1"></i> تصدير Excel
+        </a>
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="mdi mdi-printer me-1"></i> طباعة</button>
+        <a asp-action="DailyInventory" class="btn btn-outline-secondary"><i class="mdi mdi-calendar-check me-1"></i> الجرد اليومي</a>
+        <a asp-action="Movement" class="btn btn-outline-secondary"><i class="mdi mdi-chart-line me-1"></i> حركة المخزون</a>
     </div>
-    <form class="d-flex flex-wrap gap-2 stock-filter-form" method="get" asp-action="Index">
-        <select name="categoryId" class="form-select" asp-items="@(ViewData["Categories"] as SelectList)">
-            <option value="">@L["All categories"]</option>
+</div>
+
+<form method="get" asp-action="Index" class="row g-2 mb-3 bg-light p-3 rounded border shadow-sm no-print">
+    <div class="col-md-4">
+        <label class="form-label small fw-bold">بحث</label>
+        <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="اسم الصنف أو الباركود..." autocomplete="off" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small fw-bold">التصنيف</label>
+        <select name="categoryId" asp-items="@(ViewData["Categories"] as SelectList)" class="form-select form-select-sm">
+            <option value="">جميع التصنيفات</option>
         </select>
-        <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="@L["Search item"]" />
-        <input type="number" name="lowThreshold" value="@lowThreshold" class="form-control" step="1" min="0" inputmode="numeric" placeholder="@L["Low threshold"]" />
-        <div class="form-check align-self-center">
-            <input type="checkbox" class="form-check-input" id="lowOnly" name="lowOnly" value="true" @(ViewBag.LowOnly == true ? "checked" : "") />
-            <label class="form-check-label" for="lowOnly">@L["Low only"]</label>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small fw-bold">حد الطلب الافتراضي</label>
+        <input type="number" name="lowThreshold" value="@Model.LowThreshold" class="form-control form-control-sm" step="1" min="0" inputmode="numeric" />
+    </div>
+    <div class="col-md-3 d-flex align-items-end gap-2">
+        <div class="form-check ms-1">
+            <input type="checkbox" class="form-check-input" id="lowOnly" name="lowOnly" value="true" @(Model.LowOnly ? "checked" : "") />
+            <label class="form-check-label small" for="lowOnly">المنخفض فقط</label>
         </div>
-        <button class="btn btn-outline-primary" type="submit">@L["Apply"]</button>
-    </form>
+        <button type="submit" class="btn btn-primary btn-sm flex-fill">عرض</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">مسح</a>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3 col-xl">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+            <div class="text-muted small">عدد الأصناف</div>
+            <div class="fs-5 fw-bold text-primary">@Model.TotalItems</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3 col-xl">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+            <div class="text-muted small">إجمالي الكمية</div>
+            <div class="fs-5 fw-bold"><span dir="ltr">@qty(Model.TotalQuantity)</span></div>
+        </div></div>
+    </div>
+    @if (fin)
+    {
+        <div class="col-6 col-md-3 col-xl">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+                <div class="text-muted small">قيمة التكلفة</div>
+                <div class="fs-6 fw-bold text-secondary"><span dir="ltr">@money(Model.TotalCostValueLyd)</span> د.ل</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3 col-xl">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+                <div class="text-muted small">قيمة البيع</div>
+                <div class="fs-6 fw-bold text-info"><span dir="ltr">@money(Model.TotalSaleValueLyd)</span> د.ل</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-3 col-xl">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+                <div class="text-muted small">الربح المتوقع</div>
+                <div class="fs-6 fw-bold text-success"><span dir="ltr">@money(Model.TotalExpectedProfitLyd)</span> د.ل</div>
+            </div></div>
+        </div>
+    }
+    <div class="col-6 col-md-3 col-xl">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body py-2">
+            <div class="text-muted small">تحت حد الطلب</div>
+            <div class="fs-5 fw-bold text-warning">@Model.LowCount <span class="small text-danger">(نافد: @Model.OutOfStockCount)</span></div>
+        </div></div>
+    </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="text-muted">@L["Total lines"]</div>
-                        <div class="fs-4 fw-bold">@ViewBag.TotalCount</div>
-                    </div>
-                    <i class="bi bi-box-seam fs-2 text-primary"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="text-muted">@L["Low stock"]</div>
-                        <div class="fs-4 fw-bold text-danger">@ViewBag.LowCount</div>
-                        <small class="text-muted">@L["Threshold"]: @lowThreshold</small>
-                    </div>
-                    <i class="bi bi-exclamation-triangle fs-2 text-danger"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <div class="text-muted">@L["Out of stock"]</div>
-                        <div class="fs-4 fw-bold text-dark">@ViewBag.OutOfStockCount</div>
-                        <small class="text-muted">@L["Zero qty items"]</small>
-                    </div>
-                    <i class="bi bi-box2 fs-2 text-danger"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="table-responsive">
-    <table class="table table-striped table-bordered align-middle">
-        <thead class="table-light">
-            <tr>
-                <th class="d-none d-md-table-cell">@L["Category"]</th>
-                <th>@L["Item"]</th>
-                <th class="text-end">@L["Qty"]</th>
-                <th class="d-none d-lg-table-cell text-end">@L["Reorder"]</th>
-                <th>@L["Status"]</th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var row in Model)
-        {
-            var reorder = row.Item?.ReorderLevel ?? 0m;
-            var limit = reorder > 0 ? reorder : lowThreshold;
-            var statusKey = row.QuantityOnHand <= 0 ? "Out" : row.QuantityOnHand <= limit ? "Low" : "OK";
-            var status = L[statusKey].Value;
-            var badge = statusKey == "Out" ? "bg-dark" : statusKey == "Low" ? "bg-danger" : "bg-success";
-            <tr>
-                <td class="d-none d-md-table-cell">@row.Item?.Category?.Name</td>
-                <td>
-                    @if (row.ItemId != Guid.Empty)
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>التصنيف</th>
+                        <th>الصنف</th>
+                        <th>الباركود</th>
+                        <th class="text-end">الكمية</th>
+                        <th class="text-end">إعادة الطلب</th>
+                        @if (fin)
+                        {
+                            <th class="text-end">متوسط التكلفة</th>
+                            <th class="text-end">سعر البيع</th>
+                            <th class="text-end">قيمة التكلفة</th>
+                            <th class="text-end">قيمة البيع</th>
+                            <th class="text-end">الربح المتوقع</th>
+                        }
+                        <th class="text-center">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Rows.Any())
                     {
-                        <a asp-action="ItemCard" asp-route-id="@row.ItemId" class="text-decoration-none fw-semibold">
-                            @row.Item?.Name
-                        </a>
+                        <tr><td colspan="@colCount" class="text-center text-muted py-4">لا توجد أصناف مطابقة.</td></tr>
                     }
-                    else
+                    @foreach (var row in Model.Rows)
                     {
-                        @row.Item?.Name
+                        var badge = row.Status == "نفذ" ? "bg-dark" : (row.Status == "منخفض" ? "bg-danger" : "bg-success");
+                        <tr>
+                            <td><span class="badge bg-light text-dark border">@(row.CategoryName ?? "-")</span></td>
+                            <td class="fw-semibold">
+                                <a asp-action="ItemCard" asp-route-id="@row.ItemId" class="text-decoration-none">@row.ItemName</a>
+                            </td>
+                            <td class="small text-muted" dir="ltr">@(string.IsNullOrWhiteSpace(row.Barcode) ? "-" : row.Barcode)</td>
+                            <td class="text-end fw-bold"><span dir="ltr">@qty(row.QuantityOnHand)</span></td>
+                            <td class="text-end text-muted"><span dir="ltr">@(row.ReorderLevel > 0 ? qty(row.ReorderLevel) : "-")</span></td>
+                            @if (fin)
+                            {
+                                <td class="text-end"><span dir="ltr">@money(row.AverageCostLyd)</span></td>
+                                <td class="text-end"><span dir="ltr">@(row.DefaultSalePriceLyd.HasValue ? money(row.DefaultSalePriceLyd.Value) : "-")</span></td>
+                                <td class="text-end fw-semibold"><span dir="ltr">@money(row.CostValueLyd)</span></td>
+                                <td class="text-end fw-semibold"><span dir="ltr">@money(row.SaleValueLyd)</span></td>
+                                <td class="text-end fw-bold text-success"><span dir="ltr">@(row.DefaultSalePriceLyd.HasValue ? money(row.ExpectedProfitLyd) : "-")</span></td>
+                            }
+                            <td class="text-center"><span class="badge @badge">@row.Status</span></td>
+                        </tr>
                     }
-                </td>
-                <td class="text-end">@row.QuantityOnHand.ToString("0")</td>
-                <td class="d-none d-lg-table-cell text-end">@(reorder > 0 ? reorder.ToString("0") : "-")</td>
-                <td><span class="badge @badge">@status</span></td>
-            </tr>
-        }
-        </tbody>
-    </table>
+                </tbody>
+                @if (fin && Model.Rows.Any())
+                {
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end">إجمالي الصفحة</td>
+                            <td class="text-end"><span dir="ltr">@qty(Model.Rows.Sum(r => r.QuantityOnHand))</span></td>
+                            <td></td>
+                            <td colspan="2"></td>
+                            <td class="text-end"><span dir="ltr">@money(Model.Rows.Sum(r => r.CostValueLyd))</span></td>
+                            <td class="text-end"><span dir="ltr">@money(Model.Rows.Sum(r => r.SaleValueLyd))</span></td>
+                            <td class="text-end text-success"><span dir="ltr">@money(Model.Rows.Sum(r => r.ExpectedProfitLyd))</span></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    </div>
 </div>
 
-<partial name="Partial/_Pagination" model="@(ViewBag.Pagination as NewsApp2.ViewModels.Common.PaginationVM)" />
-
+<partial name="Partial/_Pagination" model="Model.Pagination" />

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
 using NewsApp2.Classes;
 using NewsApp2.Models;
 using NewsApp2.Models.Entities;
@@ -40,57 +41,149 @@ namespace NewsApp2.Controllers
         [HttpGet]
         public async Task<IActionResult> Index(string? search, Guid? categoryId, bool lowOnly = false, decimal? lowThreshold = null, int page = 1)
         {
-            var threshold = lowThreshold ?? 5m;
+            var threshold = lowThreshold.HasValue && lowThreshold.Value > 0 ? lowThreshold.Value : 5m;
 
-            IQueryable<InvStockBalance> query = _balances.Repository.GetAll()
+            var rows = await BuildStockRowsAsync(search, categoryId, threshold);
+            if (lowOnly)
+                rows = rows.Where(r => r.Status != "جيد").ToList();
+
+            var vm = new StockOverviewVM
+            {
+                Search = search,
+                CategoryId = categoryId,
+                LowOnly = lowOnly,
+                LowThreshold = threshold,
+                CanViewFinancials = CanViewStockFinancials(),
+                TotalItems = rows.Count,
+                TotalQuantity = rows.Sum(r => r.QuantityOnHand),
+                TotalCostValueLyd = rows.Sum(r => r.CostValueLyd),
+                TotalSaleValueLyd = rows.Sum(r => r.SaleValueLyd),
+                TotalExpectedProfitLyd = rows.Sum(r => r.ExpectedProfitLyd),
+                LowCount = rows.Count(r => r.Status == "منخفض"),
+                OutOfStockCount = rows.Count(r => r.Status == "نفذ")
+            };
+
+            const int pageSize = 50;
+            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
+            vm.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = rows.Count };
+            vm.Rows = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            await LoadLookups(categoryId);
+            return View(vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportStockExcel(string? search, Guid? categoryId, bool lowOnly = false, decimal? lowThreshold = null)
+        {
+            var threshold = lowThreshold.HasValue && lowThreshold.Value > 0 ? lowThreshold.Value : 5m;
+            var canFin = CanViewStockFinancials();
+            var rows = await BuildStockRowsAsync(search, categoryId, threshold);
+            if (lowOnly)
+                rows = rows.Where(r => r.Status != "جيد").ToList();
+
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("المخزون");
+
+            var headers = new List<string> { "التصنيف", "الصنف", "الباركود", "الكمية", "إعادة الطلب" };
+            if (canFin)
+                headers.AddRange(new[] { "متوسط التكلفة", "سعر البيع", "قيمة التكلفة", "قيمة البيع", "الربح المتوقع" });
+            headers.Add("الحالة");
+
+            for (var c = 0; c < headers.Count; c++)
+                sheet.Cell(1, c + 1).Value = headers[c];
+            sheet.Range(1, 1, 1, headers.Count).Style.Font.Bold = true;
+
+            var r = 2;
+            foreach (var row in rows)
+            {
+                var col = 1;
+                sheet.Cell(r, col++).Value = row.CategoryName ?? string.Empty;
+                sheet.Cell(r, col++).Value = row.ItemName;
+                sheet.Cell(r, col++).Value = row.Barcode ?? string.Empty;
+                sheet.Cell(r, col++).Value = row.QuantityOnHand;
+                sheet.Cell(r, col++).Value = row.ReorderLevel;
+                if (canFin)
+                {
+                    sheet.Cell(r, col++).Value = row.AverageCostLyd;
+                    sheet.Cell(r, col++).Value = row.DefaultSalePriceLyd ?? 0m;
+                    sheet.Cell(r, col++).Value = row.CostValueLyd;
+                    sheet.Cell(r, col++).Value = row.SaleValueLyd;
+                    sheet.Cell(r, col++).Value = row.ExpectedProfitLyd;
+                }
+                sheet.Cell(r, col).Value = row.Status;
+                r++;
+            }
+
+            sheet.Cell(r, 3).Value = "الإجمالي";
+            sheet.Cell(r, 4).Value = rows.Sum(x => x.QuantityOnHand);
+            if (canFin)
+            {
+                sheet.Cell(r, 8).Value = rows.Sum(x => x.CostValueLyd);
+                sheet.Cell(r, 9).Value = rows.Sum(x => x.SaleValueLyd);
+                sheet.Cell(r, 10).Value = rows.Sum(x => x.ExpectedProfitLyd);
+                sheet.Range(r, 3, r, 10).Style.Font.Bold = true;
+            }
+            else
+            {
+                sheet.Range(r, 3, r, 4).Style.Font.Bold = true;
+            }
+
+            sheet.Columns().AdjustToContents();
+
+            await using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+            var fileName = $"stock_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+            return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+
+        private bool CanViewStockFinancials()
+            => User.IsInRole("Admin") || User.IsInRole("Prog") || User.IsInRole("SalesManager");
+
+        private async Task<List<StockOverviewRow>> BuildStockRowsAsync(string? search, Guid? categoryId, decimal threshold)
+        {
+            IQueryable<InvStockBalance> query = _context.Set<InvStockBalance>()
                 .AsNoTracking()
                 .Include(b => b.Item)
-                .ThenInclude(i => i.Category);
+                .ThenInclude(i => i.Category)
+                .Where(b => b.Item != null);
 
             if (categoryId.HasValue && categoryId != Guid.Empty)
-            {
-                query = query.Where(b => b.Item != null && b.Item.CategoryId == categoryId.Value);
-            }
+                query = query.Where(b => b.Item!.CategoryId == categoryId.Value);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();
-                query = query.Where(b => b.Item != null && b.Item.Name.Contains(term));
+                query = query.Where(b => b.Item!.Name.Contains(term) || (b.Item.Barcode != null && b.Item.Barcode.Contains(term)));
             }
 
             var list = await query.OrderBy(b => b.Item!.Name).ToListAsync();
 
-            bool IsLow(InvStockBalance b)
+            return list.Select(b =>
             {
-                var itemLevel = b.Item?.ReorderLevel;
-                var limit = itemLevel.HasValue && itemLevel.Value > 0 ? itemLevel.Value : threshold;
-                return b.QuantityOnHand <= limit;
-            }
-
-            if (lowOnly)
-            {
-                list = list.Where(IsLow).ToList();
-            }
-
-            var lowCount = list.Count(IsLow);
-            var outOfStockCount = list.Count(b => b.QuantityOnHand <= 0);
-            ViewBag.TotalCount = list.Count;
-            ViewBag.LowCount = lowCount;
-            ViewBag.OutOfStockCount = outOfStockCount;
-            ViewBag.LowThreshold = threshold;
-            ViewBag.Search = search;
-            ViewBag.LowOnly = lowOnly;
-            ViewBag.CategoryId = categoryId;
-
-            // Summary cards (ViewBag counts above) reflect the full filtered set; the table renders one page.
-            const int pageSize = 50;
-            page = NewsApp2.ViewModels.Common.PaginationVM.NormalizePage(page);
-            var pageItems = list.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            ViewBag.Pagination = new NewsApp2.ViewModels.Common.PaginationVM { Page = page, PageSize = pageSize, TotalCount = list.Count };
-
-            await LoadLookups(categoryId);
-
-            return View(pageItems);
+                var reorder = b.Item?.ReorderLevel ?? 0m;
+                var limit = reorder > 0 ? reorder : threshold;
+                var qty = b.QuantityOnHand;
+                var status = qty <= 0 ? "نفذ" : (qty <= limit ? "منخفض" : "جيد");
+                var salePrice = b.Item?.DefaultSalePriceLyd;
+                var costValue = qty * b.AverageCostLyd;
+                var saleValue = qty * (salePrice ?? 0m);
+                return new StockOverviewRow
+                {
+                    ItemId = b.ItemId,
+                    ItemName = b.Item?.Name ?? "-",
+                    Barcode = b.Item?.Barcode,
+                    CategoryName = b.Item?.Category?.Name,
+                    QuantityOnHand = qty,
+                    ReorderLevel = reorder,
+                    AverageCostLyd = b.AverageCostLyd,
+                    DefaultSalePriceLyd = salePrice,
+                    CostValueLyd = costValue,
+                    SaleValueLyd = saleValue,
+                    ExpectedProfitLyd = salePrice.HasValue ? (saleValue - costValue) : 0m,
+                    Status = status
+                };
+            }).ToList();
         }
 
         [HttpGet]

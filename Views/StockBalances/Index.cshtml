@@ -24,19 +24,15 @@
 </div>
 
 <form method="get" asp-action="Index" class="row g-2 mb-3 bg-light p-3 rounded border shadow-sm no-print">
-    <div class="col-md-4">
+    <div class="col-md-5">
         <label class="form-label small fw-bold">بحث</label>
         <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="اسم الصنف أو الباركود..." autocomplete="off" />
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <label class="form-label small fw-bold">التصنيف</label>
         <select name="categoryId" asp-items="@(ViewData["Categories"] as SelectList)" class="form-select form-select-sm">
             <option value="">جميع التصنيفات</option>
         </select>
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small fw-bold">حد الطلب الافتراضي</label>
-        <input type="number" name="lowThreshold" value="@Model.LowThreshold" class="form-control form-control-sm" step="1" min="0" inputmode="numeric" />
     </div>
     <div class="col-md-3 d-flex align-items-end gap-2">
         <div class="form-check ms-1">

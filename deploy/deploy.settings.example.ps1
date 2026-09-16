@@ -24,7 +24,7 @@ $FtpPass = "FILL-ME"
 
 # Where the site lives, relative to wherever the FTP account lands after login.
 # Run  .\deploy\deploy.ps1 -CheckOnly  to confirm before the first real deploy.
-$RemotePath = "/httpdocs"
+$RemotePath = "/"
 
 # Shared hosting serves a self-signed panel certificate, so TLS is pinned to one
 # exact fingerprint - otherwise WinSCP refuses to connect. The transfer stays

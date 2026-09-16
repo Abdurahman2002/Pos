@@ -36,7 +36,7 @@ $FtpCertFingerprint = "*"
 
 # Polled after the upload until it answers 200, so a deploy that leaves the shop
 # without its POS is reported as a failure instead of a success.
-$HealthUrl = "http://102.213.180.7/"
+$HealthUrl = "https://elora.ly/"
 
 # Leave empty to auto-detect WinSCP.com; set it only for a non-standard install.
 $WinScpCom = ""

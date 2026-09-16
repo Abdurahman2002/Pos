@@ -81,7 +81,7 @@ $ConfigFile = Join-Path $Root "deploy\appsettings.Production.json"
 # NOTE: no spaces between entries. WinSCP.com splits the /command argument on
 # spaces, so a space here turns "logs/;" into a bogus separate command and the
 # whole deploy aborts *before* app_offline.htm is removed (site stuck offline).
-$ExcludeMask = "|app_offline.htm;appsettings.Production.json;App_Data/;logs/;backups/"
+$ExcludeMask = "|app_offline.htm;deploy/;appsettings.Production.json;App_Data/;logs/;backups/"
 
 # A folder is only a valid target if it is empty or already holds this app.
 $OwnMarker      = "NewsApp2.exe"
@@ -221,6 +221,13 @@ if ($UploadConfig) {
 
 # ------------------------------- BUILD ---------------------------------------
 if (-not $SkipBuild) {
+    # Wipe the previous publish output so stale files (e.g. a stray deploy/ folder
+    # from a manual publish) never ride along to the server.
+    if (Test-Path $PublishDir) {
+        Write-Host "==> Clearing stale publish output..." -ForegroundColor DarkGray
+        Remove-Item $PublishDir -Recurse -Force
+    }
+
     Write-Host "==> Publishing (self-contained win-x64)..." -ForegroundColor Cyan
     dotnet publish $Project -c Release -r win-x64 --self-contained true -o $PublishDir --nologo
     if ($LASTEXITCODE -ne 0) { Write-Host "Publish failed." -ForegroundColor Red; exit 1 }

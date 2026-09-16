@@ -363,3 +363,11 @@ MigrationBackup/
 FodyWeavers.xsd
 # Claude Code local tooling (do not commit)
 .claude/
+
+# Data protection keys - machine-specific, rebuilt on each server
+App_Data/keys/
+
+# Deploy files holding secrets (the example templates stay committed)
+deploy/deploy.settings.ps1
+deploy/appsettings.Production.json
+deploy/deploy.log

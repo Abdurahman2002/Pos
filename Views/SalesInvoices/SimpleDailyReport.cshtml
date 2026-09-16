@@ -400,7 +400,10 @@
             <div class="summary-block">
                 <h2>ملخص المبيعات</h2>
                 <div class="summary-line"><span class="label">عدد فواتير البيع</span><strong class="num">@Model.SoldInvoiceCount</strong></div>
+                <div class="summary-line"><span class="label">فواتير مرتجع</span><strong class="num">@Model.ReturnInvoiceCount</strong></div>
                 <div class="summary-line"><span class="label">إجمالي المبيعات</span><strong class="num amount-good">@money(Model.GrossSalesLyd)</strong></div>
+                <div class="summary-line"><span class="label">المرتجعات</span><strong class="num amount-bad">@money(Model.ReturnsLyd)</strong></div>
+                <div class="summary-line"><span class="label">صافي المبيعات</span><strong class="num amount-strong">@money(Model.NetSalesLyd)</strong></div>
                 <div class="summary-line"><span class="label">نقدي</span><strong class="num">@money(Model.CashSalesLyd)</strong></div>
                 <div class="summary-line"><span class="label">بطاقة</span><strong class="num">@money(Model.CardSalesLyd)</strong></div>
                 <div class="summary-line"><span class="label">تحويل</span><strong class="num">@money(Model.TransferSalesLyd)</strong></div>
@@ -450,22 +453,26 @@
         <h2 class="section-title">تفاصيل الأصناف</h2>
         <table class="report-table">
             <colgroup>
-                <col style="width: 8mm;" />
-                <col style="width: 82mm;" />
-                <col style="width: 22mm;" />
-                <col style="width: 30mm;" />
+                <col style="width: 6mm;" />
+                <col style="width: 56mm;" />
+                <col style="width: 14mm;" />
+                <col style="width: 13mm;" />
+                <col style="width: 20mm;" />
+                <col style="width: 19mm;" />
                 @if (canViewAllSalesInvoices)
                 {
-                <col style="width: 26mm;" />
-                <col style="width: 26mm;" />
+                <col style="width: 24mm;" />
+                <col style="width: 24mm;" />
                 }
             </colgroup>
             <thead>
                 <tr>
                     <th>#</th>
                     <th>الصنف</th>
-                    <th>الكمية</th>
-                    <th>إجمالي المبيعات</th>
+                    <th>كمية البيع</th>
+                    <th>كمية مرتجع</th>
+                    <th>إجمالي البيع</th>
+                    <th>قيمة مرتجع</th>
                     @if (canViewAllSalesInvoices)
                     {
                     <th>التكلفة</th>
@@ -476,7 +483,7 @@
             <tbody>
                 @if (!Model.Items.Any())
                 {
-                    <tr><td colspan="@(canViewAllSalesInvoices ? 6 : 4)" class="text-center empty-row">لا توجد مبيعات في هذه الفترة.</td></tr>
+                    <tr><td colspan="@(canViewAllSalesInvoices ? 8 : 6)" class="text-center empty-row">لا توجد مبيعات في هذه الفترة.</td></tr>
                 }
                 else
                 {
@@ -487,7 +494,9 @@
                             <td class="text-center num">@index</td>
                             <td class="item-name">@item.ItemName</td>
                             <td class="text-center num">@qty(item.SoldQty)</td>
+                            <td class="text-center num">@qty(item.ReturnQty)</td>
                             <td class="text-left num">@money(item.GrossSalesDinar)</td>
+                            <td class="text-left num">@money(item.ReturnDinar)</td>
                             @if (canViewAllSalesInvoices)
                             {
                             <td class="text-left num">@money(item.TotalCostLyd)</td>
@@ -502,7 +511,9 @@
                 <tr>
                     <td colspan="2">الإجمالي</td>
                     <td class="text-center num">@qty(Model.Items.Sum(x => x.SoldQty))</td>
+                    <td class="text-center num">@qty(Model.Items.Sum(x => x.ReturnQty))</td>
                     <td class="text-left num">@money(Model.Items.Sum(x => x.GrossSalesDinar))</td>
+                    <td class="text-left num">@money(Model.Items.Sum(x => x.ReturnDinar))</td>
                     @if (canViewAllSalesInvoices)
                     {
                     <td class="text-left num">@money(Model.Items.Sum(x => x.TotalCostLyd))</td>

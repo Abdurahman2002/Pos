@@ -1183,12 +1183,18 @@ namespace NewsApp2.Controllers
 
             var invoices = await invoiceQuery.ToListAsync();
 
-            var salesInvoices = invoices.Where(i => i.TotalDinar > 0).ToList();
+            bool IsReturnInvoice(SalesInvoice i) =>
+                (i.Note != null && i.Note.Contains("[POS-RETURN]")) || i.TotalDinar < 0;
+
+            var returnInvoices = invoices.Where(IsReturnInvoice).ToList();
+            var salesInvoices = invoices.Where(i => !IsReturnInvoice(i)).ToList();
             var salesInvoiceIds = salesInvoices.Select(i => i.Id).ToList();
+            var returnInvoiceIdSet = returnInvoices.Select(i => i.Id).ToHashSet();
+            var allInvoiceIds = salesInvoiceIds.Concat(returnInvoices.Select(i => i.Id)).ToList();
 
             var lines = await _context.Set<SalesLine>()
                 .AsNoTracking()
-                .Where(l => salesInvoiceIds.Contains(l.SalesInvoiceId) && l.Qty > 0 && l.LineTotalDinar > 0)
+                .Where(l => allInvoiceIds.Contains(l.SalesInvoiceId))
                 .Include(l => l.Item)
                 .ToListAsync();
 
@@ -1198,11 +1204,11 @@ namespace NewsApp2.Controllers
                 .Select(g => new SalesSimpleReportItemVM
                 {
                     ItemName = g.Key,
-                    SoldQty = g.Sum(l => l.Qty),
-                    ReturnQty = 0m,
+                    SoldQty = g.Where(l => !returnInvoiceIdSet.Contains(l.SalesInvoiceId)).Sum(l => l.Qty),
+                    ReturnQty = Math.Abs(g.Where(l => returnInvoiceIdSet.Contains(l.SalesInvoiceId)).Sum(l => l.Qty)),
                     NetQty = g.Sum(l => l.Qty),
-                    GrossSalesDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
-                    ReturnDinar = 0m,
+                    GrossSalesDinar = RoundMoney(g.Where(l => !returnInvoiceIdSet.Contains(l.SalesInvoiceId)).Sum(l => l.LineTotalDinar)),
+                    ReturnDinar = Math.Abs(RoundMoney(g.Where(l => returnInvoiceIdSet.Contains(l.SalesInvoiceId)).Sum(l => l.LineTotalDinar))),
                     NetDinar = RoundMoney(g.Sum(l => l.LineTotalDinar)),
                     TotalCostLyd = canViewAll ? RoundMoney(g.Sum(l => l.LineCostDinar)) : 0m,
                     GrossProfitLyd = canViewAll ? RoundMoney(g.Sum(l => l.LineTotalDinar - l.LineCostDinar)) : 0m
@@ -1211,12 +1217,13 @@ namespace NewsApp2.Controllers
                 .ToList();
 
             var grossSales = salesInvoices.Sum(i => i.TotalDinar);
-            var netSales = grossSales;
-            var cashSales = salesInvoices.Where(i => i.PaymentMethod == null || i.PaymentMethod == "Cash").Sum(i => i.TotalDinar);
-            var cardSales = salesInvoices.Where(i => i.PaymentMethod == "Card").Sum(i => i.TotalDinar);
-            var transferSales = salesInvoices.Where(i => i.PaymentMethod == "Transfer").Sum(i => i.TotalDinar);
-            var creditSales = salesInvoices.Where(i => i.PaymentMethod == "Credit").Sum(i => i.TotalDinar);
-            var transferSalesByBank = salesInvoices
+            var returns = returnInvoices.Sum(i => Math.Abs(i.TotalDinar));
+            var netSales = grossSales - returns;
+            var cashSales = invoices.Where(i => i.PaymentMethod == null || i.PaymentMethod == "Cash").Sum(i => i.TotalDinar);
+            var cardSales = invoices.Where(i => i.PaymentMethod == "Card").Sum(i => i.TotalDinar);
+            var transferSales = invoices.Where(i => i.PaymentMethod == "Transfer").Sum(i => i.TotalDinar);
+            var creditSales = invoices.Where(i => i.PaymentMethod == "Credit").Sum(i => i.TotalDinar);
+            var transferSalesByBank = invoices
                 .Where(i => i.PaymentMethod == "Transfer")
                 .GroupBy(i => string.IsNullOrWhiteSpace(i.Bank?.Name) ? "بدون مصرف" : i.Bank!.Name)
                 .Select(g => new SalesSimpleReportBankTransferVM
@@ -1229,7 +1236,7 @@ namespace NewsApp2.Controllers
                 .ThenBy(x => x.BankName)
                 .ToList();
 
-            var creditSalesByCustomer = salesInvoices
+            var creditSalesByCustomer = invoices
                 .Where(i => i.PaymentMethod == "Credit")
                 .GroupBy(i => string.IsNullOrWhiteSpace(i.Customer?.Name) ? "بدون عميل" : i.Customer!.Name)
                 .Select(g => new SalesSimpleReportCustomerCreditVM
@@ -1288,7 +1295,7 @@ namespace NewsApp2.Controllers
                     })
                     .ToList(),
                 GrossSalesLyd = RoundMoney(grossSales),
-                ReturnsLyd = 0m,
+                ReturnsLyd = RoundMoney(returns),
                 NetSalesLyd = RoundMoney(netSales),
                 CashSalesLyd = RoundMoney(cashSales),
                 CardSalesLyd = RoundMoney(cardSales),
@@ -1299,9 +1306,9 @@ namespace NewsApp2.Controllers
                 CardExpensesLyd = RoundMoney(cardExpenses),
                 TransferExpensesLyd = RoundMoney(transferExpenses),
                 InternalExpensesLyd = RoundMoney(internalExpenses),
-                InvoiceCount = salesInvoices.Count,
+                InvoiceCount = invoices.Count,
                 SoldInvoiceCount = salesInvoices.Count,
-                ReturnInvoiceCount = 0
+                ReturnInvoiceCount = returnInvoices.Count
             };
 
             ApplyRestrictedSalesScopeViewBag(canViewAll, today, wasScopeAdjusted);

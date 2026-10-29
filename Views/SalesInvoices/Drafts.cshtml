@@ -12,6 +12,15 @@
     <div class="d-flex gap-2">
         <a asp-action="Create" class="btn btn-primary">بيع جديد</a>
         <a asp-action="Index" class="btn btn-outline-secondary">فواتير البيع</a>
+        @if (Model.Any())
+        {
+            <form asp-action="DeleteAllDrafts" method="post" class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف جميع الفواتير المعلقة نهائياً؟');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="mdi mdi-delete-sweep me-1"></i> حذف الكل
+                </button>
+            </form>
+        }
     </div>
 </div>
 

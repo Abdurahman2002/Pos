@@ -10,7 +10,8 @@
     var createSupplierUrl = Url.Action("Create", "Suppliers", new { returnUrl }) ?? "/Suppliers/Create";
     var itemDefaultPricesJson = ViewBag.ItemDefaultPricesJson as string ?? "{}";
     var itemSalePricesJson = ViewBag.ItemSalePricesJson as string ?? "{}";      
-    var localDraftKey = "purchase.create." + ((User?.Identity?.Name ?? "anonymous").Trim().ToLowerInvariant());
+    var localDraftBaseKey = NewsApp2.Classes.Helpers.PurchaseLocalDraft.BuildBaseKey(User?.Identity?.Name);
+    var lastPostedAtUnixMs = ViewBag.PurchaseDraftLastPostedAt as long? ?? 0L;
 }
 
 <!-- NEW CSS for Dashboard/POS-like Layout -->
@@ -205,6 +206,24 @@
     </div>
 </div>
 
+<div id="local-draft-banner" class="alert alert-info border-info d-flex d-none align-items-center justify-content-between flex-wrap gap-2 py-2 mb-3" role="status">
+    <div class="d-flex align-items-center gap-2">
+        <i class="mdi mdi-content-save-clock-outline mdi-24px"></i>
+        <div>
+            <div class="fw-bold" id="local-draft-banner-title">توجد مسودة محفوظة محلياً</div>
+            <div class="small text-muted" id="local-draft-banner-time"></div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-primary d-none" id="local-draft-recover-btn">
+            <i class="mdi mdi-content-restore me-1"></i> استرجاع
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="local-draft-discard-btn">
+            <i class="mdi mdi-delete-outline me-1"></i> حذف المسودة
+        </button>
+    </div>
+</div>
+
 <script id="item-default-prices-json" type="application/json">@Html.Raw(itemDefaultPricesJson)</script>
 <script id="item-sale-prices-json" type="application/json">@Html.Raw(itemSalePricesJson)</script>
 
@@ -228,7 +247,8 @@
     data-msg-unable-create-supplier="تعذر إضافة المورد."
     data-item-default-prices='@Html.Raw(itemDefaultPricesJson)'
     data-item-sale-prices='@Html.Raw(itemSalePricesJson)'
-    data-local-draft-key="@localDraftKey"
+    data-local-draft-base-key="@localDraftBaseKey"
+    data-local-draft-last-posted-at="@lastPostedAtUnixMs"
     data-local-draft-ttl-minutes="720">
     <div asp-validation-summary="ModelOnly" class="text-danger fw-bold mb-3"></div>
 
@@ -526,7 +546,7 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/js/lines-table.js"></script>
+    <script src="~/js/lines-table.js" asp-append-version="true"></script>
     <script src="https://unpkg.com/@@zxing/library@latest"></script>
 
     @* إضافة اختصارات لوحة المفاتيح السحرية وتحديث العداد *@
@@ -546,6 +566,19 @@
             }
         });
 
+        function submitPurchaseForm() {
+            const form = document.querySelector('.invoice-create-form');
+            if (!form) return;
+
+            // requestSubmit fires the submit event (validation, double-submit guard and
+            // local draft snapshot) which form.submit() would silently skip.
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+        }
+
         document.addEventListener('keydown', function(e) {
             // F9 لترحيل الفاتورة
             if (e.key === 'F9') {
@@ -562,12 +595,12 @@
                         cancelButtonColor: '#64748b'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            document.querySelector('.invoice-create-form').submit();
+                            submitPurchaseForm();
                         }
                     });
                 } else {
                     if (confirm('هل أنت متأكد من ترحيل الفاتورة؟ (F9)')) {      
-                        document.querySelector('.invoice-create-form').submit();
+                        submitPurchaseForm();
                     }
                 }
             }

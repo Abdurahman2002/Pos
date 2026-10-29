@@ -596,6 +596,10 @@ namespace NewsApp2.Controllers
                 return View("NotFound");
 
             vm.InvoiceDate = originalInvoice.InvoiceDate;
+            // The date field is read-only on the POS screen and the value above is
+            // authoritative, so discard any culture-format binding error from the
+            // posted hidden field (it is rendered with the Arabic short-date format).
+            ModelState.Remove(nameof(vm.InvoiceDate));
 
             var isNewCredit = string.Equals(vm.PaymentMethod, PaymentCredit, StringComparison.OrdinalIgnoreCase);
             if (!isNewCredit)
@@ -877,6 +881,32 @@ namespace NewsApp2.Controllers
 
             TempData["SuccessMessage"] = "تم حذف الفاتورة المعلقة.";
             return RedirectToAction(nameof(Create));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteAllDrafts()
+        {
+            var query = _context.Set<SalesInvoiceDraft>().AsQueryable();
+
+            if (!CanSeeAllDrafts())
+            {
+                var userId = _userManager.GetUserId(User);
+                query = query.Where(d => d.CreatedByUserId == userId);
+            }
+
+            var drafts = await query.ToListAsync();
+            if (drafts.Count == 0)
+            {
+                TempData["ErrorMessage"] = "لا توجد فواتير معلقة لحذفها.";
+                return RedirectToAction(nameof(Drafts));
+            }
+
+            _context.Set<SalesInvoiceDraft>().RemoveRange(drafts);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"تم حذف {drafts.Count} فاتورة معلقة.";
+            return RedirectToAction(nameof(Drafts));
         }
 
         [HttpPost]

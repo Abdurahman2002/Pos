@@ -1,0 +1,377 @@
+@model NewsApp2.ViewModels.Customers.CustomerStatementVM
+@{
+    Layout = null;
+    var shopName = ViewBag.ShopName as string;
+    var shopLogo = ViewBag.ShopLogo as string;
+    var activity = ViewBag.Activity as string;
+var printedAt = DateTime.Now;
+        var fromText = Model.From.HasValue ? Model.From.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-";
+        var toText = Model.To.HasValue ? Model.To.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "-";
+        int rowNum = 0;
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>كشف حساب عميل - @Model.CustomerName</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            font-size: 13px;
+            margin: 0;
+            padding: 20px;
+            color: #111;
+            direction: rtl;
+        }
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 12mm;
+            background: #fff;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+        .header-logo img {
+            max-height: 60px;
+            max-width: 120px;
+            object-fit: contain;
+        }
+        .header-title {
+            text-align: center;
+            flex: 1;
+        }
+        .header-title h1 {
+            font-size: 20px;
+            margin: 0 0 4px 0;
+        }
+        .header-title .shop-name {
+            font-size: 15px;
+            font-weight: bold;
+            color: #444;
+        }
+        .header-title .shop-activity {
+            font-size: 12px;
+            color: #777;
+        }
+        .header-info {
+            text-align: left;
+            font-size: 12px;
+            color: #555;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px 20px;
+            margin-bottom: 14px;
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px 14px;
+        }
+        .info-item { display: flex; gap: 6px; }
+        .info-label { font-weight: bold; white-space: nowrap; }
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .sum-box {
+            flex: 1;
+            min-width: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 14px;
+            text-align: center;
+            background: #fafafa;
+        }
+        .sum-box .s-label { font-size: 12px; color: #666; }
+        .sum-box .s-value { font-size: 16px; font-weight: bold; margin-top: 2px; }
+        .sum-box.highlight { background: #2c3e50; color: #fff; }
+        .sum-box.highlight .s-label { color: #cfd8dc; }
+        .sum-box.highlight .s-value { color: #fff; }
+        .sum-box.open .s-value { color: #8e44ad; }
+        .sum-box.debit-sum .s-value { color: #c0392b; }
+        .sum-box.credit-sum .s-value { color: #27ae60; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+        thead th {
+            background: #2c3e50;
+            color: #fff;
+            padding: 7px 8px;
+            text-align: center;
+            font-size: 12px;
+        }
+        thead th:first-child { text-align: right; }
+        tbody tr:nth-child(even) { background: #f5f5f5; }
+        tbody td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        tbody td.type-col, tbody td.note-col { text-align: right; }
+        tfoot td {
+            padding: 7px 8px;
+            font-weight: bold;
+            background: #eceff1;
+            text-align: center;
+        }
+        .closing-row {
+            background: #2c3e50 !important;
+            color: #fff;
+        }
+        .actions {
+            text-align: center;
+            margin: 14px 0 10px;
+        }
+        .actions button {
+            background: #2c3e50;
+            color: #fff;
+            border: none;
+            padding: 8px 30px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 4px;
+        }
+        .actions a {
+            background: #6c757d;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 4px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .signature-box {
+            flex: 1;
+            text-align: center;
+        }
+        .signature-line {
+            border-top: 1px solid #999;
+            margin-top: 40px;
+            padding-top: 6px;
+            font-size: 12px;
+            color: #555;
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            border-top: 1px solid #ddd;
+            padding-top: 6px;
+            margin-top: 14px;
+        }
+        .amount-words {
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 14px;
+            background: #fffdf5;
+            font-size: 13px;
+        }
+        .amount-words strong { color: #c0392b; }
+        @@media print {
+            @@page {
+                size: A4 portrait;
+                margin: 8mm;
+            }
+            .actions { display: none; }
+            body {
+                padding: 0;
+                background: #fff;
+            }
+            .page {
+                width: auto;
+                min-height: auto;
+                max-width: none;
+                margin: 0;
+                padding: 0;
+            }
+            thead {
+                display: table-header-group;
+            }
+            tfoot {
+                display: table-footer-group;
+            }
+            tr {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            table {
+                page-break-inside: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="page">
+
+    <div class="header">
+        <div class="header-logo">
+            @if (!string.IsNullOrWhiteSpace(shopLogo))
+            {
+                <img src="@Url.Content("~/upload/" + shopLogo)" alt="شعار المتجر" />
+            }
+        </div>
+        <div class="header-title">
+            @if (!string.IsNullOrWhiteSpace(shopName))
+            {
+                <div class="shop-name">@shopName</div>
+            }
+            <h1>كشف حساب عميل</h1>
+            @if (!string.IsNullOrWhiteSpace(activity))
+            {
+                <div class="shop-activity">@activity</div>
+            }
+        </div>
+        <div class="header-info">
+            @if (!string.IsNullOrWhiteSpace(shopName))
+            {
+                <div>@shopName</div>
+            }
+            <div>تاريخ الطباعة: <strong>@printedAt.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)</strong></div>
+        </div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-item"><span class="info-label">اسم العميل:</span> <span>@Model.CustomerName</span></div>
+        <div class="info-item"><span class="info-label">الهاتف:</span> <span>@(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)</span></div>
+        <div class="info-item">
+            <span class="info-label">الفترة من:</span>
+            <span>@fromText</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">إلى:</span>
+            <span>@toText</span>
+        </div>
+    </div>
+
+    <div class="summary">
+        <div class="sum-box open">
+            <div class="s-label">رصيد أول الفترة</div>
+            <div class="s-value">@Model.OpeningBalance.ToString("0.00")</div>
+        </div>
+        <div class="sum-box debit-sum">
+            <div class="s-label">مبيعات آجل (مدين)</div>
+            <div class="s-value">@Model.TotalDebit.ToString("0.00")</div>
+        </div>
+        <div class="sum-box credit-sum">
+            <div class="s-label">تحصيلات (دائن)</div>
+            <div class="s-value">@Model.TotalCredit.ToString("0.00")</div>
+        </div>
+        <div class="sum-box highlight">
+            <div class="s-label">الرصيد الختامي</div>
+            <div class="s-value">@Model.ClosingBalance.ToString("0.00")</div>
+        </div>
+    </div>
+
+    @if (Model.Rows.Any())
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:36px">#</th>
+                    <th style="width:80px">التاريخ</th>
+                    <th>المرجع</th>
+                    <th style="width:150px">النوع</th>
+                    <th style="width:90px">مدين</th>
+                    <th style="width:90px">دائن</th>
+                    <th style="width:90px">الرصيد</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td></td>
+                    <td>@fromText</td>
+                    <td>-</td>
+                    <td class="type-col">رصيد سابق (أول الفترة)</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>@Model.OpeningBalance.ToString("0.00")</td>
+                </tr>
+                @foreach (var row in Model.Rows)
+                {
+                    rowNum++;
+                    <tr>
+                        <td>@rowNum</td>
+                        <td><span dir="ltr">@row.CreatedAtLocal.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</span></td>
+                        <td>@row.Reference</td>
+                        <td class="type-col">@row.Type</td>
+                        <td>@(row.Debit > 0 ? row.Debit.ToString("0.00") : "-")</td>
+                        <td>@(row.Credit > 0 ? row.Credit.ToString("0.00") : "-")</td>
+                        <td>@row.Balance.ToString("0.00")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" style="text-align:right">الإجمالي</td>
+                    <td>@Model.TotalDebit.ToString("0.00")</td>
+                    <td>@Model.TotalCredit.ToString("0.00")</td>
+                    <td>@Model.ClosingBalance.ToString("0.00")</td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+    else
+    {
+        <div style="text-align:center; padding:20px; color:#888; border:1px dashed #ddd;">لا توجد حركات خلال الفترة المحددة.</div>
+    }
+
+    <div class="amount-words">
+        الرصيد الختامي المستحق على العميل: <strong>@Math.Abs(Model.ClosingBalance).ToString("0.00") دينار ليبي</strong>
+        @if (Model.ClosingBalance < 0)
+        {
+            <span>(رصيد دائن لصالح العميل)</span>
+        }
+        else if (Model.ClosingBalance == 0)
+        {
+            <span>(لا توجد مديونية)</span>
+        }
+    </div>
+
+    <div class="actions">
+        <button onclick="window.print()">طباعة / حفظ PDF</button>
+        <a href="javascript:history.back()">رجوع</a>
+    </div>
+
+    <div class="signatures">
+        <div class="signature-box">
+            <div class="signature-line">توقيع العميل</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line">توقيع المحاسب / المسؤول</div>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        تم إنشاء هذا المستند بواسطة النظام &mdash; @printedAt.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+    </div>
+
+</main>
+</body>
+</html>

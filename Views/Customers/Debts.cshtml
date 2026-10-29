@@ -56,6 +56,7 @@
                     <td class="text-end fw-semibold">@row.DebtAmount.ToString("0.00")</td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary" asp-action="Statement" asp-route-id="@row.CustomerId">كشف الحساب والتحصيل</a>
+                        <a class="btn btn-sm btn-outline-dark" target="_blank" asp-action="StatementPdf" asp-route-id="@row.CustomerId" title="طباعة كشف الحساب"><i class="mdi mdi-printer"></i></a>
                     </td>
                 </tr>
             }

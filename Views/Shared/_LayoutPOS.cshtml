@@ -212,6 +212,107 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
             border-radius: 12px;
         }
+
+        /* ==========================================================
+           MOBILE / TABLET (below lg breakpoint)
+           The POS screen is a fixed 100vh dashboard on desktop. On a
+           phone the two panes stack, so keeping fixed viewport heights
+           and hidden overflow pushes the checkout card (and its save
+           button) outside the visible area with no way to scroll to it.
+           Below lg we switch to a normal scrolling page and keep the
+           primary action pinned to the bottom while checkout is open.
+           ========================================================== */
+        @@media (max-width: 991.98px) {
+            body {
+                height: auto;
+                min-height: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+
+            header.pos-header {
+                position: sticky;
+                top: 0;
+                height: auto;
+                min-height: 56px;
+                padding: 8px 12px;
+                gap: 8px;
+            }
+
+            .pos-wrapper {
+                flex: 0 0 auto;
+                overflow: visible;
+                padding: 8px;
+            }
+
+            .erp-page-body {
+                display: block;
+                flex: 0 0 auto;
+                overflow: visible;
+                padding-bottom: 8px;
+            }
+
+            form.invoice-create-form,
+            form.invoice-create-form > .row.mb-3,
+            form.invoice-create-form > .row.mb-3 > .col-lg-8,
+            form.invoice-create-form > .row.mb-3 > .col-lg-4 {
+                display: block;
+                height: auto;
+                min-height: 0;
+                width: 100%;
+            }
+
+            form.invoice-create-form > .row.mb-3 > .col-lg-8,
+            form.invoice-create-form > .row.mb-3 > .col-lg-4 {
+                max-width: 100%;
+                flex: 0 0 auto;
+            }
+
+            /* Lines table: let the page scroll instead of a nested scroll box */
+            .col-lg-8 .card.shadow-sm.border-0 {
+                display: block;
+                overflow: hidden;
+            }
+
+            .col-lg-8 .table-responsive {
+                max-height: none !important;
+                min-height: 0 !important;
+                overflow-y: visible;
+            }
+
+            /* No sticky table head on phones (the app header is sticky instead) */
+            #lines-table th { position: static; }
+
+            /* Checkout card: no fixed height, no inner vertical scroll */
+            .col-lg-4 .card,
+            .col-lg-4 .card.sticky-top {
+                position: static !important;
+                top: auto !important;
+                height: auto;
+                overflow: visible;
+                margin-top: 12px;
+            }
+
+            #live-total-secondary { font-size: 2.75rem !important; }
+            .border-primary.border-opacity-25 { padding: 16px !important; }
+
+            /* Always reachable primary action while the checkout panel is on screen */
+            form.invoice-create-form .pos-submit-bar {
+                position: sticky;
+                bottom: 0;
+                z-index: 30;
+                margin-top: 12px !important;
+                padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+                background: #fff;
+                box-shadow: 0 -8px 18px rgba(15, 23, 42, 0.12);
+            }
+
+            #submit-pos-btn {
+                margin-top: 0;
+                padding: 14px 16px;
+                font-size: 1.15rem;
+            }
+        }
     </style>
     @RenderSection("Styles", required: false)
 </head>

@@ -251,6 +251,35 @@ namespace NewsApp2.Controllers
         [Authorize(Policy = "InventoryCreatePolicy")]
         public async Task<IActionResult> Statement(Guid id, DateOnly? from, DateOnly? to)
         {
+            var vm = await BuildCustomerStatementAsync(id, from, to);
+            if (vm == null)
+                return View("NotFound");
+
+            return View(vm);
+        }
+
+        [HttpGet]
+        [Authorize(Policy = "InventoryCreatePolicy")]
+        public async Task<IActionResult> StatementPdf(Guid id, DateOnly? from, DateOnly? to)
+        {
+            var vm = await BuildCustomerStatementAsync(id, from, to);
+            if (vm == null)
+                return View("NotFound");
+
+            var siteInfo = await _context.Set<SiteInfo>()
+                .AsNoTracking()
+                .OrderByDescending(s => s.Created)
+                .FirstOrDefaultAsync();
+
+            ViewBag.ShopName = siteInfo?.Name;
+            ViewBag.ShopLogo = siteInfo?.LogoUrl;
+            ViewBag.Activity = siteInfo?.Activity;
+
+            return View(vm);
+        }
+
+        private async Task<CustomerStatementVM?> BuildCustomerStatementAsync(Guid id, DateOnly? from, DateOnly? to)
+        {
             var customer = await _context.Set<Customer>()
                 .AsNoTracking()
                 .Where(c => c.Id == id)
@@ -259,7 +288,7 @@ namespace NewsApp2.Controllers
                 .FirstOrDefaultAsync();
 
             if (customer == null)
-                return View("NotFound");
+                return null;
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var toDate = to ?? today;
@@ -355,7 +384,7 @@ namespace NewsApp2.Controllers
                 });
             }
 
-            var vm = new CustomerStatementVM
+            return new CustomerStatementVM
             {
                 CustomerId = customer.Id,
                 CustomerName = customer.Name,
@@ -374,8 +403,6 @@ namespace NewsApp2.Controllers
                 },
                 Rows = rows
             };
-
-            return View(vm);
         }
 
         [HttpPost]

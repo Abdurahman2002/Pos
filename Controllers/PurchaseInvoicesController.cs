@@ -267,6 +267,7 @@ namespace NewsApp2.Controllers
         public async Task<IActionResult> Create()
         {
             await LoadItemsAsync();
+            ViewBag.PurchaseDraftLastPostedAt = await GetLastPurchaseInvoiceCreatedAtMsAsync();
             var vm = new PurchaseCreateVM
             {
                 CurrencyCode = "LYD",
@@ -333,6 +334,7 @@ namespace NewsApp2.Controllers
 
             if (!ModelState.IsValid)
             {
+                ViewBag.PurchaseDraftLastPostedAt = await GetLastPurchaseInvoiceCreatedAtMsAsync();
                 await LoadItemsAsync();
                 return View(vm);
             }
@@ -363,12 +365,18 @@ namespace NewsApp2.Controllers
             try
             {
                 var id = await _purchaseService.CreateAsync(invoice, lines);
+
+                // The invoice is committed: tell the next screen to drop the
+                // browser-side draft so it no longer reappears on a new visit.
+                TempData["PurchaseDraftToClear"] = PurchaseLocalDraft.BuildBaseKey(User?.Identity?.Name);
+
                 return RedirectToAction(nameof(Details), new { id });
             }
             catch (Exception ex)
             {
                 ModelState.AddModelError(string.Empty,
                     UserMessageSanitizer.Sanitize(ex.Message, "تعذر حفظ فاتورة الشراء."));
+                ViewBag.PurchaseDraftLastPostedAt = await GetLastPurchaseInvoiceCreatedAtMsAsync();
                 await LoadItemsAsync();
                 return View(vm);
             }
@@ -464,6 +472,36 @@ namespace NewsApp2.Controllers
             };
 
             return View(vm);
+        }
+
+        private async Task<long> GetLastPurchaseInvoiceCreatedAtMsAsync()
+        {
+            var userId = _userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+                return 0L;
+
+            try
+            {
+                var lastCreated = await _context.PurchaseInvoices
+                    .AsNoTracking()
+                    .Where(i => i.CreatedByUserId == userId)
+                    .Select(i => (DateTime?)i.Created)
+                    .MaxAsync();
+
+                if (!lastCreated.HasValue)
+                    return 0L;
+
+                var value = lastCreated.Value;
+                if (value.Kind == DateTimeKind.Unspecified)
+                    value = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+                return new DateTimeOffset(value.ToUniversalTime()).ToUnixTimeMilliseconds();
+            }
+            catch
+            {
+                // A draft timestamp is a nice-to-have; never break the screen for it.
+                return 0L;
+            }
         }
 
         private async Task LoadItemsAsync()

@@ -22,9 +22,9 @@
 <h1>@(isEditMode ? "تعديل فاتورة بيع" : "شاشة نقطة البيع")</h1>
 @if (isEditMode)
 {
-    <div class="alert alert-info d-flex align-items-center justify-content-between">
-        <span><i class="mdi mdi-pencil me-1"></i> أنت بصدد تعديل فاتورة رقم <strong>@ViewBag.EditInvoiceNumber</strong></span>
-        <div>
+    <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <span class="me-auto"><i class="mdi mdi-pencil me-1"></i> أنت بصدد تعديل فاتورة رقم <strong>@ViewBag.EditInvoiceNumber</strong></span>
+        <div class="d-flex flex-wrap gap-2">
             <a asp-action="Receipt" asp-route-id="@Model.EditInvoiceId" asp-route-autoPrint="false" target="_blank" class="btn btn-sm btn-outline-dark me-2">طباعة</a>
             <a asp-action="Pdf" asp-route-id="@Model.EditInvoiceId" target="_blank" class="btn btn-sm btn-outline-info me-2">PDF</a>
             <a asp-action="Details" asp-route-id="@Model.EditInvoiceId" class="btn btn-sm btn-secondary">إلغاء التعديل</a>
@@ -54,6 +54,7 @@
     data-msg-unknown-with-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود أو إنشاء صنف جديد."
     data-msg-unknown-without-create="الباركود {code} غير مربوط بصنف. يمكنك ربطه بصنف موجود."
     data-simple-pos-mode="@(simplePosMode ? "true" : "false")"
+    data-edit-mode="@(isEditMode ? "true" : "false")"
     data-max-cashier-discount-percent="@maxCashierDiscountPercentText"
     data-sound-user-key="@soundUserKey"
     data-item-default-prices='@itemDefaultPricesJson'
@@ -375,7 +376,7 @@
                         <span asp-validation-for="CustomerId" class="text-danger small"></span>
                     </div>
 
-                    <div class="d-grid mt-4 pt-2 border-top">
+                    <div class="d-grid mt-4 pt-2 border-top pos-submit-bar">
                         <button type="submit" class="btn btn-primary btn-lg fw-bold w-100" id="submit-pos-btn">@(isEditMode ? "حفظ التعديلات" : "ترحيل البيع")</button>
                     </div>
                 </div>
@@ -609,7 +610,7 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/js/lines-table.js"></script>
+    <script src="~/js/lines-table.js" asp-append-version="true"></script>
     <script src="https://unpkg.com/@@zxing/library@latest"></script>
     <script>
         (function forceTransferBankVisibility() {

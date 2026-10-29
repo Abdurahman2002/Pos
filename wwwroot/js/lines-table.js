@@ -1,5 +1,226 @@
 (function () {
 
+    // ---------------------------------------------------------------------
+    // Local draft storage (used by the purchase invoice screen).
+    // The base key is per user; a per-tab suffix keeps concurrent tabs from
+    // overwriting each other while still surviving reloads and the login
+    // redirect inside the same tab.
+    // ---------------------------------------------------------------------
+    var LOCAL_DRAFT_TAB_ID_STORAGE_KEY = 'pos.localDraft.tabId';
+    var LOCAL_DRAFT_HEARTBEAT_PREFIX = 'pos.localDraft.alive.';
+    var LOCAL_DRAFT_HEARTBEAT_INTERVAL_MS = 20000;
+    var LOCAL_DRAFT_HEARTBEAT_TTL_MS = 120000;
+    var localDraftMemoryTabId = '';
+    var localDraftHeartbeatStarted = false;
+
+    function createLocalDraftTabId() {
+        try {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+        } catch (_) { }
+
+        return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    }
+
+    function getLocalDraftTabId() {
+        try {
+            var existing = window.sessionStorage.getItem(LOCAL_DRAFT_TAB_ID_STORAGE_KEY);
+            if (existing) return existing;
+
+            var created = createLocalDraftTabId();
+            window.sessionStorage.setItem(LOCAL_DRAFT_TAB_ID_STORAGE_KEY, created);
+            return created;
+        } catch (_) {
+            // sessionStorage blocked: isolate at least within this page instance.
+            if (!localDraftMemoryTabId) {
+                localDraftMemoryTabId = createLocalDraftTabId();
+            }
+            return localDraftMemoryTabId;
+        }
+    }
+
+    function buildLocalDraftKey(baseKey) {
+        var base = (baseKey || '').trim();
+        if (!base) return '';
+        return base + '.' + getLocalDraftTabId();
+    }
+
+    function removeLocalDraftKey(key) {
+        if (!key) return false;
+        try {
+            window.localStorage.removeItem(key);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function readLocalDraftData(key) {
+        try {
+            var raw = window.localStorage.getItem(key);
+            if (!raw) return null;
+
+            var data = JSON.parse(raw);
+            if (!data || !data.savedAt) return null;
+            return data;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function localDraftHeartbeatKey(tabId) {
+        return LOCAL_DRAFT_HEARTBEAT_PREFIX + (tabId || '');
+    }
+
+    function isLocalDraftTabAlive(tabId) {
+        if (!tabId) return false;
+        try {
+            var raw = window.localStorage.getItem(localDraftHeartbeatKey(tabId));
+            if (!raw) return false;
+
+            var last = parseInt(raw, 10);
+            return Number.isFinite(last) && (Date.now() - last) < LOCAL_DRAFT_HEARTBEAT_TTL_MS;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    // Removes a draft and the heartbeat of the tab that owned it.
+    function removeLocalDraftEntry(baseKey, key) {
+        removeLocalDraftKey(key);
+
+        var base = (baseKey || '').trim();
+        if (!base || !key || key.indexOf(base + '.') !== 0) return;
+
+        removeLocalDraftKey(localDraftHeartbeatKey(key.substring(base.length + 1)));
+    }
+
+    function startLocalDraftHeartbeat() {
+        if (localDraftHeartbeatStarted) return;
+        localDraftHeartbeatStarted = true;
+
+        var tabId = getLocalDraftTabId();
+        var heartbeatKey = localDraftHeartbeatKey(tabId);
+        var timer = null;
+
+        function beat() {
+            try {
+                window.localStorage.setItem(heartbeatKey, String(Date.now()));
+            } catch (_) { }
+        }
+
+        // Heartbeat entries of crashed tabs are never removed by pagehide; drop the
+        // ones that are already past the alive window so they cannot pile up.
+        function cleanupStaleHeartbeats() {
+            var stale = [];
+            try {
+                for (var i = 0; i < window.localStorage.length; i++) {
+                    var key = window.localStorage.key(i);
+                    if (!key || key.indexOf(LOCAL_DRAFT_HEARTBEAT_PREFIX) !== 0 || key === heartbeatKey) continue;
+
+                    var last = parseInt(window.localStorage.getItem(key), 10);
+                    if (!Number.isFinite(last) || (Date.now() - last) >= LOCAL_DRAFT_HEARTBEAT_TTL_MS) {
+                        stale.push(key);
+                    }
+                }
+            } catch (_) {
+                return;
+            }
+
+            stale.forEach(removeLocalDraftKey);
+        }
+
+        function startTimer() {
+            if (timer) window.clearInterval(timer);
+            timer = window.setInterval(beat, LOCAL_DRAFT_HEARTBEAT_INTERVAL_MS);
+        }
+
+        cleanupStaleHeartbeats();
+        beat();
+        startTimer();
+
+        // A closed tab stops being "alive" immediately, so its draft can be offered
+        // for recovery in a new tab; a crashed tab is detected after the TTL.
+        window.addEventListener('pagehide', function () {
+            if (timer) {
+                window.clearInterval(timer);
+                timer = null;
+            }
+            removeLocalDraftKey(heartbeatKey);
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event && event.persisted) {
+                beat();
+                startTimer();
+            }
+        });
+
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) beat();
+        });
+    }
+
+    // Returns the most recent draft that belongs to no live tab (closed/crashed tab),
+    // skipping the current tab's own draft. Expired/corrupt entries are cleaned up.
+    function findLocalDraftOrphan(baseKey, ownKey, ttlMinutes) {
+        var base = (baseKey || '').trim();
+        if (!base) return null;
+
+        var prefix = base + '.';
+        var minutes = ttlMinutes > 0 ? ttlMinutes : 720;
+        var ttlMs = minutes * 60 * 1000;
+        var now = Date.now();
+        var best = null;
+        var staleKeys = [];
+
+        try {
+            for (var i = 0; i < window.localStorage.length; i++) {
+                var key = window.localStorage.key(i);
+                if (!key || key.indexOf(prefix) !== 0 || key === ownKey) continue;
+
+                var data = readLocalDraftData(key);
+                if (!data || (now - data.savedAt) > ttlMs) {
+                    staleKeys.push(key);
+                    continue;
+                }
+
+                var tabId = key.substring(base.length + 1);
+                if (isLocalDraftTabAlive(tabId)) continue;
+
+                if (!best || data.savedAt > best.data.savedAt) {
+                    best = { key: key, data: data };
+                }
+            }
+        } catch (_) {
+            return null;
+        }
+
+        staleKeys.forEach(function (key) {
+            removeLocalDraftEntry(base, key);
+        });
+
+        return best;
+    }
+
+    window.PosLocalDraft = {
+        buildKey: buildLocalDraftKey,
+        removeKey: removeLocalDraftKey,
+        remove: function (baseKey) {
+            var base = (baseKey || '').trim();
+            if (!base) return;
+
+            removeLocalDraftEntry(base, buildLocalDraftKey(base));
+            // Legacy single-key draft shared by every tab (pre per-tab keys).
+            removeLocalDraftKey(base);
+        },
+        startHeartbeat: startLocalDraftHeartbeat,
+        isTabAlive: isLocalDraftTabAlive,
+        findOrphan: findLocalDraftOrphan,
+        removeEntry: removeLocalDraftEntry
+    };
+
     function parseDecimal(value) {
         var number = parseFloat(value);
         return Number.isFinite(number) ? number : 0;
@@ -56,12 +277,25 @@
         var autoSaveDirty = false;
         var autoSaveInFlight = false;
         var autoSaveDelayMs = 45000;
-        var localDraftKey = (form.dataset.localDraftKey || '').trim();
+        var localDraftBaseKey = (form.dataset.localDraftBaseKey || form.dataset.localDraftKey || '').trim();
+        var localDraftKey = localDraftBaseKey ? window.PosLocalDraft.buildKey(localDraftBaseKey) : '';
+        var localDraftLastPostedAt = parseInt(form.dataset.localDraftLastPostedAt || '0', 10);
+        if (!Number.isFinite(localDraftLastPostedAt) || localDraftLastPostedAt < 0) {
+            localDraftLastPostedAt = 0;
+        }
         var localDraftTtlMinutes = parseInt(form.dataset.localDraftTtlMinutes || '720', 10);
         if (!Number.isFinite(localDraftTtlMinutes) || localDraftTtlMinutes <= 0) {
             localDraftTtlMinutes = 720;
         }
         var localDraftEnabled = !!localDraftKey;
+        var isEditMode = form.dataset.editMode === 'true';
+        var localDraftBanner = document.getElementById('local-draft-banner');
+        var localDraftBannerTitle = document.getElementById('local-draft-banner-title');
+        var localDraftBannerTime = document.getElementById('local-draft-banner-time');
+        var localDraftDiscardBtn = document.getElementById('local-draft-discard-btn');
+        var localDraftRecoverBtn = document.getElementById('local-draft-recover-btn');
+        var pendingOrphanDraftKey = '';
+        var restoringLocalDraft = false;
 
         var barcodeInput = form.querySelector('#barcode-input');
         var barcodeAddBtn = form.querySelector('#barcode-add-btn');
@@ -619,6 +853,9 @@
 
         function applyReturnUiState() {
             if (!isReturnToggle || !submitPosBtn) return;
+            // While editing a posted invoice the action is always "save changes";
+            // the return toggle must not relabel it as a new sale/return.
+            if (isEditMode) return;
             var isReturn = !!isReturnToggle.checked;
             submitPosBtn.textContent = isReturn ? textPostReturn : textPostSale;
             submitPosBtn.classList.toggle('btn-warning', isReturn);
@@ -633,6 +870,16 @@
                 return; // let validation surface errors; keep the button usable
             }
             if (posSubmitting) { e.preventDefault(); return; }
+
+            // Persist the latest edits right before the request leaves the page, so a
+            // session timeout or dropped connection does not lose the last seconds of
+            // work (the server clears this draft once the invoice is posted).
+            if (!holdUrl && localDraftEnabled) {
+                if (saveLocalDraft()) {
+                    autoSaveDirty = false;
+                }
+            }
+
             posSubmitting = true;
             if (submitPosBtn) {
                 if (!submitPosBtn.dataset.originalHtml) {
@@ -640,7 +887,7 @@
                 }
                 submitPosBtn.disabled = true;
                 submitPosBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>'
-                    + (submitPosBtn.dataset.savingText || 'جارٍ الترحيل…');
+                    + (submitPosBtn.dataset.savingText || (isEditMode ? 'جارٍ الحفظ…' : 'جارٍ الترحيل…'));
             }
             // Safety net: if we're still on the page later (e.g. server-side validation
             // returned the form), re-enable so the cashier is never locked out.
@@ -728,112 +975,312 @@
             try {
                 var payload = buildLocalDraftPayload();
                 window.localStorage.setItem(localDraftKey, JSON.stringify(payload));
+                pendingOrphanDraftKey = '';
+                showLocalDraftBanner(payload.savedAt, 'saved');
                 return true;
             } catch (_) {
                 return false;
             }
         }
 
+        function formatLocalDraftTime(timestamp) {
+            try {
+                var date = new Date(timestamp);
+                if (isNaN(date.getTime())) return '';
+
+                function pad(value) {
+                    return value < 10 ? '0' + value : '' + value;
+                }
+
+                return pad(date.getDate()) + '/' + pad(date.getMonth() + 1) + '/' + date.getFullYear()
+                    + ' - ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+            } catch (_) {
+                return '';
+            }
+        }
+
+        function showLocalDraftBanner(savedAt, state) {
+            if (!localDraftBanner) return;
+
+            localDraftBanner.classList.remove('d-none');
+            if (localDraftBannerTitle) {
+                if (state === 'restored') {
+                    localDraftBannerTitle.textContent = 'تم استرجاع مسودة محفوظة محلياً';
+                } else if (state === 'recovered') {
+                    localDraftBannerTitle.textContent = 'تم استرجاع مسودة من جلسة سابقة';
+                } else if (state === 'saved') {
+                    localDraftBannerTitle.textContent = 'تم حفظ مسودة محلياً';
+                } else if (state === 'orphan') {
+                    localDraftBannerTitle.textContent = 'توجد مسودة غير مكتملة من جلسة سابقة';
+                } else {
+                    localDraftBannerTitle.textContent = 'توجد مسودة محفوظة محلياً';
+                }
+            }
+            if (localDraftBannerTime) {
+                var formatted = formatLocalDraftTime(savedAt);
+                localDraftBannerTime.textContent = formatted ? 'آخر تحديث: ' + formatted : '';
+            }
+            if (localDraftRecoverBtn) {
+                localDraftRecoverBtn.classList.toggle('d-none', state !== 'orphan');
+            }
+        }
+
+        function hideLocalDraftBanner() {
+            if (!localDraftBanner) return;
+            localDraftBanner.classList.add('d-none');
+        }
+
+        function discardLocalDraft() {
+            if (!localDraftEnabled) return;
+
+            if (pendingOrphanDraftKey) {
+                if (!window.confirm('حذف المسودة غير المكتملة من الجلسة السابقة نهائياً؟')) {
+                    return;
+                }
+
+                window.PosLocalDraft.removeEntry(localDraftBaseKey, pendingOrphanDraftKey);
+                pendingOrphanDraftKey = '';
+                hideLocalDraftBanner();
+                return;
+            }
+
+            if (!window.confirm('هل تريد حذف المسودة المحفوظة؟ سيتم تفريغ الشاشة. لن تتأثر الفواتير المرحّلة.')) {
+                return;
+            }
+
+            window.PosLocalDraft.remove(localDraftBaseKey);
+
+            if (autoSaveTimer) {
+                window.clearTimeout(autoSaveTimer);
+                autoSaveTimer = null;
+            }
+            autoSaveDirty = false;
+            hideLocalDraftBanner();
+
+            // Reload the empty create screen so the restored data does not stay on display.
+            window.location.href = newUrl || window.location.pathname;
+        }
+
+        function recoverLocalDraft() {
+            if (!pendingOrphanDraftKey) return;
+
+            var data = readLocalDraftData(pendingOrphanDraftKey);
+            if (!data) {
+                pendingOrphanDraftKey = '';
+                hideLocalDraftBanner();
+                return;
+            }
+
+            if (!isFormEmptyForRestore()
+                && !window.confirm('سيتم استبدال البيانات المكتوبة حالياً بمسودة الجلسة السابقة. هل تريد المتابعة؟')) {
+                return;
+            }
+
+            // Adopt the orphan payload as this tab's own draft, then drop the source.
+            // The TTL restarts now because the user explicitly chose to keep it, even
+            // if the data itself was typed close to the expiry limit.
+            var adopted = {};
+            for (var prop in data) {
+                if (Object.prototype.hasOwnProperty.call(data, prop)) {
+                    adopted[prop] = data[prop];
+                }
+            }
+            adopted.savedAt = Date.now();
+
+            try {
+                window.localStorage.setItem(localDraftKey, JSON.stringify(adopted));
+            } catch (_) {
+                return;
+            }
+
+            window.PosLocalDraft.removeEntry(localDraftBaseKey, pendingOrphanDraftKey);
+            pendingOrphanDraftKey = '';
+
+            applyLocalDraftData(data);
+            showLocalDraftBanner(data.savedAt, 'recovered');
+            calculateTotals();
+        }
+
+        // Older versions used one shared key per user. Move a still-useful draft
+        // into this tab's key, but drop it when it was already posted (its savedAt
+        // predates the latest posted purchase invoice) or when it expired.
+        function migrateLegacyLocalDraft() {
+            var legacyRaw = null;
+            try {
+                legacyRaw = window.localStorage.getItem(localDraftBaseKey);
+            } catch (_) {
+                return;
+            }
+            if (!legacyRaw) return;
+
+            var data = readLocalDraftData(localDraftBaseKey);
+            var ttlMs = localDraftTtlMinutes * 60 * 1000;
+            var expired = !data || (ttlMs > 0 && (Date.now() - data.savedAt) > ttlMs);
+            var alreadyPosted = !!data
+                && localDraftLastPostedAt > 0
+                && data.savedAt <= localDraftLastPostedAt;
+
+            if (!expired && !alreadyPosted) {
+                try {
+                    // Never overwrite a draft this tab already owns.
+                    if (!window.localStorage.getItem(localDraftKey)) {
+                        window.localStorage.setItem(localDraftKey, legacyRaw);
+                    }
+                } catch (_) { }
+            }
+
+            removeLocalDraftKey(localDraftBaseKey);
+        }
+
+        // Draft keys of tabs that were closed before their TTL elapsed would otherwise
+        // stay in localStorage forever. Only expired/corrupt ones are removed.
+        function cleanupStaleLocalDrafts() {
+            if (!localDraftBaseKey) return;
+
+            var prefix = localDraftBaseKey + '.';
+            var ttlMs = localDraftTtlMinutes * 60 * 1000;
+            var staleKeys = [];
+
+            try {
+                for (var i = 0; i < window.localStorage.length; i++) {
+                    var key = window.localStorage.key(i);
+                    if (!key || key.indexOf(prefix) !== 0) continue;
+
+                    var data = readLocalDraftData(key);
+                    var expired = !data || (ttlMs > 0 && (Date.now() - data.savedAt) > ttlMs);
+                    if (expired) {
+                        staleKeys.push(key);
+                    }
+                }
+            } catch (_) {
+                return;
+            }
+
+            staleKeys.forEach(function (key) {
+                window.PosLocalDraft.removeEntry(localDraftBaseKey, key);
+            });
+        }
+
+        function applyLocalDraftData(data) {
+            if (!data) return;
+
+            // Applying a draft dispatches input/change events so the rows recalculate,
+            // and those events must not mark the draft as changed again (otherwise the
+            // 12h TTL would be refreshed on every visit and the draft never expires).
+            restoringLocalDraft = true;
+            try {
+                if (invoiceDateInput && data.invoiceDate) {
+                    invoiceDateInput.value = data.invoiceDate;
+                }
+                if (paymentMethodSelect && data.paymentMethod) {
+                    paymentMethodSelect.value = data.paymentMethod;
+                    paymentMethodSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (supplierSelect && data.supplierId) {
+                    setSelectValue(supplierSelect, data.supplierId);
+                }
+                if (customerSelect && data.customerId) {
+                    setSelectValue(customerSelect, data.customerId);
+                }
+                if (bankSelect && data.bankId) {
+                    setSelectValue(bankSelect, data.bankId);
+                }
+                if (dueDateInput) {
+                    dueDateInput.value = data.dueDate || '';
+                }
+                if (discountTypeInput && data.discountType) {
+                    discountTypeInput.value = data.discountType;
+                }
+                if (discountValueInput) {
+                    discountValueInput.value = data.discountValue || '';
+                }
+                if (noteInput) {
+                    noteInput.value = data.note || '';
+                }
+
+                var lines = Array.isArray(data.lines) ? data.lines : [];
+                if (lines.length) {
+                    while (tableBody.querySelectorAll('tr').length < lines.length) {
+                        addLine();
+                    }
+                    while (tableBody.querySelectorAll('tr').length > Math.max(lines.length, 1)) {
+                        var rows = tableBody.querySelectorAll('tr');
+                        if (rows.length > 1) {
+                            rows[rows.length - 1].remove();
+                        } else {
+                            break;
+                        }
+                    }
+                    reindexLines();
+
+                    var rows = tableBody.querySelectorAll('tr');
+                    rows.forEach(function (row, index) {
+                        var line = lines[index] || {};
+                        var itemSelect = row.querySelector('.item-select');
+                        var qtyInput = row.querySelector('.qty-input');
+                        var priceInput = row.querySelector('.price-input');
+                        var sellPriceInput = row.querySelector('.sell-price-input');
+
+                        if (itemSelect && line.itemId) {
+                            setSelectValue(itemSelect, line.itemId);
+                        }
+                        if (qtyInput) {
+                            qtyInput.value = line.qty || '';
+                            qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        if (priceInput) {
+                            priceInput.value = line.unitPriceEur || '';
+                            priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        if (sellPriceInput) {
+                            sellPriceInput.value = line.sellPriceLyd || '';
+                            sellPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    });
+                }
+            } finally {
+                restoringLocalDraft = false;
+            }
+        }
+
         function restoreLocalDraftIfAny() {
             if (!localDraftEnabled) return;
-            var raw = null;
-            try {
-                raw = window.localStorage.getItem(localDraftKey);
-            } catch (_) {
-                return;
-            }
-            if (!raw) return;
 
-            var data = null;
-            try {
-                data = JSON.parse(raw);
-            } catch (_) {
-                return;
-            }
-            if (!data || !data.savedAt) return;
+            window.PosLocalDraft.startHeartbeat();
+            migrateLegacyLocalDraft();
+            cleanupStaleLocalDrafts();
 
-            var ttlMs = localDraftTtlMinutes * 60 * 1000;
-            if (ttlMs > 0 && (Date.now() - data.savedAt) > ttlMs) {
-                try { window.localStorage.removeItem(localDraftKey); } catch (_) { }
-                return;
+            var data = readLocalDraftData(localDraftKey);
+            if (data) {
+                var ttlMs = localDraftTtlMinutes * 60 * 1000;
+                if (ttlMs > 0 && (Date.now() - data.savedAt) > ttlMs) {
+                    window.PosLocalDraft.removeEntry(localDraftBaseKey, localDraftKey);
+                } else if (!isFormEmptyForRestore()) {
+                    // The form already has content (for example after a failed post):
+                    // surface the draft so the user can delete it explicitly.
+                    showLocalDraftBanner(data.savedAt, 'exists');
+                    return;
+                } else {
+                    applyLocalDraftData(data);
+                    showLocalDraftBanner(data.savedAt, 'restored');
+                    calculateTotals();
+                    return;
+                }
             }
 
             if (!isFormEmptyForRestore()) return;
 
-            if (invoiceDateInput && data.invoiceDate) {
-                invoiceDateInput.value = data.invoiceDate;
+            // No draft for this tab: offer the most recent draft left behind by a
+            // tab that was closed (or crashed) instead of restoring it silently.
+            var orphan = window.PosLocalDraft.findOrphan(localDraftBaseKey, localDraftKey, localDraftTtlMinutes);
+            if (orphan) {
+                pendingOrphanDraftKey = orphan.key;
+                showLocalDraftBanner(orphan.data.savedAt, 'orphan');
             }
-            if (paymentMethodSelect && data.paymentMethod) {
-                paymentMethodSelect.value = data.paymentMethod;
-                paymentMethodSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            if (supplierSelect && data.supplierId) {
-                setSelectValue(supplierSelect, data.supplierId);
-            }
-            if (customerSelect && data.customerId) {
-                setSelectValue(customerSelect, data.customerId);
-            }
-            if (bankSelect && data.bankId) {
-                setSelectValue(bankSelect, data.bankId);
-            }
-            if (dueDateInput) {
-                dueDateInput.value = data.dueDate || '';
-            }
-            if (discountTypeInput && data.discountType) {
-                discountTypeInput.value = data.discountType;
-            }
-            if (discountValueInput) {
-                discountValueInput.value = data.discountValue || '';
-            }
-            if (noteInput) {
-                noteInput.value = data.note || '';
-            }
-
-            var lines = Array.isArray(data.lines) ? data.lines : [];
-            if (lines.length) {
-                while (tableBody.querySelectorAll('tr').length < lines.length) {
-                    addLine();
-                }
-                while (tableBody.querySelectorAll('tr').length > Math.max(lines.length, 1)) {
-                    var rows = tableBody.querySelectorAll('tr');
-                    if (rows.length > 1) {
-                        rows[rows.length - 1].remove();
-                    } else {
-                        break;
-                    }
-                }
-                reindexLines();
-
-                var rows = tableBody.querySelectorAll('tr');
-                rows.forEach(function (row, index) {
-                    var line = lines[index] || {};
-                    var itemSelect = row.querySelector('.item-select');
-                    var qtyInput = row.querySelector('.qty-input');
-                    var priceInput = row.querySelector('.price-input');
-                    var sellPriceInput = row.querySelector('.sell-price-input');
-
-                    if (itemSelect && line.itemId) {
-                        setSelectValue(itemSelect, line.itemId);
-                    }
-                    if (qtyInput) {
-                        qtyInput.value = line.qty || '';
-                        qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                    if (priceInput) {
-                        priceInput.value = line.unitPriceEur || '';
-                        priceInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                    if (sellPriceInput) {
-                        sellPriceInput.value = line.sellPriceLyd || '';
-                        sellPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                });
-            }
-
-            calculateTotals();
         }
 
         function markDraftDirty() {
+            if (restoringLocalDraft) return;
             if (!holdUrl && !localDraftEnabled) return;
             autoSaveDirty = true;
             scheduleAutoSave();
@@ -1365,6 +1812,14 @@
 
         if (restoreInvoiceBtn) {
             restoreInvoiceBtn.addEventListener('click', resetToNewSale);
+        }
+
+        if (localDraftDiscardBtn) {
+            localDraftDiscardBtn.addEventListener('click', discardLocalDraft);
+        }
+
+        if (localDraftRecoverBtn) {
+            localDraftRecoverBtn.addEventListener('click', recoverLocalDraft);
         }
 
         if (paymentMethodInputs && paymentMethodInputs.length) {

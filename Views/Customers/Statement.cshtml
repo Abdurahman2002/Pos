@@ -9,6 +9,9 @@
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" asp-action="Debts">ديون العملاء</a>
         <a class="btn btn-outline-secondary" asp-action="Index">العملاء</a>
+        <a class="btn btn-outline-dark" target="_blank" asp-action="StatementPdf" asp-route-id="@Model.CustomerId" asp-route-from="@(Model.From?.ToString("yyyy-MM-dd"))" asp-route-to="@(Model.To?.ToString("yyyy-MM-dd"))">
+            <i class="mdi mdi-printer"></i> طباعة / PDF
+        </a>
     </div>
 </div>
 

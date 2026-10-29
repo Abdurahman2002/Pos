@@ -82,3 +82,30 @@
     <a asp-action="Index" class="btn btn-secondary">@L["Back"]</a>
 </p>
 
+@section Scripts {
+    @if (TempData["PurchaseDraftToClear"] is string purchaseDraftBaseKey && !string.IsNullOrWhiteSpace(purchaseDraftBaseKey))
+    {
+        <script>
+            // The purchase invoice was posted successfully; remove this tab's local
+            // draft (and any legacy shared draft) so the create screen starts empty.
+            (function () {
+                var baseKey = @Json.Serialize(purchaseDraftBaseKey);
+                try {
+                    if (window.PosLocalDraft && typeof window.PosLocalDraft.remove === 'function') {
+                        window.PosLocalDraft.remove(baseKey);
+                        return;
+                    }
+
+                    // Fallback if the shared script is unavailable: resolve this
+                    // tab's own key from sessionStorage, then drop the legacy key.
+                    var tabId = window.sessionStorage ? window.sessionStorage.getItem('pos.localDraft.tabId') : null;
+                    if (tabId) {
+                        window.localStorage.removeItem(baseKey + '.' + tabId);
+                    }
+                    window.localStorage.removeItem(baseKey);
+                } catch (_) { }
+            })();
+        </script>
+    }
+}
+

@@ -53,7 +53,7 @@ namespace NewsApp2.ViewModels.Purchasing
         [DataType(DataType.Date)]
         public DateOnly? DueDate { get; set; }
 
-        [MinLength(1, ErrorMessage = "Add at least one line")]
+        [MinLength(1, ErrorMessage = "أضف سطر صنف واحد على الأقل.")]
         public List<PurchaseEditLineVM> Lines { get; set; } = new();
     }
 }

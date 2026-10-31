@@ -210,7 +210,7 @@
     <div class="d-flex align-items-center gap-2">
         <i class="mdi mdi-content-save-clock-outline mdi-24px"></i>
         <div>
-            <div class="fw-bold" id="local-draft-banner-title">توجد مسودة محفوظة محلياً</div>
+            <div class="fw-bold" id="local-draft-banner-title">توجد نسخة احتياطية محلية — الفاتورة لم تُرحَّل بعد</div>
             <div class="small text-muted" id="local-draft-banner-time"></div>
         </div>
     </div>
@@ -251,6 +251,10 @@
     data-local-draft-last-posted-at="@lastPostedAtUnixMs"
     data-local-draft-ttl-minutes="720">
     <div asp-validation-summary="ModelOnly" class="text-danger fw-bold mb-3"></div>
+    <div id="purchase-validation-alert" class="alert alert-danger shadow-sm d-none" role="alert">
+        <div class="fw-bold mb-1"><i class="mdi mdi-alert-circle-outline me-1"></i> لم تُرحَّل الفاتورة — أكمل الحقول التالية:</div>
+        <ul id="purchase-validation-list" class="mb-0 small"></ul>
+    </div>
 
     <div class="pos-layout">
         <!-- ==== Main Panel (Barcode & Items Table) ==== -->
@@ -566,7 +570,142 @@
             }
         });
 
+        // Any client-side validation stop used to fail silently: the cashier pressed
+        // "ترحيل" and nothing happened except the local-backup banner. Collect the
+        // invalid fields, name them in Arabic and scroll them into view.
+        (function purchaseSubmitDiagnostics() {
+            var form = document.querySelector('.invoice-create-form');
+            var box = document.getElementById('purchase-validation-alert');
+            var list = document.getElementById('purchase-validation-list');
+            if (!form || !box || !list) return;
+
+            if (window.jQuery && window.jQuery.validator && window.jQuery.validator.messages) {
+                window.jQuery.extend(window.jQuery.validator.messages, {
+                    required: 'هذا الحقل مطلوب.',
+                    number: 'أدخل رقماً صحيحاً.',
+                    digits: 'أدخل أرقاماً فقط.',
+                    range: 'القيمة خارج النطاق المسموح.',
+                    date: 'أدخل تاريخاً صحيحاً.',
+                    min: 'القيمة أصغر من المسموح.',
+                    max: 'القيمة أكبر من المسموح.'
+                });
+            }
+
+            function fieldLabel(el) {
+                var id = el.id || '';
+                if (id) {
+                    var label = document.querySelector('label[for="' + id + '"]');
+                    if (label && label.textContent.trim()) return label.textContent.trim();
+                }
+                if (el.closest('#lines-table tbody')) {
+                    var row = el.closest('tr');
+                    var index = row && row.parentElement ? Array.prototype.indexOf.call(row.parentElement.children, row) + 1 : 0;
+                    return index ? ('سطر الأصناف رقم ' + index) : 'سطر الأصناف';
+                }
+                if (el.name) return el.name;
+                return 'حقل مطلوب';
+            }
+
+            function collect() {
+                var out = [];
+                var seen = {};
+                function add(el) {
+                    if (!el || el.disabled) return;
+                    var text = fieldLabel(el);
+                    if (el.name) {
+                        var span = form.querySelector('[data-valmsg-for="' + el.name.replace(/"/g, '\\"') + '"]');
+                        var message = span ? span.textContent.trim() : '';
+                        if (message) text += ': ' + message;
+                    }
+                    if (seen[text]) return;
+                    seen[text] = true;
+                    out.push(text);
+                }
+                Array.prototype.forEach.call(form.querySelectorAll('.input-validation-error'), add);
+                Array.prototype.forEach.call(form.querySelectorAll(':invalid'), add);
+
+                // Model-level errors (e.g. "الكمية أكبر من صفر") are rendered only in the
+                // validation summary, so surface them here too.
+                Array.prototype.forEach.call(document.querySelectorAll('.validation-summary-errors li'), function (li) {
+                    var text = li.textContent.trim();
+                    if (!text || seen[text]) return;
+                    seen[text] = true;
+                    out.push(text);
+                });
+
+                return out;
+            }
+
+            function refresh() {
+                var items = collect();
+                if (!items.length) { box.classList.add('d-none'); return false; }
+
+                list.innerHTML = '';
+                items.forEach(function (text) {
+                    var li = document.createElement('li');
+                    li.textContent = text;
+                    list.appendChild(li);
+                });
+                box.classList.remove('d-none');
+                if (typeof box.scrollIntoView === 'function') {
+                    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return true;
+            }
+
+            // Extra blank rows at the end of the table are a very common cause of a
+            // rejected post (the server sees a line without an item). Drop them just
+            // before submitting instead of failing on something the user cannot see.
+            function dropTrailingEmptyRows() {
+                var rows = Array.prototype.slice.call(form.querySelectorAll('#lines-table tbody tr'));
+                for (var i = rows.length - 1; i >= 1; i--) {
+                    var row = rows[i];
+                    var item = row.querySelector('.item-select');
+                    var qty = row.querySelector('.qty-input');
+                    var price = row.querySelector('.price-input');
+                    var sell = row.querySelector('.sell-price-input');
+                    var empty = (!item || !item.value)
+                        && (!qty || !qty.value)
+                        && (!price || !price.value)
+                        && (!sell || !sell.value);
+                    if (!empty) break;
+
+                    var remove = row.querySelector('.remove-line');
+                    if (remove) { remove.click(); } else { row.remove(); }
+                }
+            }
+            window.PurchaseDropEmptyRows = dropTrailingEmptyRows;
+
+            // 'invalid' does not bubble, so listen in the capture phase: it fires for
+            // native required/min/max checks even when the submit event never starts.
+            form.addEventListener('invalid', function () { window.setTimeout(refresh, 0); }, true);
+            form.addEventListener('submit', function () {
+                dropTrailingEmptyRows();
+                window.setTimeout(refresh, 0);
+            }, false);
+            var submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function () {
+                    dropTrailingEmptyRows();
+                    window.setTimeout(refresh, 0);
+                });
+            }
+            form.addEventListener('input', function () {
+                if (!box.classList.contains('d-none')) window.setTimeout(refresh, 0);
+            });
+            form.addEventListener('change', function () {
+                if (!box.classList.contains('d-none')) window.setTimeout(refresh, 0);
+            });
+
+            // The server may have returned the form with validation errors: show them
+            // straight away instead of leaving the cashier with a silent screen.
+            window.setTimeout(refresh, 0);
+        })();
+
         function submitPurchaseForm() {
+            if (typeof window.PurchaseDropEmptyRows === 'function') {
+                window.PurchaseDropEmptyRows();
+            }
             const form = document.querySelector('.invoice-create-form');
             if (!form) return;
 

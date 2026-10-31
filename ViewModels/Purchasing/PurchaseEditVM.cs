@@ -4,18 +4,18 @@ namespace NewsApp2.ViewModels.Purchasing
 {
     public class PurchaseEditLineVM
     {
-        [Required]
+        [Required(ErrorMessage = "اختر الصنف.")]
         public Guid ItemId { get; set; }
 
-        [Required]
-        [Range(1, int.MaxValue)]
+        [Required(ErrorMessage = "أدخل الكمية.")]
+        [Range(1, int.MaxValue, ErrorMessage = "يجب أن تكون الكمية 1 على الأقل.")]
         public int? Qty { get; set; }
 
-        [Required]
-        [Range(typeof(decimal), "0", "9999999999999")]
+        [Required(ErrorMessage = "أدخل سعر الوحدة.")]
+        [Range(typeof(decimal), "0", "9999999999999", ErrorMessage = "سعر الوحدة غير صالح.")]
         public decimal? UnitPriceEur { get; set; }
 
-        [Range(typeof(decimal), "0", "9999999999999")]
+        [Range(typeof(decimal), "0", "9999999999999", ErrorMessage = "سعر البيع غير صالح.")]
         public decimal? SellPriceLyd { get; set; }
     }
 

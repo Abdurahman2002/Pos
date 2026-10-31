@@ -1009,11 +1009,11 @@
                 } else if (state === 'recovered') {
                     localDraftBannerTitle.textContent = 'تم استرجاع مسودة من جلسة سابقة';
                 } else if (state === 'saved') {
-                    localDraftBannerTitle.textContent = 'تم حفظ مسودة محلياً';
+                    localDraftBannerTitle.textContent = 'تم تحديث النسخة الاحتياطية محلياً — الفاتورة لم تُرحَّل بعد';
                 } else if (state === 'orphan') {
                     localDraftBannerTitle.textContent = 'توجد مسودة غير مكتملة من جلسة سابقة';
                 } else {
-                    localDraftBannerTitle.textContent = 'توجد مسودة محفوظة محلياً';
+                    localDraftBannerTitle.textContent = 'توجد نسخة احتياطية محلية — الفاتورة لم تُرحَّل بعد';
                 }
             }
             if (localDraftBannerTime) {

@@ -210,16 +210,16 @@ namespace NewsApp2.Controllers
             }
 
             if (!vm.Lines.Any())
-                ModelState.AddModelError("Lines", "أضف سطر صنف واحد على الأقل.");
+                ModelState.AddModelError(string.Empty, "أضف سطر صنف واحد على الأقل.");
 
             if (vm.Lines.Any(l => !l.Qty.HasValue || l.Qty.Value <= 0))
-                ModelState.AddModelError("Lines", "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
+                ModelState.AddModelError(string.Empty, "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
 
             if (vm.Lines.Any(l => !l.UnitPriceEur.HasValue || l.UnitPriceEur.Value < 0))
-                ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر الوحدة سالبا.");
+                ModelState.AddModelError(string.Empty, "لا يمكن أن يكون سعر الوحدة سالبا.");
 
             if (vm.Lines.Any(l => l.SellPriceLyd.HasValue && l.SellPriceLyd.Value < 0))
-                ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر البيع سالبا.");
+                ModelState.AddModelError(string.Empty, "لا يمكن أن يكون سعر البيع سالبا.");
 
             ValidateDiscount(vm.DiscountType, vm.DiscountValue, nameof(vm.DiscountValue));
 
@@ -319,16 +319,16 @@ namespace NewsApp2.Controllers
             }
 
             if (!vm.Lines.Any())
-                ModelState.AddModelError("Lines", "أضف سطر صنف واحد على الأقل.");
+                ModelState.AddModelError(string.Empty, "أضف سطر صنف واحد على الأقل.");
 
             if (vm.Lines.Any(l => !l.Qty.HasValue || l.Qty.Value <= 0))
-                ModelState.AddModelError("Lines", "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
+                ModelState.AddModelError(string.Empty, "يجب أن تكون الكمية أكبر من صفر في جميع السطور.");
 
             if (vm.Lines.Any(l => !l.UnitPriceEur.HasValue || l.UnitPriceEur.Value < 0))
-                ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر الوحدة سالبا.");
+                ModelState.AddModelError(string.Empty, "لا يمكن أن يكون سعر الوحدة سالبا.");
 
             if (vm.Lines.Any(l => l.SellPriceLyd.HasValue && l.SellPriceLyd.Value < 0))
-                ModelState.AddModelError("Lines", "لا يمكن أن يكون سعر البيع سالبا.");
+                ModelState.AddModelError(string.Empty, "لا يمكن أن يكون سعر البيع سالبا.");
 
             ValidateDiscount(vm.DiscountType, vm.DiscountValue, nameof(vm.DiscountValue));
 

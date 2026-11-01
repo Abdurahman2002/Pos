@@ -1114,9 +1114,6 @@ namespace NewsApp2.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
 
-                    b.Property<DateOnly?>("DueDate")
-                        .HasColumnType("date");
-
                     b.Property<decimal>("DiscountDinar")
                         .HasColumnType("decimal(18,2)");
 
@@ -1130,6 +1127,9 @@ namespace NewsApp2.Migrations
 
                     b.Property<decimal>("DiscountValue")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
 
                     b.Property<decimal>("EurToDinarRateSnapshot")
                         .HasColumnType("decimal(18,6)");
@@ -1235,7 +1235,7 @@ namespace NewsApp2.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("UnitPriceEur")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 

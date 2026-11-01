@@ -16,7 +16,9 @@ namespace NewsApp2.Models.Entities
 
         public int LineOrder { get; set; }
 
-        [Column(TypeName = "decimal(18,2)")]
+        // Four decimals: the unit cost is often a line total divided by the quantity
+        // (50 / 12 = 4.1666...), and two decimals would drift the line total.
+        [Column(TypeName = "decimal(18,4)")]
         public decimal UnitPriceEur { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]

@@ -337,7 +337,7 @@
                                     <span asp-validation-for="Lines[i].Qty" class="text-danger small fw-bold"></span>
                                 </td>
                                 <td>
-                                    <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input fw-bold border-primary shadow-sm" type="number" step="0.01" min="0" placeholder="0.00" />
+                                    <input asp-for="Lines[i].UnitPriceEur" class="form-control price-input fw-bold border-primary shadow-sm" type="number" step="any" min="0" placeholder="0.00" />
                                     <span asp-validation-for="Lines[i].UnitPriceEur" class="text-danger small fw-bold mt-1 d-block"></span>
                                 </td>
                                 <td>
@@ -501,7 +501,7 @@
     </td>
     <td><input name="Lines[__index__].Qty" class="form-control qty-input bg-light" type="number" step="1" min="1" inputmode="numeric" placeholder="0" /></td>
     <td>
-        <input name="Lines[__index__].UnitPriceEur" class="form-control price-input fw-bold border-primary shadow-sm" type="number" step="0.01" min="0" placeholder="0.00" />
+        <input name="Lines[__index__].UnitPriceEur" class="form-control price-input fw-bold border-primary shadow-sm" type="number" step="any" min="0" placeholder="0.00" />
     </td>
     <td>
         <input name="Lines[__index__].SellPriceLyd" class="form-control sell-price-input fw-bold border-success shadow-sm" type="number" step="0.01" min="0" placeholder="0.00" />
@@ -604,13 +604,34 @@
                     var label = document.querySelector('label[for="' + id + '"]');
                     if (label && label.textContent.trim()) return label.textContent.trim();
                 }
+                function lineFieldName(input) {
+                    if (!input || !input.classList) return '';
+                    if (input.classList.contains('item-select')) return 'الصنف';
+                    if (input.classList.contains('qty-input')) return 'الكمية';
+                    if (input.classList.contains('price-input')) return 'سعر الوحدة';
+                    if (input.classList.contains('sell-price-input')) return 'سعر البيع';
+                    return '';
+                }
                 if (el.closest('#lines-table tbody')) {
                     var row = el.closest('tr');
                     var index = row && row.parentElement ? Array.prototype.indexOf.call(row.parentElement.children, row) + 1 : 0;
-                    return index ? ('سطر الأصناف رقم ' + index) : 'سطر الأصناف';
+                    var rowLabel = index ? ('سطر الأصناف رقم ' + index) : 'سطر الأصناف';
+                    var fieldName = lineFieldName(el);
+                    return fieldName ? (rowLabel + ' (' + fieldName + ')') : rowLabel;
                 }
                 if (el.name) return el.name;
                 return 'حقل مطلوب';
+            }
+
+            function nativeValidityMessage(el) {
+                if (!el || !el.validity) return '';
+                var v = el.validity;
+                if (v.valueMissing) return 'هذا الحقل مطلوب.';
+                if (v.stepMismatch) return 'عدد المنازل العشرية غير مسموح لهذا الحقل.';
+                if (v.rangeUnderflow) return 'القيمة أقل من الحد المسموح.';
+                if (v.rangeOverflow) return 'القيمة أكبر من الحد المسموح.';
+                if (v.badInput) return 'قيمة غير صحيحة.';
+                return '';
             }
 
             function collect() {
@@ -622,6 +643,7 @@
                     if (el.name) {
                         var span = form.querySelector('[data-valmsg-for="' + el.name.replace(/"/g, '\\"') + '"]');
                         var message = span ? span.textContent.trim() : '';
+                        if (!message) message = nativeValidityMessage(el);
                         if (message) text += ': ' + message;
                     }
                     if (seen[text]) return;

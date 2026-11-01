@@ -252,7 +252,7 @@
                     <td>@(line.Item?.Barcode ?? "-")</td>
                     <td class="name-col">@(line.Item?.Name ?? "-")</td>
                     <td>@line.Qty.ToString("0.##")</td>
-                    <td>@line.UnitPriceEur.ToString("0.000")</td>
+                    <td>@line.UnitPriceEur.ToString("0.####")</td>
                     <td>@line.UnitCostLyd.ToString("0.00")</td>
                     <td>@(line.Item?.DefaultSalePriceLyd.HasValue == true ? line.Item.DefaultSalePriceLyd!.Value.ToString("0.00") : "-")</td>
                     <td>@line.LineTotalDinar.ToString("0.00")</td>

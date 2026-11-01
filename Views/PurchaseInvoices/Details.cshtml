@@ -61,7 +61,7 @@
             <tr>
                 <td>@line.Item?.Name</td>
                 <td>@line.Qty.ToString("0")</td>
-                <td>@line.UnitPriceEur.ToString("0.00")</td>
+                <td>@line.UnitPriceEur.ToString("0.####")</td>
                 <td>@((line.Qty * line.UnitPriceEur).ToString("0.00"))</td>
                 <td>@line.DiscountAllocatedDinar.ToString("0.00")</td>
                 <td class="fw-bold">@line.LineTotalDinar.ToString("0.00")</td>

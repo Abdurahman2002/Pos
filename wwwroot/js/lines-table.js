@@ -1934,6 +1934,22 @@
 
         form.addEventListener('input', markDraftDirty);
         form.addEventListener('change', markDraftDirty);
+
+        // The unit price allows up to four decimals (a line total divided by the
+        // quantity), but longer values cannot be stored. Round on blur so the value
+        // the cashier sees is exactly what the database will keep.
+        tableBody.addEventListener('change', function (event) {
+            var input = event.target;
+            if (!input || !input.classList || !input.classList.contains('price-input')) return;
+            if (input.value === '') return;
+            var value = parseDecimal(input.value);
+            if (!isFinite(value)) return;
+            var rounded = Math.round(value * 10000) / 10000;
+            if (rounded !== value) {
+                input.value = String(rounded);
+                calculateTotals();
+            }
+        });
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) {
                 runAutoSave();

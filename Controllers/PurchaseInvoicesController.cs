@@ -234,7 +234,7 @@ namespace NewsApp2.Controllers
                 var lines = vm.Lines.Select(l => (
                     l.ItemId,
                     (decimal)l.Qty!.Value,
-                    l.UnitPriceEur!.Value,
+                    RoundUnitPrice(l.UnitPriceEur!.Value),
                     l.SellPriceLyd
                 ));
 
@@ -358,7 +358,7 @@ namespace NewsApp2.Controllers
             var lines = vm.Lines.Select(l => (
                 l.ItemId,
                 (decimal)l.Qty!.Value,
-                l.UnitPriceEur!.Value,
+                RoundUnitPrice(l.UnitPriceEur!.Value),
                 l.SellPriceLyd
             ));
 
@@ -576,6 +576,14 @@ namespace NewsApp2.Controllers
         private string GetSecondaryCurrencyCode()
         {
             return "دينار";
+        }
+
+        // PurchaseLines.UnitPriceEur is decimal(18,4): a unit cost is often a line
+        // total divided by the quantity (50 / 12 = 4.1666...). Round here so the
+        // stored unit price and the line total computed from it always agree.
+        private static decimal RoundUnitPrice(decimal value)
+        {
+            return Math.Round(value, 4, MidpointRounding.AwayFromZero);
         }
 
         private static string NormalizePaymentMethod(string? paymentMethod)

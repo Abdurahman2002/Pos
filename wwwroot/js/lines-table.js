@@ -294,6 +294,9 @@
         var localDraftBannerTime = document.getElementById('local-draft-banner-time');
         var localDraftDiscardBtn = document.getElementById('local-draft-discard-btn');
         var localDraftRecoverBtn = document.getElementById('local-draft-recover-btn');
+        var localDraftExportBtn = document.getElementById('local-draft-export-btn');
+        var localDraftImportBtn = document.getElementById('local-draft-import-btn');
+        var localDraftImportFile = document.getElementById('local-draft-import-file');
         var pendingOrphanDraftKey = '';
         var restoringLocalDraft = false;
 
@@ -970,6 +973,80 @@
             };
         }
 
+        function formatDraftFileStamp() {
+            var date = new Date();
+            function pad(value) { return value < 10 ? '0' + value : '' + value; }
+            return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate())
+                + '-' + pad(date.getHours()) + pad(date.getMinutes());
+        }
+
+        // Downloads the current screen as a JSON file so the data can be kept
+        // even if the browser storage is cleared or the machine changes.
+        function exportLocalDraft() {
+            try {
+                var payload = buildLocalDraftPayload();
+                var file = {
+                    app: 'elora-pos',
+                    kind: 'purchase-invoice-draft',
+                    exportedAt: new Date().toISOString(),
+                    data: payload
+                };
+                var blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json;charset=utf-8' });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = 'purchase-draft-' + formatDraftFileStamp() + '.json';
+                document.body.appendChild(link);
+                link.click();
+                window.setTimeout(function () {
+                    URL.revokeObjectURL(url);
+                    link.remove();
+                }, 1000);
+            } catch (_) {
+                window.alert('تعذر تنزيل ملف المسودة.');
+            }
+        }
+
+        // Reads a previously exported file, stores it as this tab's draft and
+        // reloads: the draft is then applied automatically because the form is empty.
+        function importLocalDraftFromFile(file) {
+            if (!file) return;
+            if (file.size > 1024 * 1024) {
+                window.alert('ملف المسودة كبير جداً.');
+                return;
+            }
+
+            var reader = new FileReader();
+            reader.onload = function () {
+                var parsed = null;
+                try { parsed = JSON.parse(reader.result); } catch (_) { parsed = null; }
+
+                var data = (parsed && parsed.data && typeof parsed.data === 'object') ? parsed.data : parsed;
+                if (!data || typeof data !== 'object' || !Array.isArray(data.lines)) {
+                    window.alert('الملف ليس نسخة مسودة صالحة.');
+                    return;
+                }
+                if (!localDraftEnabled) {
+                    window.alert('تعذر تحديد مسودة هذا المستخدم.');
+                    return;
+                }
+
+                data.savedAt = Date.now();
+                try {
+                    window.localStorage.setItem(localDraftKey, JSON.stringify(data));
+                } catch (_) {
+                    window.alert('تعذر حفظ المسودة في المتصفح.');
+                    return;
+                }
+
+                window.location.reload();
+            };
+            reader.onerror = function () {
+                window.alert('تعذر قراءة الملف.');
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
         function saveLocalDraft() {
             if (!localDraftEnabled) return false;
             try {
@@ -1023,11 +1100,23 @@
             if (localDraftRecoverBtn) {
                 localDraftRecoverBtn.classList.toggle('d-none', state !== 'orphan');
             }
+            if (localDraftExportBtn) {
+                localDraftExportBtn.classList.remove('d-none');
+            }
+            if (localDraftImportBtn) {
+                localDraftImportBtn.classList.remove('d-none');
+            }
         }
 
         function hideLocalDraftBanner() {
             if (!localDraftBanner) return;
             localDraftBanner.classList.add('d-none');
+            if (localDraftExportBtn) {
+                localDraftExportBtn.classList.add('d-none');
+            }
+            if (localDraftImportBtn) {
+                localDraftImportBtn.classList.add('d-none');
+            }
         }
 
         function discardLocalDraft() {
@@ -1820,6 +1909,21 @@
 
         if (localDraftRecoverBtn) {
             localDraftRecoverBtn.addEventListener('click', recoverLocalDraft);
+        }
+
+        if (localDraftExportBtn) {
+            localDraftExportBtn.addEventListener('click', exportLocalDraft);
+        }
+
+        if (localDraftImportBtn && localDraftImportFile) {
+            localDraftImportBtn.addEventListener('click', function () {
+                localDraftImportFile.click();
+            });
+            localDraftImportFile.addEventListener('change', function () {
+                var file = localDraftImportFile.files && localDraftImportFile.files[0];
+                localDraftImportFile.value = '';
+                importLocalDraftFromFile(file);
+            });
         }
 
         if (paymentMethodInputs && paymentMethodInputs.length) {

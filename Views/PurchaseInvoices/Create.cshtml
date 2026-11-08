@@ -258,8 +258,12 @@
     data-local-draft-last-posted-at="@lastPostedAtUnixMs"
     data-local-draft-ttl-minutes="720">
     <div asp-validation-summary="ModelOnly" class="text-danger fw-bold mb-3"></div>
-    <div id="purchase-validation-alert" class="alert alert-danger shadow-sm d-none" role="alert">
-        <div class="fw-bold mb-1"><i class="mdi mdi-alert-circle-outline me-1"></i> لم تُرحَّل الفاتورة — أكمل الحقول التالية:</div>
+    <div id="purchase-validation-alert" class="alert alert-danger shadow-sm d-none" role="alert"
+         style="position: fixed; inset-inline: 1rem; bottom: 1rem; margin: 0 auto; max-width: 620px; max-height: 45vh; overflow-y: auto; z-index: 1080;">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="fw-bold mb-1"><i class="mdi mdi-alert-circle-outline me-1"></i> لم تُرحَّل الفاتورة — أكمل الحقول التالية:</div>
+            <button type="button" id="purchase-validation-close" class="btn-close" aria-label="إغلاق"></button>
+        </div>
         <ul id="purchase-validation-list" class="mb-0 small"></ul>
     </div>
 
@@ -579,12 +583,26 @@
 
         // Any client-side validation stop used to fail silently: the cashier pressed
         // "ترحيل" and nothing happened except the local-backup banner. Collect the
-        // invalid fields, name them in Arabic and scroll them into view.
+        // invalid fields and name them in Arabic in a banner that stays visible while
+        // the cashier scrolls, without moving the page under their hands.
         (function purchaseSubmitDiagnostics() {
             var form = document.querySelector('.invoice-create-form');
             var box = document.getElementById('purchase-validation-alert');
             var list = document.getElementById('purchase-validation-list');
             if (!form || !box || !list) return;
+
+            // Only a server-side rejection should show the banner on first paint; an
+            // empty line row on a brand-new invoice is not something to shout about.
+            var hasServerErrors = !!document.querySelector('.validation-summary-errors li, .field-validation-error');
+            var dismissed = false;
+
+            var closeBtn = document.getElementById('purchase-validation-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    dismissed = true;
+                    box.classList.add('d-none');
+                });
+            }
 
             if (window.jQuery && window.jQuery.validator && window.jQuery.validator.messages) {
                 window.jQuery.extend(window.jQuery.validator.messages, {
@@ -666,6 +684,7 @@
             }
 
             function refresh() {
+                if (dismissed) return false;
                 var items = collect();
                 if (!items.length) { box.classList.add('d-none'); return false; }
 
@@ -676,9 +695,6 @@
                     list.appendChild(li);
                 });
                 box.classList.remove('d-none');
-                if (typeof box.scrollIntoView === 'function') {
-                    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
                 return true;
             }
 
@@ -707,15 +723,20 @@
 
             // 'invalid' does not bubble, so listen in the capture phase: it fires for
             // native required/min/max checks even when the submit event never starts.
-            form.addEventListener('invalid', function () { window.setTimeout(refresh, 0); }, true);
+            form.addEventListener('invalid', function () {
+                dismissed = false;
+                window.setTimeout(refresh, 0);
+            }, true);
             form.addEventListener('submit', function () {
                 dropTrailingEmptyRows();
+                dismissed = false;
                 window.setTimeout(refresh, 0);
             }, false);
             var submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.addEventListener('click', function () {
                     dropTrailingEmptyRows();
+                    dismissed = false;
                     window.setTimeout(refresh, 0);
                 });
             }
@@ -728,7 +749,9 @@
 
             // The server may have returned the form with validation errors: show them
             // straight away instead of leaving the cashier with a silent screen.
-            window.setTimeout(refresh, 0);
+            if (hasServerErrors) {
+                window.setTimeout(refresh, 0);
+            }
         })();
 
         function submitPurchaseForm() {

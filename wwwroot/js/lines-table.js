@@ -316,8 +316,33 @@
 
         function focusBarcodeInput() {
             if (!barcodeInput) return;
-            barcodeInput.focus();
+            // preventScroll keeps the viewport where the cashier left it: focusing the
+            // barcode field at the top of the page must not jump the screen upwards.
+            try {
+                barcodeInput.focus({ preventScroll: true });
+            } catch (_) {
+                barcodeInput.focus();
+            }
             barcodeInput.select();
+        }
+
+        function focusLineItemSelect(row) {
+            if (!row) return;
+            var itemSelect = row.querySelector('.item-select');
+            if (!itemSelect) return;
+            var searchInput = itemSelect.parentElement
+                ? itemSelect.parentElement.querySelector('.ts-control input')
+                : null;
+            try {
+                if (searchInput) {
+                    searchInput.focus({ preventScroll: true });
+                } else {
+                    itemSelect.focus({ preventScroll: true });
+                }
+            } catch (_) {
+                if (searchInput) searchInput.focus();
+                else itemSelect.focus();
+            }
         }
 
         var cameraModalEl = form.querySelector('#barcode-camera-modal') || document.getElementById('barcode-camera-modal');
@@ -1454,7 +1479,7 @@
             }
         }
 
-        function addLine() {
+        function addLine(focusNewLine) {
             var index = tableBody.querySelectorAll('tr').length;
             var row = document.createElement('tr');
 
@@ -1482,7 +1507,16 @@
 
             document.dispatchEvent(new Event('ts:refresh'));
             calculateTotals();
-            focusBarcodeInput();
+            if (focusNewLine) {
+                // Keep the table where it is and put the cursor on the new row instead
+                // of sending the page back to the barcode box at the top.
+                try {
+                    row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } catch (_) {
+                    row.scrollIntoView(false);
+                }
+                focusLineItemSelect(row);
+            }
             return row;
         }
 
@@ -1766,7 +1800,7 @@
 
         if (addButton) {
             addButton.addEventListener('click', function () {
-                addLine();
+                addLine(true);
             });
         }
 
@@ -1934,6 +1968,17 @@
 
         form.addEventListener('input', markDraftDirty);
         form.addEventListener('change', markDraftDirty);
+
+        // Scrolling the page while the pointer happens to be over a focused number
+        // input used to change its value silently. Drop the focus on the first wheel
+        // tick so the page scrolls and the value stays untouched.
+        form.addEventListener('wheel', function (event) {
+            var target = event.target;
+            if (!target || !target.matches || !target.matches('input[type="number"]')) return;
+            if (document.activeElement === target) {
+                target.blur();
+            }
+        }, { passive: true });
 
         // The unit price allows up to four decimals (a line total divided by the
         // quantity), but longer values cannot be stored. Round on blur so the value
